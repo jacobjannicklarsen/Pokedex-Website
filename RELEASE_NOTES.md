@@ -1,5 +1,18 @@
 # Dexhaven release notes
 
+## v0.3.0 — Pokémon Analytics & Advanced Filtering
+
+- Added the public `dashboard.html` page with dataset-derived overview cards, interactive generation/type distributions, six-stat generation averages and top-ten rankings switchable between Total and every base stat. Dual-type memberships count toward both types; tied rankings use ascending National number.
+- Added two-species comparisons using the existing searchable keyboard-operated selector. Cards show artwork, ID/name, generation, types, measurements and abilities. A grouped chart and semantic table show exact stats, totals, advantages and ties; selecting a replacement or removing a species updates the interface immediately.
+- Added collapsible Advanced Filters to the National Pokédex: inclusive min/max bounds for six stats and total, combined with existing generation/type/search controls. Invalid numeric or inverted ranges show clear validation and preserve the last valid results. Added all requested Highest stat/total sorts and Lowest Total; Reset Advanced and Reset all filters have distinct scopes.
+- Added a complete, validated local PokéAPI snapshot for standard species #001–649 with metadata and an explicit `npm.cmd run data:update` maintenance command. Data-dependent controls wait for the entire collection. Failures expose retry states; no partial dataset is aggregated. Runtime pages do not make 649 detail requests.
+- Pinned Chart.js 4.6.1 and committed its local bundle and license. Charts support theme changes and tooltips, with named canvases, readable labels and table equivalents. If Chart.js fails to load, tables, rankings and comparison controls remain available with a warning.
+- Updated navigation across all four pages, Express's explicit asset/page allowlist, both package versions and documentation. Preserved trainer authentication, profiles/uploads, teams, favourites, persistent sessions, catalogue caches/details and the custom homepage artwork. No database schema or live records were changed.
+
+Validation: **44 automated tests passed**, **one opt-in live-MySQL test skipped**, **40 browser checks passed**, and the existing read-only live PokéAPI contract check passed. Browser workflows use isolated test accounts/repositories, deterministic legacy API responses and the committed real analytics snapshot. See [QA_REPORT.md](QA_REPORT.md) for scope and remaining manual checks.
+
+Restart Express and review http://localhost:3000/pokemon.html and http://localhost:3000/dashboard.html. [ANALYTICS.md](ANALYTICS.md) documents source/refresh procedures, calculation formulas, filter/comparison test steps, the changed files and limitations. This is a local development update; no commit, push, deployment or release was created.
+
 ## v0.2.2 — Trainer Hub
 
 Local development update for **Dexhaven**, in the **Pokédex Website** project. No release or deployment is created automatically.

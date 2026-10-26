@@ -142,7 +142,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'artwork-fallback.svg']) {
+  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
@@ -152,6 +152,9 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     res.sendFile(path.join(config.uploadDir, req.params.filename));
   });
   app.get('/pokemon.html', (req, res) => res.sendFile(path.join(root, 'pokemon.html')));
+  app.get('/dashboard.html', (req, res) => res.sendFile(path.join(root, 'dashboard.html')));
+  app.get('/data/pokemon-summary.json', (req, res) => res.sendFile(path.join(root, 'data/pokemon-summary.json')));
+  app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(root, 'vendor/chart.umd.js')));
   app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
   for (const view of ['profile', 'teams', 'favorites']) app.get(`/${view}`, (req, res) => res.redirect(302, `trainers.html#view=${view}`));
   for (const page of ['/', '/index.html']) app.get(page, (req, res) => res.sendFile(path.join(root, 'index.html')));

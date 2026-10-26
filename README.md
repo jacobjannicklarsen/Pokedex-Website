@@ -1,8 +1,8 @@
-# Dexhaven v0.2.2 — Trainer Hub
+# Dexhaven v0.3.0 — Pokémon Analytics & Advanced Filtering
 
 The public website is **Dexhaven**; the development project remains **Pokédex Website** and its MySQL database remains **pokedex_app**. Explore all **649 species from Generations I–V** with the existing vanilla HTML/CSS/JavaScript frontend and Node.js/Express/MySQL backend. Trainer accounts, profiles, uploads, multiple six-member teams, favourites and both themes are preserved. No frontend framework or build step.
 
-Version **0.2.0** introduced the National Pokédex expansion. Version **0.2.1** separated the homepage from the catalogue. Version **0.2.2** centralizes the existing profile, teams and favourites in the dedicated Trainer Hub at `trainers.html`. See [RELEASE_NOTES.md](RELEASE_NOTES.md). No MySQL schema change is required when upgrading from v0.2.0 or v0.2.1.
+Version **0.2.0** introduced the National Pokédex expansion. Version **0.2.1** separated the homepage from the catalogue. Version **0.2.2** centralized the existing profile, teams and favourites in the dedicated Trainer Hub at `trainers.html`. Version **0.3.0** adds a public statistics dashboard, advanced stat filters/sorts and two-Pokémon comparisons. See [ANALYTICS.md](ANALYTICS.md) for data provenance, formulas, refresh instructions and feature testing. See [RELEASE_NOTES.md](RELEASE_NOTES.md). No MySQL schema change is required when upgrading from v0.2.0, v0.2.1 or v0.2.2.
 
 ## Run locally
 
@@ -17,15 +17,20 @@ npm.cmd ci
 npm.cmd start
 ```
 
-Open **http://localhost:3000/** for the homepage and **http://localhost:3000/pokemon.html** for the National Pokédex, and **http://localhost:3000/trainers.html** for the Trainer Hub. Stop with Ctrl+C. Use `npm.cmd run dev` for automatic server restarts during development. Use Express for the full application; Live Server and Python do not provide the account API.
+Open **http://localhost:3000/** for the homepage and **http://localhost:3000/pokemon.html** for the National Pokédex, and **http://localhost:3000/trainers.html** for the Trainer Hub. Open **http://localhost:3000/dashboard.html** for public analytics and comparisons. Stop with Ctrl+C. Use `npm.cmd run dev` for automatic server restarts during development. Use Express for the full application; Live Server and Python do not provide the account API.
 
-Internet is needed for the first data load and artwork. Optional Google Fonts fall back to system fonts.
+The existing catalogue needs internet on its first uncached index load. Dashboard charts, rankings and comparisons use a complete local PokéAPI snapshot. Artwork remains external with existing fallbacks. Optional Google Fonts fall back to system fonts.
 
 ## Project structure
 
-- `index.html`: dedicated homepage with the original hero, founder artwork and caption, plus introductions to the catalogue, trainer tools and future dashboard.
-- `pokemon.html`: the complete National Pokédex collection, generation/search/type/sort controls and loading/error states.
+- `index.html`: dedicated homepage with the original hero, founder artwork and caption, plus introductions to the catalogue, trainer tools and analytics.
+- `pokemon.html`: the complete National Pokédex collection, generation/search/type/sort controls, advanced stat ranges and loading/error states.
 - `trainers.html`: Trainer Hub with a guest sign-in invitation and authenticated Profile, My Teams and My Favourites sections; the existing account forms and six-slot selector are reused.
+- `dashboard.html`, `dashboard.js`: public generation/type/stat charts, numeric top-ten rankings and searchable comparisons with accessible tables.
+- `pokemon-data.js`, `data/pokemon-summary.json`: validated complete PokéAPI data, deterministic calculations, shared loader and inclusive filter predicates.
+- `advanced-filters.js`: collapsible seven-stat min/max controls, validation, retry and sorting readiness.
+- `scripts/update-pokemon-data.cjs`: explicit maintenance updater; four concurrent read-only PokéAPI requests, complete validation and atomic snapshot replacement.
+- `vendor/chart.umd.js`, `vendor/Chart.js.LICENSE.md`, `scripts/vendor-chart.cjs`: locally served pinned Chart.js bundle, MIT license and vendor refresh helper.
 - `styles.css`, `theme.js`: shared design, responsive layout and persistent light/dark mode.
 - `script.js`: shared catalogue/cache/artwork/detail functions; separate guarded collection, dialog and hero initializers. The homepage makes no catalogue requests. The hub loads the catalogue only after authentication, and concurrent loads reuse one promise. Shared detail dialogs support the Pokédex and saved favourites.
 - `account.js`: shared login/register dialog and session/header avatar management on all pages, plus guarded Trainer Hub profile editing/uploads, teams and favourites using same-origin fetch requests.
@@ -44,7 +49,7 @@ Accounts use Argon2id passwords, HTTP-only SameSite session cookies, login sessi
 
 ### Team selection and account navigation
 
-All three pages share Home, National Pokédex and Trainer Hub links, optional Log in/Register, the theme toggle and the logged-in trainer's header avatar. The current page and hub section are indicated with `aria-current`. Profile, My Teams and My Favourites links live inside the hub and stay hidden until authentication is confirmed. The hub is publicly accessible, with a sign-in/create-account invitation for guests; private account data and forms require login. Dashboard remains a future page without a broken link.
+All four pages share Home, National Pokédex, Trainer Hub and Analytics links, optional Log in/Register, the theme toggle and the logged-in trainer's header avatar. The current page and hub section are indicated with `aria-current`. Profile, My Teams and My Favourites links live inside the hub and stay hidden until authentication is confirmed. The hub is publicly accessible, with a sign-in/create-account invitation for guests; private account data and forms require login. The Dashboard is public and uses only species data; trainer account data remains private.
 
 Navigation and avatar links use relative HTML paths, including on repository-subpath previews. The top-right avatar opens the hub's Profile section, uses an initial when no image is available and updates after uploads. Profile shows the existing username/email, editable biography, avatar upload and team/favourite summaries. Editing uses the existing `{bio}` API; username and email remain display fields. Obsolete trainer-management containers and selector-script loading were removed from the homepage and National Pokédex.
 
@@ -79,7 +84,7 @@ To test: toggle both ways, reload, emulate the opposite system preference in bro
 
 - A cold load uses **19 index requests**: one species-name list and 18 type-membership lists, with at most four concurrent index requests. Alternate-form IDs above #649 are excluded; type slots preserve primary/secondary ordering. Cards render progressively and artwork loads lazily.
 - Compact species/type resources are cached for seven days under `dexhaven-index-v2-*`. A fresh cached startup makes **zero catalogue data requests** (artwork remains browser-loaded). Blocked or full storage does not prevent use.
-- Full stats, abilities and measurements are fetched **only when opening details**, with duplicate requests coalesced and results cached. Legacy `kanto-pokedex-v1-*` detail caches remain compatible; existing theme/account/session keys are unchanged.
+- Live detail endpoint requests occur **only when opening details**, with duplicate requests coalesced and results cached. Advanced filters and the dashboard also load the committed complete local summary snapshot; dashboard details/comparisons reuse that data. Legacy `kanto-pokedex-v1-*` detail caches remain compatible; existing theme/account/session keys are unchanged.
 - Search by partial name or exact number (`25`, `025`, `#025`), combined with generation, type and sorting. Generation ranges: Kanto 1–151, Johto 152–251, Hoenn 252–386, Sinnoh 387–493, Unova 494–649. Counts, headings and range labels update together.
 - Index/detail requests time out after 12 seconds. A failed species-list request stops immediately; sustained type errors stop the remaining queue. Retry loads only missing index resources. Partial type failures retain name/number/generation search and clearly identify incomplete type results.
 - Detail modals have loading, error and retry states; closed/stale responses cannot replace a newer selection. Height and weight are converted to meters and kilograms.
@@ -88,7 +93,7 @@ To test: toggle both ways, reload, emulate the opposite system preference in bro
 
 ### Static/GitHub Pages preview
 
-The public catalogue works without Express, including generation/search/type/sort controls, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg` and `images/group-picture.png` at the same relative paths. The custom hero artwork and founder caption are preserved.
+The public catalogue and analytics work without Express, including generation/search/type/stat/sort controls, comparisons, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `dashboard.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg`, `images/group-picture.png`, `pokemon-data.js`, `advanced-filters.js`, `dashboard.js`, `data/pokemon-summary.json` and `vendor/chart.umd.js` at the same relative paths. The custom hero artwork and founder caption are preserved.
 
 For a local static preview:
 
@@ -96,7 +101,7 @@ For a local static preview:
 python -m http.server 8000
 ```
 
-Open http://localhost:8000/, http://localhost:8000/pokemon.html and http://localhost:8000/trainers.html. GitHub Pages project paths are supported: assets stay relative, and trainer navigation uses `trainers.html#view=teams`, `trainers.html#view=favorites` and `trainers.html#view=profile`, so reloads do not request nonexistent server routes. The static hub shows its guest invitation and backend-unavailable message without exposing private data. Account/team/favourite persistence still requires the same-origin Express backend; the preview displays login/backend messaging rather than storing private data locally. No publishing workflow or release is triggered by this upgrade.
+Open http://localhost:8000/, http://localhost:8000/pokemon.html, http://localhost:8000/trainers.html and http://localhost:8000/dashboard.html. GitHub Pages project paths are supported: assets stay relative, and trainer navigation uses `trainers.html#view=teams`, `trainers.html#view=favorites` and `trainers.html#view=profile`, so reloads do not request nonexistent server routes. The static hub shows its guest invitation and backend-unavailable message without exposing private data. Account/team/favourite persistence still requires the same-origin Express backend; the preview displays login/backend messaging rather than storing private data locally. No publishing workflow or release is triggered by this upgrade.
 
 ## Manual checks
 
@@ -112,12 +117,12 @@ Frontend logic tests use a minimal DOM stand-in; backend tests exercise real Exp
 
 The optional `mysql.integration.test.cjs` is skipped unless `RUN_MYSQL_TESTS=1` is explicitly set after manual database setup/migration. The separate live PokéAPI check makes three read-only GETs. Fixture tests do not replace real MySQL, screen-reader or phone verification. See [QA_REPORT.md](QA_REPORT.md) for verified results and remaining checks.
 
-1. Open the homepage and confirm the original hero and founder caption. Choose **Explore the collection** to open `pokemon.html`; confirm navigation highlights the current page. Wait for 649 cards; verify Bulbasaur (#001) and Genesect (#649). Developer tools should show no full `/pokemon/{id}/` requests until details open.
+1. Open the homepage and confirm the original hero and founder caption. As a guest, choose **Create an account** or **Already a member** to open registration or login; both hero buttons stay hidden when signed in. Choose **National Pokédex** in navigation or **Browse Pokémon** below the hero to open `pokemon.html`; confirm navigation highlights the current page. Wait for 649 cards; verify Bulbasaur (#001) and Genesect (#649). Developer tools should show no full `/pokemon/{id}/` requests until details open.
 2. Search `pika`, `25`, and `#025` to find Pikachu. Search `not-a-pokemon` for the empty state.
 3. Select each generation and verify counts 151, 100, 135, 107, 156. Combine Sinnoh with Dragon, then search `gible`. Reset and check all sort modes.
 4. Open Bulbasaur: height 0.7 m, weight 6.9 kg; stats 45, 49, 49, 65, 65, 45 (total 318). Check Grass/Poison and hidden ability label.
 5. Use Tab and Enter, close details with Escape, and confirm focus returns to the card. Press `/` to focus search.
-6. Check all three pages at desktop and 375px mobile widths, including dialog scrolling. Toggle the theme, switch pages and verify it persists. Register/log in on either page and verify the session, teams and favourites survive navigation between all three pages and refreshes. In the hub, test the guest invitation, direct section links and Back/Forward navigation. Confirm logout hides private forms and the header avatar immediately.
+6. Check all four pages at desktop and 375px mobile widths, including dialog scrolling. Toggle the theme, switch pages and verify it persists. Register/log in on any page and verify the session, teams and favourites survive navigation between all four pages and refreshes. In the hub, test the guest invitation, direct section links and Back/Forward navigation. Confirm logout hides private forms and the header avatar immediately.
 7. Reload to check caching. To test a first-load failure, clear site storage in developer tools, enable Offline, and reload. Disable Offline and select Try again.
 8. Block artwork requests in developer tools to check image fallbacks.
 9. On an actual phone, check touch interactions, opening the keyboard, zoom, orientation changes, and scrolling the modal. Check Safari and Firefox separately.

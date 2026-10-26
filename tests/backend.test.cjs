@@ -56,7 +56,11 @@ test('public homepage and Pokédex serve without authentication; legacy trainer 
     assert.match(hub.data,/<title>Trainer Hub — Dexhaven<\/title>/);
     assert.match(hub.data,/id="trainer-invitation"/);
   }
-  assert.equal((await client.call('/dashboard.html')).status,404);
+  const dashboard=await client.call('/dashboard.html',{raw:true});assert.equal(dashboard.status,200);
+  assert.match(dashboard.data,/id="comparison-chart"/);
+  const snapshot=await client.call('/data/pokemon-summary.json');assert.equal(snapshot.status,200);assert.equal(snapshot.data.pokemon.length,649);
+  for(const asset of ['/pokemon-data.js','/advanced-filters.js','/dashboard.js','/vendor/chart.umd.js'])assert.equal((await client.call(asset,{raw:true})).status,200);
+  for(const secret of ['/scripts/update-pokemon-data.cjs','/node_modules/chart.js/package.json'])assert.equal((await client.call(secret)).status,404);
 });
 
 test('registration, Argon2id, cookies, session rotation, login/logout and validation',async t=>{

@@ -11,7 +11,7 @@
     const matches = pokemon.filter(p => !trimmed || (numeric ? p.id === id : name && (normalize(p.name).includes(name) || normalize(formatName(p.name)).includes(name))));
     return { count: matches.length, items: matches.slice(0, limit) };
   }
-  function create({ slot, selectedId = null, total = 649, getPokemon, excludedIds, formatName, makeArtwork, onChange }) {
+  function create({ slot, label: customLabel, selectedId = null, total = 649, getPokemon, excludedIds, formatName, makeArtwork, onChange }) {
     const node = (tag, className, text) => {
       const el = document.createElement(tag);
       if (className) el.className = className;
@@ -20,7 +20,7 @@
     };
     const uid = `pokemon-slot-${++sequence}`;
     const root = node('div', 'pokemon-selector');
-    const label = node('label', '', `Slot ${slot}`); label.htmlFor = uid;
+    const label = node('label', '', customLabel || `Slot ${slot}`); label.htmlFor = uid;
     const input = node('input', 'selector-input');
     input.id = uid; input.type = 'text'; input.autocomplete = 'off'; input.spellcheck = false;
     input.placeholder = 'Name or #'; input.maxLength = 80;

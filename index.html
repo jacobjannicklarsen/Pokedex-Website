@@ -40,6 +40,7 @@
     <a href="./" data-page="home" aria-current="page">Home</a>
     <a href="pokemon.html" data-page="pokemon">National Pokédex</a>
     <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="dashboard.html" data-page="dashboard">Analytics</a>
     <span id="session-status" class="form-help" role="status">Checking session…</span>
     <div id="guest-actions" class="guest-actions" hidden>
       <button id="account-button" class="text-button" type="button">Log in</button>
@@ -54,7 +55,10 @@
       <div><p class="eyebrow">● &nbsp; GENERATIONS I–V · 649 POKÉMON</p>
         <h1 id="hero-title">Look up Pokémon.<br><span>Show off your teams.</span></h1>
         <p class="hero-description">Five regions. Countless combinations. Find your favourites and build your next team with 649 spectacular Pokémon.</p>
-        <a class="explore-link" href="pokemon.html">Explore the collection <span aria-hidden="true">↘</span></a>
+        <div id="home-auth-actions" class="home-auth-actions" hidden>
+          <button id="home-register" class="action-button" type="button">Create an account</button>
+          <button id="home-login" class="text-button" type="button">Already a member</button>
+        </div>
       </div>
       <div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="art-label">THE SITE FOUNDERS</span>
         <img src="./images/group-picture.png" alt="" width="280" height="280" fetchpriority="high">
@@ -64,7 +68,7 @@
     <section class="home-features" aria-label="Discover Dexhaven">
       <article><p class="eyebrow">DISCOVER</p><h2>National Pokédex</h2><p>Explore 649 Pokémon from five generations. Search by name or number, compare types and discover their stats.</p><a class="explore-link" href="pokemon.html">Browse Pokémon <span aria-hidden="true">↗</span></a></article>
       <article><p class="eyebrow">BUILD YOUR JOURNEY</p><h2>Trainer features</h2><p>Create a trainer account to build six-member teams, save favourites and personalise your profile. Visit your Trainer Hub to get started.</p><a class="explore-link" href="trainers.html">Open Trainer Hub <span aria-hidden="true">↗</span></a></article>
-      <article><p class="eyebrow">COMING LATER</p><h2>Statistics dashboard</h2><p>A dedicated dashboard is planned for a future update. For now, explore individual Pokémon stats in the National Pokédex.</p></article>
+      <article><p class="eyebrow">COMPARE & DISCOVER</p><h2>Pokémon analytics</h2><p>Explore generation trends, discover the strongest stats and compare any two Pokémon side by side.</p><a class="explore-link" href="dashboard.html">Explore analytics <span aria-hidden="true">↗</span></a></article>
     </section>
   </main>
   <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10171e">
+    <meta name="description" content="Discover Dexhaven: 649 Pokémon across Kanto, Johto, Hoenn, Sinnoh and Unova. Explore the National Pokédex, build teams and save your favourites.">
+    <meta property="og:site_name" content="Dexhaven">
+    <meta property="og:title" content="Pokémon Analytics — Dexhaven">
+    <meta property="og:description" content="Your home for 649 Pokémon from Generations I–V. Discover, build teams and save favourites.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Pokémon Analytics — Dexhaven">
+    <meta name="twitter:description" content="Explore 649 Pokémon from Generations I–V with Dexhaven.">
+    <title>Pokémon Analytics — Dexhaven</title>
+    <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <script src="pokemon-data.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="pokemon-selector.js" defer></script>
+    <script src="vendor/chart.umd.js" defer></script>
+    <script src="dashboard.js" defer></script>
+    <script src="account.js" defer></script>
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a>
+    <span class="header-label">FIVE GENERATIONS. YOUR CHOICES.</span>
+    <div class="header-actions">
+      <span class="region"><i></i>Change theme</span>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" hidden>
+        <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
+      </button>
+      <a id="header-profile" class="header-profile" href="trainers.html#view=profile" aria-label="Open trainer profile" data-requires-auth hidden>
+        <img id="header-avatar" alt="" width="36" height="36" hidden>
+        <span id="header-avatar-initial" aria-hidden="true"></span>
+      </a>
+    </div>
+  </header>
+  <nav class="trainer-nav" aria-label="Main navigation">
+    <a href="./" data-page="home">Home</a>
+    <a href="pokemon.html" data-page="pokemon">National Pokédex</a>
+    <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="dashboard.html" data-page="dashboard" aria-current="page">Analytics</a>
+    <span id="session-status" class="form-help" role="status">Checking session…</span>
+    <div id="guest-actions" class="guest-actions" hidden>
+      <button id="account-button" class="text-button" type="button">Log in</button>
+      <button id="register-button" class="text-button" type="button">Register</button>
+    </div>
+    <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
+  </nav>
+  <main id="main" class="dashboard">
+    <p id="account-message" class="account-message" role="status" aria-live="polite" hidden></p>
+    <header class="dashboard-intro">
+      <p class="eyebrow">FIVE GENERATIONS. A WORLD OF DATA.</p>
+      <h1>Pokémon, <span>by the numbers.</span></h1>
+      <p class="hero-description">Discover patterns across the National Pokédex. Explore the stats, find the standouts and see how your favourites compare.</p>
+    </header>
+    <div id="dashboard-status" class="load-status" role="status"><span class="spinner" aria-hidden="true"></span>Loading all 649 Pokémon for a complete picture…</div>
+    <div id="dashboard-error" class="notice" role="alert" hidden><div><strong>The analytics dataset could not load.</strong><p id="dashboard-error-message"></p></div><button id="dashboard-retry" class="action-button" type="button">Try again</button></div>
+    <p id="chart-warning" class="notice" role="status" hidden>Charts are unavailable. All exact values remain available in the tables, rankings and comparison below. Reload to try the charts again.</p>
+    <div id="dashboard-content" hidden>
+      <section class="overview-grid" aria-label="Dataset overview">
+        <article class="overview-card"><p>Pokémon</p><strong id="metric-total">—</strong><span>Standard National species</span></article>
+        <article class="overview-card"><p>Generations</p><strong id="metric-generations">—</strong><span>Kanto through Unova</span></article>
+        <article class="overview-card"><p>Distinct types</p><strong id="metric-types">—</strong><span>Including current typings</span></article>
+        <article class="overview-card"><p>Average total base stats</p><strong id="metric-average">—</strong><span>Six base stats per species</span></article>
+      </section>
+      <p id="dataset-source" class="form-help"></p>
+      <div class="analytics-grid">
+        <section class="analytics-panel" aria-labelledby="generation-chart-title">
+          <p class="eyebrow">01 · THE REGIONS</p><h2 id="generation-chart-title">A growing world</h2>
+          <p id="generation-chart-description" class="form-help">Pokémon introduced in each generation, by National Pokédex number. Hover a bar for its exact count.</p>
+          <div class="chart-frame"><canvas id="generation-chart" role="img" aria-label="Pokémon distribution by generation" aria-describedby="generation-chart-description">Exact counts are in the table below.</canvas></div>
+          <details class="chart-values"><summary>View generation counts</summary><div id="generation-table" class="table-scroll"></div></details>
+        </section>
+        <section class="analytics-panel" aria-labelledby="type-chart-title">
+          <p class="eyebrow">02 · ELEMENTS IN BALANCE</p><h2 id="type-chart-title">Every type counts</h2>
+          <p id="type-chart-description" class="form-help">Dual-type Pokémon count once in each type. Fire/Flying counts toward both Fire and Flying, so memberships exceed the species total.</p>
+          <div class="chart-frame chart-frame-tall"><canvas id="type-chart" role="img" aria-label="Pokémon type membership counts" aria-describedby="type-chart-description">Exact type counts are in the table below.</canvas></div>
+          <details class="chart-values"><summary>View all type counts</summary><div id="type-table" class="table-scroll"></div></details>
+        </section>
+        <section class="analytics-panel analytics-wide" aria-labelledby="averages-chart-title">
+          <p class="eyebrow">03 · GENERATIONAL TRAITS</p><h2 id="averages-chart-title">The shape of a generation</h2>
+          <p id="averages-chart-description" class="form-help">Mean base stats for every species introduced in each generation. Values are averaged before rounding and share a common scale.</p>
+          <div class="chart-frame"><canvas id="averages-chart" role="img" aria-label="Six average base stats across five generations" aria-describedby="averages-chart-description">Exact averages are in the table below.</canvas></div>
+          <details class="chart-values"><summary>View average base stats</summary><div id="averages-table" class="table-scroll"></div></details>
+        </section>
+      </div>
+      <section class="analytics-panel ranking-section" aria-labelledby="rankings-title">
+        <div class="section-heading"><div><p class="eyebrow">04 · THE STANDOUTS</p><h2 id="rankings-title">At the top of the Pokédex</h2></div><label class="analytics-control" for="ranking-stat">Rank by<select id="ranking-stat"></select></label></div>
+        <p class="form-help">Ten species with the highest selected base stat. Equal values are ordered by National Pokédex number. Select a Pokémon to view its details.</p>
+        <ol id="ranking-list" class="ranking-list" aria-live="polite"></ol>
+      </section>
+      <section id="comparison" class="analytics-panel comparison-section" aria-labelledby="comparison-title">
+        <p class="eyebrow">05 · SIDE BY SIDE</p><h2 id="comparison-title">How do they compare?</h2>
+        <p class="form-help">Search two different species by name or National number. Arrow keys browse, Enter selects, Escape cancels. Comparison uses the same complete dataset as the charts.</p>
+        <div id="comparison-selectors" class="comparison-selectors"></div>
+        <p id="comparison-status" class="form-help" role="status" aria-live="polite">Choose two different Pokémon.</p>
+        <div id="comparison-cards" class="comparison-cards"></div>
+        <div id="comparison-results" hidden>
+          <div class="chart-frame"><canvas id="comparison-chart" role="img" aria-label="Side-by-side comparison of six Pokémon base statistics" aria-describedby="comparison-status">Exact values and differences are in the comparison table below.</canvas></div>
+          <div id="comparison-table" class="table-scroll"></div>
+        </div>
+      </section>
+    </div>
+    <noscript><p class="notice">Please enable JavaScript to view Pokémon analytics and comparisons.</p></noscript>
+  </main>
+  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
+  <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <button id="close-auth" class="close-button" type="button" aria-label="Close account form">×</button>
+    <form id="auth-form" class="account-form">
+      <p class="eyebrow">WELCOME TO DEXHAVEN</p><h2 id="auth-title">Log in</h2>
+      <label id="username-label" hidden>Username<input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+"></label>
+      <label id="email-label" hidden>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254"></label>
+      <label id="identifier-label">Username or email<input id="auth-identifier" name="identifier" autocomplete="username" maxlength="254" required></label>
+      <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <p id="password-help" class="form-help" hidden>Use 12–128 characters. Usernames use letters, numbers and underscores.</p>
+      <p id="auth-error" class="form-error" role="alert" hidden></p>
+      <button id="auth-submit" class="action-button" type="submit">Log in</button>
+      <button id="auth-switch" class="text-button" type="button">New here? Create an account</button>
+    </form>
+  </dialog>
+    
+</body>
+</html>

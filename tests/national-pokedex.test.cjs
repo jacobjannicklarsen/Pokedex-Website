@@ -21,6 +21,7 @@ function setup({failures=new Set(),mode='ok',blocked=false,collection=true,hero=
   const nodes=new Map(),storage=new Map(),calls=[];let active=0,maxActive=0;
   const fixture=createPokeFixture();
   const context=vm.createContext({
+    PokemonData:require('../pokemon-data'),
     document:{querySelector(selector){if((!collection&&selector==='#pokemon-grid')||(!hero&&selector==='.hero-art img')||(!details&&selector==='#pokemon-dialog'))return null;if(!nodes.has(selector))nodes.set(selector,new Node());return nodes.get(selector);},querySelectorAll(){return nodes.get('#type-filters')?.children||[];},createElement(){return new Node();},createTextNode(text){const n=new Node();n.textContent=text;return n;},addEventListener(){}},
     AbortController,clearTimeout,setTimeout:(fn,ms)=>setTimeout(fn,mode==='timeout'&&ms===12000?1:ms),requestAnimationFrame:fn=>setTimeout(fn,0),
     localStorage:{getItem(k){if(blocked)throw Error('Blocked');return storage.get(k)||null;},setItem(k,v){if(blocked)throw Error('Blocked');storage.set(k,v);}},
@@ -39,6 +40,25 @@ function setup({failures=new Set(),mode='ok',blocked=false,collection=true,hero=
   return {context,nodes,storage,calls,run:code=>vm.runInContext(code,context),maxActive:()=>maxActive};
 }
 const ids=app=>app.nodes.get('#pokemon-grid').children.map(c=>Number(c.dataset.id));
+
+test('advanced stat predicates and all new sorts integrate with collection generation/type/search/reset',async()=>{
+  const app=setup();await app.context.ready;
+  const records=require('../data/pokemon-summary.json').pokemon;
+  app.context.realRecords=records;
+  app.run('state.statData=new Map(realRecords.map(p=>[p.id,p]));state.pokemon=new Map(realRecords.map(p=>[p.id,p]))');
+  for(const key of [...require('../pokemon-data').stats,'total']) {
+    const value=require('../pokemon-data').value(records[444],key);
+    app.run(`state.sort='number';state.statRanges={${JSON.stringify(key)}:{min:${value},max:${value}}};render()`);
+    const expected=records.filter(p=>require('../pokemon-data').value(p,key)===value).map(p=>p.id);
+    assert.deepEqual(ids(app),expected);
+    app.run(`state.statRanges={};state.sort='stat:${key}:desc';render()`);
+    assert.deepEqual(ids(app),[...records].sort(require('../pokemon-data').compare(key)).map(p=>p.id));
+  }
+  app.run("state.sort='stat:total:asc';render()");assert.deepEqual(ids(app),[...records].sort(require('../pokemon-data').compare('total',true)).map(p=>p.id));
+  app.run("resetFilters();state.generation='4';state.type='dragon';state.statRanges={attack:{min:100},speed:{min:90}};state.query='garch';render()");assert.deepEqual(ids(app),[445]);
+  app.run("state.statRanges={hp:{min:255},speed:{min:255}};render()");assert.equal(ids(app).length,0);assert.equal(app.nodes.get('#empty-state').hidden,false);
+  app.run('resetFilters()');assert.equal(ids(app).length,649);assert.equal(app.run('state.sort'),'number');assert.equal(app.run('Object.keys(state.statRanges).length'),0);
+});
 
 test('homepage skips collection initialization; trainer catalogue loads lazily and coalesces callers',async()=>{
   const app=setup({collection:false});

@@ -1,10 +1,10 @@
 # Windows / VS Code setup
 
-The project is **Pokédex Website**; the public website is **Dexhaven v0.2.2**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
+The project is **Pokédex Website**; the public website is **Dexhaven v0.3.0**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
 
 **Upgrading an existing v0.1.0 installation:** follow [database/MIGRATION_v0.2.0.md](database/MIGRATION_v0.2.0.md) first. Do not recreate the database or replace your environment file. No migration is executed automatically. The steps below describe new installations and normal startup/testing.
 
-**Upgrading from v0.2.0 or v0.2.1:** no database migration is needed. Restart Express after updating files. Test the homepage at http://localhost:3000/ and the National Pokédex at http://localhost:3000/pokemon.html and the Trainer Hub at http://localhost:3000/trainers.html. Test login/logout, Profile, My Teams, My Favourites, avatar uploads and theme/session persistence across all three pages. Old `/profile`, `/teams` and `/favorites` links redirect to the hub.
+**Upgrading from v0.2.0, v0.2.1 or v0.2.2:** no database migration is needed. Restart Express after updating files. Test the homepage at http://localhost:3000/ and the National Pokédex at http://localhost:3000/pokemon.html and the Trainer Hub at http://localhost:3000/trainers.html. Test login/logout, Profile, My Teams, My Favourites, avatar uploads and theme/session persistence across all four pages. Test the new dashboard at http://localhost:3000/dashboard.html and stat bounds/sorts in the National Pokédex. The committed snapshot and Chart.js bundle need no build step; see [ANALYTICS.md](ANALYTICS.md) for optional refresh commands. Old `/profile`, `/teams` and `/favorites` links redirect to the hub.
 
 ## 1. Prerequisites
 

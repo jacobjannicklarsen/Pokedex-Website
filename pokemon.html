@@ -16,7 +16,9 @@
     <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <script src="pokemon-data.js" defer></script>
     <script src="script.js" defer></script>
+    <script src="advanced-filters.js" defer></script>
     <script src="account.js" defer></script>
 </head>
 <body>
@@ -40,6 +42,7 @@
     <a href="./" data-page="home">Home</a>
     <a href="pokemon.html" data-page="pokemon" aria-current="page">National Pokédex</a>
     <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="dashboard.html" data-page="dashboard">Analytics</a>
     <span id="session-status" class="form-help" role="status">Checking session…</span>
     <div id="guest-actions" class="guest-actions" hidden>
       <button id="account-button" class="text-button" type="button">Log in</button>
@@ -61,14 +64,23 @@
       </select></div>
       <div class="search-row">
         <div class="search-box"><span aria-hidden="true">⌕</span><label class="sr-only" for="search">Search by Pokémon name or number</label><input id="search" type="search" placeholder="Search by name or number…" autocomplete="off" aria-keyshortcuts="/"><kbd aria-hidden="true">/</kbd></div>
-        <div class="sort-box"><label for="sort">Sort by</label><select id="sort"><option value="number">Pokédex number</option><option value="name">Name A–Z</option><option value="reverse">Number: high to low</option></select></div>
+        <div class="sort-box"><label for="sort">Sort by</label><select id="sort"><option value="number">Pokédex number</option><option value="name">Name A–Z</option><option value="reverse">Number: high to low</option><optgroup id="stat-sort-options" label="Base statistics" disabled><option value="stat:hp:desc">Highest HP</option><option value="stat:attack:desc">Highest Attack</option><option value="stat:defense:desc">Highest Defense</option><option value="stat:special-attack:desc">Highest Special Attack</option><option value="stat:special-defense:desc">Highest Special Defense</option><option value="stat:speed:desc">Highest Speed</option><option value="stat:total:desc">Highest Total Base Stats</option><option value="stat:total:asc">Lowest Total Base Stats</option></optgroup></select></div>
       </div>
       <div class="filter-row"><span class="filter-label" id="type-label">FILTER BY TYPE</span><div id="type-filters" class="type-filters" role="group" aria-labelledby="type-label"></div></div>
-      <div class="results-row"><p id="result-count" role="status" aria-live="polite">Connecting to the Pokédex…</p><button class="text-button" id="reset" type="button" hidden>Reset filters ↺</button></div>
+      <details id="advanced-filters" class="advanced-filters">
+        <summary>Advanced Filters <span id="advanced-summary">No stat limits</span></summary>
+        <p class="form-help">Combine any base stat limits with your search, generation and type. Blank bounds are unrestricted. Values use current Pok&eacute;API base stats.</p>
+        <p id="advanced-status" class="form-help" role="status">Loading complete base statistics...</p>
+        <button id="advanced-retry" class="text-button" type="button" hidden>Retry base statistics</button>
+        <fieldset id="advanced-fields" class="stat-ranges" disabled><legend class="sr-only">Base stat limits</legend></fieldset>
+        <p id="advanced-error" class="form-error" role="alert" hidden></p>
+        <button id="advanced-reset" class="text-button" type="button">Reset Advanced Filters</button>
+      </details>
+      <div class="results-row"><p id="result-count" role="status" aria-live="polite">Connecting to the Pokédex…</p><button class="text-button" id="reset" type="button" hidden>Reset all filters ↺</button></div>
       <div id="load-status" class="load-status" role="status"><span class="spinner" aria-hidden="true"></span><span id="load-message">Loading Pokémon data…</span></div>
       <div id="error-state" class="notice" role="alert" hidden><div><strong>Some Pokémon are still out exploring.</strong><p id="error-message"></p></div><button id="retry" class="action-button" type="button">Try again ↻</button></div>
       <div id="pokemon-grid" class="pokemon-grid" role="group" aria-label="Pokémon collection" aria-busy="true"></div>
-      <div id="empty-state" class="empty-state" hidden><h3>No Pokémon found</h3><p>Try another name, number, or type.</p><button id="empty-reset" class="action-button" type="button">Clear filters</button></div>
+      <div id="empty-state" class="empty-state" hidden><h3>No Pokémon found</h3><p>Try another name, number, generation, type or stat range.</p><button id="empty-reset" class="action-button" type="button">Clear filters</button></div>
       <p class="collection-end" id="collection-end" hidden>ALL 649. ENDLESS POSSIBILITIES.</p>
     </section>
   </main>

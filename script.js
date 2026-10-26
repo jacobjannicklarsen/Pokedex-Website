@@ -22,7 +22,7 @@ const TYPE_COLORS = {
   rock: '#cbb880', ghost: '#a79ace', dragon: '#ab9bf5', dark: '#c0aa98',
   steel: '#a6c5ce', fairy: '#eab1d8'
 };
-const state = { pokemon: new Map(), query: '', type: 'all', generation: 'all', sort: 'number', loading: false, typesLoaded: new Set() };
+const state = { pokemon: new Map(), query: '', type: 'all', generation: 'all', sort: 'number', loading: false, typesLoaded: new Set(), statRanges: {}, statData: null };
 const detailRequests = new Map();
 let detailRevision = 0;
 const $ = (selector) => document.querySelector(selector);
@@ -115,13 +115,18 @@ function matches(pokemon) {
   const queryMatch = /^\d+$/.test(numeric) ? pokemon.id === Number(numeric) : nameMatch;
   const generation = GENERATIONS.find(g => g.id === state.generation) || GENERATIONS[0];
   return pokemon.id >= generation.start && pokemon.id <= generation.end
-    && (!query || queryMatch) && (state.type === 'all' || pokemon.types.includes(state.type));
+    && (!query || queryMatch) && (state.type === 'all' || pokemon.types.includes(state.type))
+    && (!Object.keys(state.statRanges).length || (state.statData?.has(pokemon.id) && globalThis.PokemonData.matches(state.statData.get(pokemon.id), state.statRanges)));
 }
 
 function render() {
   if (!grid) { globalThis.PokedexAccounts?.onPokemonUpdate(); return; }
   const visible = [...state.pokemon.values()].filter(matches).sort((a, b) => {
     if (state.sort === 'name') return prettyName(a.name).localeCompare(prettyName(b.name));
+    if (state.sort.startsWith('stat:') && state.statData) {
+      const [, key, direction] = state.sort.split(':');
+      return globalThis.PokemonData.compare(key, direction === 'asc')(state.statData.get(a.id), state.statData.get(b.id));
+    }
     return state.sort === 'reverse' ? b.id - a.id : a.id - b.id;
   });
   // Reuse cards during progressive loading to preserve focus and image requests.
@@ -140,7 +145,7 @@ function render() {
   $('.collection-total').textContent = `${String(generation.start).padStart(3, '0')} — ${generation.end}`;
   $('#result-count').textContent = `Showing ${visible.length} of ${count} Pokémon${state.loading ? ' · updating index…' : ''}`;
   $('#empty-state').hidden = visible.length > 0 || state.loading || state.pokemon.size === 0;
-  $('#reset').hidden = !state.query && state.type === 'all' && state.generation === 'all';
+  $('#reset').hidden = !state.query && state.type === 'all' && state.generation === 'all' && !Object.keys(state.statRanges).length && state.sort === 'number';
   $('#collection-end').hidden = state.pokemon.size !== TOTAL || visible.length !== TOTAL;
   document.querySelectorAll('.filter-chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.type === state.type)));
   globalThis.PokedexAccounts?.onPokemonUpdate();
@@ -150,6 +155,10 @@ function resetFilters() {
   state.query = '';
   state.type = 'all';
   state.generation = 'all';
+  state.sort = 'number';
+  state.statRanges = {};
+  $('#sort').value = 'number';
+  globalThis.PokedexAdvanced?.reset();
   $('#generation').value = 'all';
   $('#search').value = '';
   render();

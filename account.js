@@ -76,6 +76,8 @@
     const authenticated = session.ready && Boolean(session.user);
     $('#logout-button').hidden = !authenticated;
     $('#guest-actions').hidden = !session.ready || authenticated;
+    const homeActions = $('#home-auth-actions');
+    if (homeActions) homeActions.hidden = !session.ready || authenticated;
     $('#session-status').hidden = session.ready;
     document.querySelectorAll('[data-requires-auth]').forEach(link => { link.hidden = !authenticated; });
     document.querySelectorAll('[data-view]').forEach(link => {
@@ -422,6 +424,8 @@
   $('#trainer-catalog-retry')?.addEventListener('click', loadTrainerCatalogue);
   $('#hub-login')?.addEventListener('click', () => openAuth());
   $('#hub-register')?.addEventListener('click', () => openAuth('register'));
+  $('#home-register')?.addEventListener('click', () => openAuth('register'));
+  $('#home-login')?.addEventListener('click', () => openAuth());
   updateAccountUI();
   [...(grid?.children || [])].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
   navigate(activeView, false);
