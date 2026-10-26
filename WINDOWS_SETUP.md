@@ -1,0 +1,147 @@
+# Windows / VS Code setup
+
+The Express application is implemented and dependencies have been installed in this workspace. **MySQL credentials have not been supplied, and no database has been created or modified.** The ignored `.env` contains a generated session secret and blank MySQL username/password fields. Complete the database steps below before starting the full app.
+
+## 1. Prerequisites
+
+1. Use Node.js 22 or later. In VS Code choose **Terminal → New Terminal → PowerShell** and verify `node --version` and `npm.cmd --version`.
+2. Use an existing compatible MySQL server, or install **MySQL Community Server 8.4** using its Windows MSI. Run the bundled **MySQL Configurator**, configure a local server and Windows service, and choose your own administrator password. Do not reinstall or reconfigure an existing server unnecessarily. Follow the [official Windows installation guide](https://dev.mysql.com/doc/refman/8.4/en/windows-installation.html).
+3. Start the configured MySQL service using Windows **Services** (`services.msc`). Its name depends on your installation; do not assume a specific service name.
+4. Use MySQL Workbench or the `mysql.exe` command-line client. Workbench is optional and installed separately. This schema requires MySQL 8.0.16+ with enforced CHECK constraints; MariaDB/XAMPP are not the verified target.
+
+## 2. Create only the separate database
+
+Recommended with Workbench:
+
+1. Connect to your local MySQL server using an administrator account you control.
+2. Run `SHOW DATABASES LIKE 'pokedex_app';`. If that name is already used for unrelated data, inspect it and resolve the conflict before proceeding. Never drop an existing database for this setup.
+3. Choose **File → Open SQL Script** and open `E:\EK - IT-Arkitektur\Pokedex Website\database\schema.sql`.
+4. Execute the whole script. It selects only `pokedex_app` and creates its missing tables: `users`, `teams`, `team_pokemon`, `favorites`, `sessions`. It contains no DROP statements or data replacement. Existing tables are not migrated automatically.
+5. Verify:
+
+```sql
+USE pokedex_app;
+SHOW TABLES;
+```
+
+Command-line alternative (adjust the executable path and administrator username to your installation):
+
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -h 127.0.0.1 -P 3306 -u YOUR_ADMIN_USERNAME -p
+```
+
+At the `mysql>` prompt:
+
+```sql
+SOURCE E:/EK - IT-Arkitektur/Pokedex Website/database/schema.sql;
+```
+
+Use the prompt or Workbench to create a **new dedicated application account**, choosing your own username and password. Replace every placeholder before executing; these are not supplied credentials:
+
+```sql
+CREATE USER 'YOUR_CHOSEN_APP_USERNAME'@'localhost'
+  IDENTIFIED BY 'YOUR_CHOSEN_APP_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE ON pokedex_app.*
+  TO 'YOUR_CHOSEN_APP_USERNAME'@'localhost';
+```
+
+Do not overwrite or alter an existing MySQL account. The runtime user needs only these CRUD privileges on `pokedex_app.*`, not administrator or schema-creation privileges. The local hostname/account host must match your MySQL installation's account rules.
+
+Optional setup alternative: `npm.cmd run db:setup` executes the same fixed SQL script using `.env`. It needs an explicitly configured account with database/table creation privileges, so use it only if you intentionally grant that setup access. Normal `npm.cmd start` never creates databases or tables.
+
+## 3. Configure the ignored environment file
+
+Open this project in VS Code and run:
+
+```powershell
+Set-Location -LiteralPath 'E:\EK - IT-Arkitektur\Pokedex Website'
+if (!(Test-Path -LiteralPath '.env')) {
+    Copy-Item -LiteralPath '.env.example' -Destination '.env'
+}
+```
+
+Edit `.env` in VS Code. Keep the generated `SESSION_SECRET`; enter your actual database account details:
+
+```dotenv
+NODE_ENV=development
+HOST=127.0.0.1
+PORT=3000
+APP_ORIGIN=http://localhost:3000
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=pokedex_app
+DB_USER=YOUR_CHOSEN_APP_USERNAME
+DB_PASSWORD="YOUR_CHOSEN_APP_PASSWORD"
+SESSION_SECRET=KEEP_THE_EXISTING_GENERATED_SECRET
+TRUST_PROXY=false
+```
+
+The uppercase values above describe what to enter; do not paste them literally. Quote a password containing `#` or spaces. If you copied `.env.example` into a fresh checkout and the secret is blank, generate a random value with:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
+```
+
+Paste that value into `SESSION_SECRET`. Keep it stable across restarts so saved sessions remain valid. `.env`, uploads, installed packages, and local npm cache are excluded by `.gitignore`; never put credentials in source files or `.env.example`.
+
+## 4. Install and start Express
+
+```powershell
+npm.cmd ci
+npm.cmd start
+```
+
+Open **http://localhost:3000** in your browser. Keep the terminal running. Use **Ctrl+C** to stop. For restart-on-edit development use `npm.cmd run dev` instead of `npm.cmd start`.
+
+Use the same hostname/port as `APP_ORIGIN`; `http://127.0.0.1:3000` has a different origin from `http://localhost:3000`. Do not use Live Server or Python's HTTP server for account features: frontend and API need the same Express origin.
+
+If PowerShell blocks `npm.ps1`, continue using **npm.cmd** as shown; no execution-policy changes are needed. On a machine that needs to build native Argon2/Sharp binaries, follow the packages' installation requirements. Installed native binaries were successfully exercised in this workspace.
+
+## 5. Test the application
+
+1. Click **Log in → New here? Create an account**. Register a username (3–24 letters/numbers/underscores), email, and password (12–128 characters).
+2. Search and filter the Pokédex; toggle light/dark mode. Open a Pokémon's details and check its measurements, abilities and stats.
+3. Tap hearts on a card and in details. Open **My Favourites**, remove one, and reload to verify persistence.
+4. Open **My Teams**, create two named teams, choose up to six distinct Pokémon in each, and save. Replace a member, set a slot to **Empty slot** to remove it, and save again. Try a duplicate: it must be rejected. You can also add from a detail view using **Add to a team**.
+5. Open **Trainer Profile**, save a bio, and upload a JPEG/PNG/WebP. Try an invalid file or a file over 2 MB: it must be rejected. The profile also displays your saved teams and favourites.
+6. Log out and log back in. Restart Express and verify that the MySQL-backed session, teams, favourites, bio and avatar persist. Keep `SESSION_SECRET` unchanged.
+7. Create a second account and verify that its private teams/favourites are separate.
+8. Test narrow screens and Tab/Enter/Space/Escape navigation. Use browser developer tools to check the session cookie: HTTP-only, SameSite=Lax, and a seven-day rolling expiration.
+
+Run automated tests from a second terminal:
+
+```powershell
+npm.cmd test
+npm.cmd run test:browser
+```
+
+The browser suite expects installed Chrome at its standard Windows path. For another Chromium installation:
+
+```powershell
+$env:CHROME_PATH = 'C:\your\actual\path\chrome.exe'
+npm.cmd run test:browser
+Remove-Item Env:CHROME_PATH
+```
+
+After your real MySQL configuration works, explicitly run the live database integration test:
+
+```powershell
+$env:RUN_MYSQL_TESTS = '1'
+node --test tests/mysql.integration.test.cjs
+Remove-Item Env:RUN_MYSQL_TESTS
+```
+
+This test creates random `qa_...` users inside `pokedex_app`, verifies constraints/transactions and session storage, then deletes only its own test users and session. Related team/favourite rows cascade. It does not create the schema or truncate tables. Run it against a development database; if forcibly interrupted, its generated test rows may require cleanup.
+
+## Troubleshooting and deployment
+
+- **Missing DB_USER:** enter actual credentials; blank credentials deliberately stop startup.
+- **ECONNREFUSED:** start the correct MySQL service and check DB_HOST/DB_PORT.
+- **ER_ACCESS_DENIED_ERROR:** check the account's password, allowed host, and privileges.
+- **ER_BAD_DB_ERROR / missing tables:** import `database/schema.sql` into the intended local server.
+- **Port in use:** stop the other listener or change both PORT and APP_ORIGIN.
+- **403 on writes:** use the exact configured origin; refresh to renew the session/CSRF token.
+- **Pokémon data unavailable:** the PokéAPI/artwork network connection is separate from MySQL. Existing loading, cache and retry behavior is preserved.
+- **Production:** use HTTPS, `NODE_ENV=production`, an HTTPS APP_ORIGIN and a strong secret. Cookies become Secure automatically; local HTTP development intentionally uses non-Secure cookies. If using exactly one trusted HTTPS reverse proxy, configure TRUST_PROXY=true and bind the app so clients cannot bypass that proxy. Persist/back up both MySQL and `uploads/avatars`. The built-in rate limiter is per process; multiple production instances need a shared limiter and shared upload storage.
+
+Password reset and email verification are outside this implementation's requested scope. Registration/login/logout and private trainer data are implemented.
