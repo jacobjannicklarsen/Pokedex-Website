@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS team_pokemon (
   PRIMARY KEY (team_id, slot),
   UNIQUE KEY uq_team_pokemon (team_id, pokemon_id),
   CONSTRAINT ck_team_slot CHECK (slot BETWEEN 1 AND 6),
-  CONSTRAINT ck_team_pokemon CHECK (pokemon_id BETWEEN 1 AND 151),
+  CONSTRAINT ck_team_pokemon_v020 CHECK (pokemon_id BETWEEN 1 AND 649),
   CONSTRAINT fk_member_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS favorites (
   pokemon_id SMALLINT UNSIGNED NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, pokemon_id),
-  CONSTRAINT ck_favorite_pokemon CHECK (pokemon_id BETWEEN 1 AND 151),
+  CONSTRAINT ck_favorite_pokemon_v020 CHECK (pokemon_id BETWEEN 1 AND 649),
   CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 

@@ -18,10 +18,10 @@ First call `GET /api/auth/session` with cookies enabled. It returns `{ user, csr
 | PUT | `/api/teams/:id` | `{name,pokemonIds:[1,25]}` → `{team}`; atomically replaces name and complete roster |
 | DELETE | `/api/teams/:id` | 204; own team only |
 | GET | `/api/favorites` | `{pokemonIds:[...]}` belonging to current user |
-| PUT | `/api/favorites/:id` | Idempotently save Kanto Pokémon → 204 |
+| PUT | `/api/favorites/:id` | Idempotently save Pokémon #001–649 → 204 |
 | DELETE | `/api/favorites/:id` | Idempotently remove favourite → 204 |
 
-All profile/team/favourite endpoints require authentication. Team member IDs are integers 1–151, at most six, without duplicates. PUT supports adding, removing and replacing members in one transaction. Ownership is selected with the authenticated session's user ID; client-supplied user IDs are never used. A team row lock serializes concurrent writes; CHECK/unique/foreign-key constraints reinforce invariants. Concurrent saves use last-completed-save semantics.
+All profile/team/favourite endpoints require authentication. Team member IDs are integers 1–649, at most six, without duplicates. #650 is rejected. PUT supports adding, removing and replacing members in one transaction. Ownership is selected with the authenticated session's user ID; client-supplied user IDs are never used. A team row lock serializes concurrent writes; CHECK/unique/foreign-key constraints reinforce invariants. Concurrent saves use last-completed-save semantics. Existing databases need the manual v0.2.0 CHECK migration; startup never runs it.
 
 Statuses: 400 invalid data; 401 unauthenticated/invalid login; 403 missing or invalid CSRF/disallowed origin; 404 absent or unowned team; 409 conflicting username/email; 413 upload/request too large; 429 rate limited; 503 unavailable database; 500 unexpected server error. Password hashes, SQL errors and secrets are never returned.
 

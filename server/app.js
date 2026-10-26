@@ -134,17 +134,18 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   });
   app.get('/api/favorites', async (req, res) => res.json({ pokemonIds: await repo.favorites(req.user.id) }));
   app.put('/api/favorites/:id', async (req, res) => {
-    await repo.favorite(req.user.id, v.id(req.params.id, 151), true); res.status(204).end();
+    await repo.favorite(req.user.id, v.id(req.params.id, 649), true); res.status(204).end();
   });
   app.delete('/api/favorites/:id', async (req, res) => {
-    await repo.favorite(req.user.id, v.id(req.params.id, 151), false); res.status(204).end();
+    await repo.favorite(req.user.id, v.id(req.params.id, 649), false); res.status(204).end();
   });
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'script.js', 'theme.js', 'account.js', 'artwork-fallback.svg']) {
+  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
+  app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
   app.get('/media/avatars/:filename', (req, res, next) => {
     if (!avatarPattern.test(req.params.filename)) return next(new v.HttpError(404, 'Image not found.'));
     res.set('Cache-Control', 'public, max-age=86400');

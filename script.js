@@ -1,10 +1,20 @@
 'use strict';
 
 const API = 'https://pokeapi.co/api/v2/pokemon/';
-const TOTAL = 151;
-const CONCURRENCY = 6;
+const TOTAL = 649;
+const CONCURRENCY = 4;
+// Retain the old detail-cache namespace so returning trainers can reuse it.
 const CACHE_PREFIX = 'kanto-pokedex-v1-';
+const INDEX_PREFIX = 'dexhaven-index-v2-';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+const GENERATIONS = [
+  { id: 'all', label: 'National Pokédex', region: 'National', start: 1, end: 649 },
+  { id: '1', label: 'Generation I — Kanto', region: 'Kanto', start: 1, end: 151 },
+  { id: '2', label: 'Generation II — Johto', region: 'Johto', start: 152, end: 251 },
+  { id: '3', label: 'Generation III — Hoenn', region: 'Hoenn', start: 252, end: 386 },
+  { id: '4', label: 'Generation IV — Sinnoh', region: 'Sinnoh', start: 387, end: 493 },
+  { id: '5', label: 'Generation V — Unova', region: 'Unova', start: 494, end: 649 }
+];
 const TYPE_COLORS = {
   normal: '#bdbaa7', fire: '#ff9a66', water: '#78baff', electric: '#f1d76b',
   grass: '#8bd394', ice: '#8addde', fighting: '#e98a7d', poison: '#c399dd',
@@ -12,7 +22,9 @@ const TYPE_COLORS = {
   rock: '#cbb880', ghost: '#a79ace', dragon: '#ab9bf5', dark: '#c0aa98',
   steel: '#a6c5ce', fairy: '#eab1d8'
 };
-const state = { pokemon: new Map(), query: '', type: 'all', sort: 'number', loading: false };
+const state = { pokemon: new Map(), query: '', type: 'all', generation: 'all', sort: 'number', loading: false, typesLoaded: new Set() };
+const detailRequests = new Map();
+let detailRevision = 0;
 const $ = (selector) => document.querySelector(selector);
 const grid = $('#pokemon-grid');
 const dialog = $('#pokemon-dialog');
@@ -74,13 +86,25 @@ function createCard(pokemon) {
   top.lastChild.setAttribute('aria-hidden', 'true');
   const art = element('span', 'card-art');
   art.append(artwork(pokemon));
-  card.append(top, art, element('span', 'card-name', prettyName(pokemon.name)), badges(pokemon.types));
+  const typeBadges = badges(pokemon.types);
+  card.append(top, art, element('span', 'card-name', prettyName(pokemon.name)), typeBadges);
   // Keep the detail button and favourite button as siblings, never nested buttons.
   const tile = element('article', 'pokemon-tile');
   tile.dataset.id = pokemon.id;
+  tile.cardParts = { card, typeBadges };
+  tile.dataset.types = pokemon.types.join(',');
   tile.append(card);
   globalThis.PokedexAccounts?.decorateCard(tile, pokemon);
   return tile;
+}
+
+function updateCardTypes(tile, pokemon) {
+  if (!tile.cardParts || tile.dataset.types === pokemon.types.join(',')) return;
+  const parts = tile.cardParts;
+  parts.card.style.setProperty('--type-color', TYPE_COLORS[pokemon.types[0]] || '#bdbaa7');
+  parts.card.setAttribute('aria-label', `View ${prettyName(pokemon.name)}, ${number(pokemon.id)}, ${pokemon.types.map(prettyName).join(' / ')}`);
+  parts.typeBadges.replaceChildren(...badges(pokemon.types).children);
+  tile.dataset.types = pokemon.types.join(',');
 }
 
 function matches(pokemon) {
@@ -89,7 +113,9 @@ function matches(pokemon) {
   const normalized = normalizeName(query);
   const nameMatch = normalized.length > 0 && (normalizeName(pokemon.name).includes(normalized) || normalizeName(prettyName(pokemon.name)).includes(normalized));
   const queryMatch = /^\d+$/.test(numeric) ? pokemon.id === Number(numeric) : nameMatch;
-  return (!query || queryMatch) && (state.type === 'all' || pokemon.types.includes(state.type));
+  const generation = GENERATIONS.find(g => g.id === state.generation) || GENERATIONS[0];
+  return pokemon.id >= generation.start && pokemon.id <= generation.end
+    && (!query || queryMatch) && (state.type === 'all' || pokemon.types.includes(state.type));
 }
 
 function render() {
@@ -103,11 +129,17 @@ function render() {
   for (const [id, card] of existing) if (!wanted.has(id)) card.remove();
   visible.forEach((pokemon, index) => {
     const card = existing.get(pokemon.id) || createCard(pokemon);
+    updateCardTypes(card, pokemon);
     if (grid.children[index] !== card) grid.insertBefore(card, grid.children[index] || null);
   });
-  $('#result-count').textContent = `Showing ${visible.length} of ${TOTAL} Pokémon${state.loading ? ` · ${state.pokemon.size} loaded` : ''}`;
+  const generation = GENERATIONS.find(g => g.id === state.generation) || GENERATIONS[0];
+  const count = generation.end - generation.start + 1;
+  $('#collection-title').textContent = generation.id === 'all' ? 'The National Pokédex' : `The ${generation.region} collection`;
+  $('#collection-title').append(element('span', '', '.'));
+  $('.collection-total').textContent = `${String(generation.start).padStart(3, '0')} — ${generation.end}`;
+  $('#result-count').textContent = `Showing ${visible.length} of ${count} Pokémon${state.loading ? ' · updating index…' : ''}`;
   $('#empty-state').hidden = visible.length > 0 || state.loading || state.pokemon.size === 0;
-  $('#reset').hidden = !state.query && state.type === 'all';
+  $('#reset').hidden = !state.query && state.type === 'all' && state.generation === 'all';
   $('#collection-end').hidden = state.pokemon.size !== TOTAL || visible.length !== TOTAL;
   document.querySelectorAll('.filter-chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.type === state.type)));
   globalThis.PokedexAccounts?.onPokemonUpdate();
@@ -116,18 +148,20 @@ function render() {
 function resetFilters() {
   state.query = '';
   state.type = 'all';
+  state.generation = 'all';
+  $('#generation').value = 'all';
   $('#search').value = '';
   render();
   // Reset buttons disappear after activation; keep keyboard focus in the search flow.
   $('#search').focus();
 }
 
-function showDetails(pokemon) {
+function renderDetails(pokemon) {
   const content = $('#detail-content');
   content.replaceChildren();
   content.style.setProperty('--type-color', TYPE_COLORS[pokemon.types[0]] || '#bdbaa7');
   const hero = element('div', 'detail-hero');
-  hero.append(element('p', 'card-number', `KANTO POKÉDEX / ${number(pokemon.id)}`), artwork(pokemon, false));
+  hero.append(element('p', 'card-number', `NATIONAL POKÉDEX / ${number(pokemon.id)}`), artwork(pokemon, false));
   const title = element('h2', '', prettyName(pokemon.name));
   title.id = 'detail-name';
   hero.append(title, badges(pokemon.types));
@@ -161,8 +195,46 @@ function showDetails(pokemon) {
   body.append(total);
   content.append(hero, body);
   globalThis.PokedexAccounts?.decorateDetails(content, pokemon);
-  dialog.showModal();
   dialog.scrollTop = 0;
+}
+
+async function showDetails(pokemon) {
+  if (!pokemon || !Number.isInteger(pokemon.id) || pokemon.id < 1 || pokemon.id > TOTAL) return;
+  const revision = ++detailRevision;
+  const content = $('#detail-content');
+  content.replaceChildren();
+  const title = element('h2', '', prettyName(pokemon.name)); title.id = 'detail-name';
+  const loading = element('div', 'detail-loading');
+  loading.append(title, element('p', '', 'Loading Pokémon details…')); loading.setAttribute('role', 'status');
+  content.append(loading);
+  if (!dialog.open) dialog.showModal();
+  content.setAttribute('aria-busy', 'true');
+  try {
+    const details = await ensureDetails(pokemon.id);
+    if (revision !== detailRevision || !dialog.open) return;
+    renderDetails(details);
+  } catch {
+    if (revision !== detailRevision || !dialog.open) return;
+    loading.lastChild.textContent = 'Details couldn’t be loaded. Check your connection and try again.';
+    const retry = element('button', 'action-button', 'Retry details'); retry.type = 'button';
+    retry.addEventListener('click', () => showDetails(pokemon)); loading.append(retry);
+  } finally { if (revision === detailRevision) content.setAttribute('aria-busy', 'false'); }
+}
+
+function ensureDetails(id) {
+  if (!Number.isInteger(id) || id < 1 || id > TOTAL) return Promise.reject(new Error('Invalid Pokémon number'));
+  const current = state.pokemon.get(id);
+  if (validRecord(current, id)) return Promise.resolve(current);
+  const cached = readCache(id);
+  if (cached) return Promise.resolve({ ...cached, name: current?.name || cached.name });
+  if (!detailRequests.has(id)) {
+    detailRequests.set(id, fetchPokemon(id).then(details => {
+      details.name = state.pokemon.get(id)?.name || details.name;
+      state.pokemon.set(id, details);
+      return details;
+    }).finally(() => detailRequests.delete(id)));
+  }
+  return detailRequests.get(id);
 }
 
 function validRecord(record, id) {
@@ -192,7 +264,7 @@ async function fetchPokemon(id) {
     if (!response.ok) throw new Error(`PokéAPI returned ${response.status}`);
     const data = await response.json();
     const pokemon = {
-      id: data.id, name: data.name, height: data.height, weight: data.weight,
+      id: data.id, name: data.species?.name || data.name, height: data.height, weight: data.weight,
       types: data.types.map((entry) => entry.type.name),
       artwork: data.sprites.other?.['official-artwork']?.front_default,
       sprite: data.sprites.front_default,
@@ -212,53 +284,93 @@ async function loadPokemon() {
   state.loading = true;
   $('#error-state').hidden = true;
   $('#load-status').hidden = false;
-  $('#load-message').textContent = 'Loading Pokémon data…';
+  $('#load-message').textContent = 'Loading the National Pokédex index…';
   grid.setAttribute('aria-busy', 'true');
-  const pending = [];
-  for (let id = 1; id <= TOTAL; id++) {
-    if (state.pokemon.has(id)) continue;
-    const cached = readCache(id);
-    if (cached) state.pokemon.set(id, cached);
-    else pending.push(id);
-  }
   render();
-  let cursor = 0;
-  let consecutiveFailures = 0;
-  let stopRequests = false;
-  let renderScheduled = false;
-  function scheduleRender() {
-    if (renderScheduled) return;
-    renderScheduled = true;
-    requestAnimationFrame(() => { renderScheduled = false; render(); });
-  }
-  async function worker() {
-    while (cursor < pending.length && !stopRequests) {
-      const id = pending[cursor++];
-      try {
-        state.pokemon.set(id, await fetchPokemon(id));
-        consecutiveFailures = 0;
-      } catch {
-        // A sustained outage should not force users through 151 request timeouts.
-        consecutiveFailures++;
-        if (consecutiveFailures >= CONCURRENCY) stopRequests = true;
-      }
-      $('#load-message').textContent = `Discovering Kanto… ${state.pokemon.size} / ${TOTAL} Pokémon`;
-      scheduleRender();
-    }
-  }
+  let failed = false;
   try {
+    if (state.pokemon.size !== TOTAL) {
+      state.typesLoaded.clear();
+      const species = await indexResource('species', 'https://pokeapi.co/api/v2/pokemon-species/?limit=649', data => {
+        if (!Array.isArray(data.results)) throw Error('Invalid species index');
+        return data.results.map(item => ({ id: resourceId(item.url), name: item.name }));
+      }, validSpeciesIndex);
+      species.forEach(({ id, name }) => {
+        if (!state.pokemon.has(id)) state.pokemon.set(id, {
+          id, name, types: [], typeSlots: {},
+          artwork: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+          sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+        });
+      });
+      render(); // All species can be searched before type indices finish.
+    }
+    const pending = Object.keys(TYPE_COLORS).filter(type => !state.typesLoaded.has(type));
+    let cursor = 0, consecutiveFailures = 0, stop = false, scheduled = false;
+    function scheduleRender() {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => { scheduled = false; render(); });
+    }
+    async function worker() {
+      while (cursor < pending.length && !stop) {
+        const type = pending[cursor++];
+        try {
+          const members = await indexResource(`type-${type}`, `https://pokeapi.co/api/v2/type/${type}/`, data => {
+            if (!Array.isArray(data.pokemon)) throw Error('Invalid type index');
+            return data.pokemon.map(entry => [resourceId(entry.pokemon?.url), entry.slot]).filter(([id]) => id >= 1 && id <= TOTAL);
+          }, validTypeIndex);
+          members.forEach(([id, slot]) => {
+            const pokemon = state.pokemon.get(id);
+            if (validRecord(pokemon, id)) return;
+            pokemon.typeSlots ||= {};
+            pokemon.typeSlots[slot] = type;
+            pokemon.types = Object.entries(pokemon.typeSlots).sort(([a], [b]) => Number(a) - Number(b)).map(([, name]) => name);
+          });
+          state.typesLoaded.add(type); consecutiveFailures = 0;
+        } catch { failed = true; if (++consecutiveFailures >= CONCURRENCY) stop = true; }
+        $('#load-message').textContent = `Indexing Pokémon types… ${state.typesLoaded.size} / ${Object.keys(TYPE_COLORS).length}`;
+        scheduleRender();
+      }
+    }
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker));
+  } catch { failed = true;
   } finally {
     state.loading = false;
     $('#load-status').hidden = true;
     grid.setAttribute('aria-busy', 'false');
-    const missing = TOTAL - state.pokemon.size;
-    if (missing) {
+    if (failed || state.typesLoaded.size !== Object.keys(TYPE_COLORS).length) {
       $('#error-state').hidden = false;
-      $('#error-message').textContent = `${missing} Pokémon couldn’t be loaded. Check your connection and try again. Your loaded Pokémon are still available.`;
+      $('#error-message').textContent = state.pokemon.size ? 'Some type data couldn’t be loaded. Name, number and generation search still work; type matches may be incomplete. Retry to finish the index.' : 'The Pokémon index couldn’t be loaded. Check your connection and try again.';
     }
     render();
   }
+}
+
+const resourceId = url => Number(typeof url === 'string' ? url.match(/\/(\d+)\/?$/)?.[1] : NaN);
+function validSpeciesIndex(data) {
+  return Array.isArray(data) && data.length === TOTAL && new Set(data.map(p => p?.id)).size === TOTAL
+    && data.every(p => p && Number.isInteger(p.id) && p.id >= 1 && p.id <= TOTAL && typeof p.name === 'string' && p.name.length > 0);
+}
+function validTypeIndex(data) {
+  return Array.isArray(data) && data.length > 0 && new Set(data.map(p => p?.[0])).size === data.length
+    && data.every(p => Array.isArray(p) && Number.isInteger(p[0]) && p[0] >= 1 && p[0] <= TOTAL && [1, 2].includes(p[1]));
+}
+async function indexResource(key, url, compact, valid) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(INDEX_PREFIX + key));
+    const age = cached && Date.now() - cached.timestamp;
+    if (cached && Number.isFinite(cached.timestamp) && age >= 0 && age < CACHE_TTL && valid(cached.data)) return cached.data;
+  } catch { /* Malformed/blocked storage is safe to ignore. */ }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw Error('PokéAPI index request failed');
+    const data = compact(await response.json());
+    if (!valid(data)) throw Error('Unexpected PokéAPI index');
+    try { localStorage.setItem(INDEX_PREFIX + key, JSON.stringify({ timestamp: Date.now(), data })); } catch { /* Memory-only use remains functional. */ }
+    return data;
+  } finally { clearTimeout(timeout); }
 }
 
 // Include current typings, including types introduced after Generation I.
@@ -285,6 +397,9 @@ filters.addEventListener('click', (event) => {
 });
 $('#search').addEventListener('input', (event) => { state.query = event.target.value; render(); });
 $('#sort').addEventListener('change', (event) => { state.sort = event.target.value; render(); });
+$('#generation').addEventListener('change', (event) => {
+  state.generation = GENERATIONS.some(g => g.id === event.target.value) ? event.target.value : 'all'; render();
+});
 $('#reset').addEventListener('click', resetFilters);
 $('#empty-reset').addEventListener('click', resetFilters);
 $('#retry').addEventListener('click', loadPokemon);
@@ -293,6 +408,7 @@ grid.addEventListener('click', (event) => {
   if (card) showDetails(state.pokemon.get(Number(card.dataset.id)));
 });
 $('#close-dialog').addEventListener('click', () => dialog.close());
+dialog.addEventListener('close', () => { detailRevision++; });
 dialog.addEventListener('click', (event) => {
   if (event.target !== dialog) return;
   const rect = dialog.getBoundingClientRect();

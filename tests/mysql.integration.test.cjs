@@ -25,9 +25,10 @@ test('real MySQL: constraints, ownership, atomic updates, favorites and session 
     await assert.rejects(pool.execute('INSERT INTO team_pokemon (team_id,slot,pokemon_id) VALUES (?, ?, ?)',[team.id,7,2]));
     await repo.saveTeam(alice.id,team.id,{name:'One',pokemonIds:[25]});
     await assert.rejects(pool.execute('INSERT INTO team_pokemon (team_id,slot,pokemon_id) VALUES (?, ?, ?)',[team.id,2,25]));
-    await assert.rejects(pool.execute('INSERT INTO team_pokemon (team_id,slot,pokemon_id) VALUES (?, ?, ?)',[team.id,2,152]));
+    await assert.rejects(pool.execute('INSERT INTO team_pokemon (team_id,slot,pokemon_id) VALUES (?, ?, ?)',[team.id,2,650]));
+    await pool.execute('INSERT INTO team_pokemon (team_id,slot,pokemon_id) VALUES (?, ?, ?)',[team.id,2,649]);
     await assert.rejects(repo.saveTeam(alice.id,team.id,{name:'Should roll back',pokemonIds:[1,1]}));
-    assert.deepEqual((await repo.teams(alice.id))[0].pokemonIds,[25]);
+    assert.deepEqual((await repo.teams(alice.id))[0].pokemonIds,[25,649]);
     await Promise.all([
       repo.saveTeam(alice.id,team.id,{name:'Concurrent A',pokemonIds:[1,4]}),
       repo.saveTeam(alice.id,team.id,{name:'Concurrent B',pokemonIds:[7,25]})
@@ -36,10 +37,17 @@ test('real MySQL: constraints, ownership, atomic updates, favorites and session 
     assert.ok([[1,4],[7,25]].some(ids=>JSON.stringify(ids)===JSON.stringify(final.pokemonIds)));
     await repo.favorite(alice.id,25,true);await repo.favorite(alice.id,25,true);
     assert.deepEqual(await repo.favorites(alice.id),[25]);assert.deepEqual(await repo.favorites(bob.id),[]);
+    await repo.favorite(alice.id,649,true);assert.deepEqual(await repo.favorites(alice.id),[25,649]);
+    await assert.rejects(repo.favorite(alice.id,650,true));
     await new Promise((resolve,reject)=>store.set(sid,{userId:alice.id,cookie:{expires:new Date(Date.now()+60000)}},e=>e?reject(e):resolve()));
     const reopened = new MySQLSessionStore(pool);
     const data = await new Promise((resolve,reject)=>reopened.get(sid,(e,data)=>e?reject(e):resolve(data)));
     assert.equal(data.userId,alice.id);
+    await repo.deleteTeam(alice.id,team.id);
+    assert.deepEqual(await repo.teams(alice.id),[]);
+    const [remainingMembers]=await pool.execute('SELECT pokemon_id FROM team_pokemon WHERE team_id = ?',[team.id]);
+    assert.deepEqual(remainingMembers,[]);
+    await assert.rejects(repo.deleteTeam(alice.id,team.id),/not found/);
   } finally {
     try {
       await pool.execute('DELETE FROM sessions WHERE sid = ?',[sid]);

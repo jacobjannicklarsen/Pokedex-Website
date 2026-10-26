@@ -1,6 +1,8 @@
 # Windows / VS Code setup
 
-The Express application is implemented and dependencies have been installed in this workspace. **MySQL credentials have not been supplied, and no database has been created or modified.** The ignored `.env` contains a generated session secret and blank MySQL username/password fields. Complete the database steps below before starting the full app.
+The project is **Pokédex Website**; the public website is **Dexhaven v0.2.0**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
+
+**Upgrading an existing v0.1.0 installation:** follow [database/MIGRATION_v0.2.0.md](database/MIGRATION_v0.2.0.md) first. Do not recreate the database or replace your environment file. No migration is executed automatically. The steps below describe new installations and normal startup/testing.
 
 ## 1. Prerequisites
 
@@ -99,10 +101,10 @@ If PowerShell blocks `npm.ps1`, continue using **npm.cmd** as shown; no executio
 
 ## 5. Test the application
 
-1. Click **Log in → New here? Create an account**. Register a username (3–24 letters/numbers/underscores), email, and password (12–128 characters).
+1. Click **Register** in the logged-out navigation (or **Log in → New here? Create an account**). Register a username (3–24 letters/numbers/underscores), email, and password (12–128 characters). Confirm trainer links appear only after login and return after a session-restoring refresh; they must disappear on logout.
 2. Search and filter the Pokédex; toggle light/dark mode. Open a Pokémon's details and check its measurements, abilities and stats.
 3. Tap hearts on a card and in details. Open **My Favourites**, remove one, and reload to verify persistence.
-4. Open **My Teams**, create two named teams, choose up to six distinct Pokémon in each, and save. Replace a member, set a slot to **Empty slot** to remove it, and save again. Try a duplicate: it must be rejected. You can also add from a detail view using **Add to a team**.
+4. Open **My Teams**, create two named teams, and search each slot by name or number. Select with a click or Arrow Up/Down and Enter; Escape cancels and Tab leaves without changing the member. Choose up to six distinct Pokémon from #001–649 and save. Replace a member by searching again; use **Remove** to leave a slot empty. Try a duplicate: it must be unavailable in other slots of that team. Save and reload to confirm persistence. You can also add from a detail view using **Add to a team**. #649 is valid; #650 must be rejected by the API/database.
 5. Open **Trainer Profile**, save a bio, and upload a JPEG/PNG/WebP. Try an invalid file or a file over 2 MB: it must be rejected. The profile also displays your saved teams and favourites.
 6. Log out and log back in. Restart Express and verify that the MySQL-backed session, teams, favourites, bio and avatar persist. Keep `SESSION_SECRET` unchanged.
 7. Create a second account and verify that its private teams/favourites are separate.

@@ -4,22 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#10171e">
-    <meta name="description" content="Discover the original 151 Pokémon. Search by name or number, filter by type, and explore abilities and stats.">
-    <title>Pokédex — The Kanto Collection</title>
+    <meta name="description" content="Discover Dexhaven: 649 Pokémon across Kanto, Johto, Hoenn, Sinnoh and Unova. Explore the National Pokédex, build teams and save your favourites.">
+    <meta property="og:site_name" content="Dexhaven">
+    <meta property="og:title" content="Dexhaven — National Pokédex">
+    <meta property="og:description" content="Your home for 649 Pokémon from Generations I–V. Discover, build teams and save favourites.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Dexhaven — National Pokédex">
+    <meta name="twitter:description" content="Explore 649 Pokémon from Generations I–V with Dexhaven.">
+    <title>Dexhaven — Pokédex & Team Building</title>
     <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" defer></script>
+    <script src="pokemon-selector.js" defer></script>
     <script src="account.js" defer></script>
 </head>
 <body>
 
   <header class="site-header">
-    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>pokédex<span>.</span></a>
-    <span class="header-label">A FIELD GUIDE TO THE ORIGINALS</span>
+    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a>
+    <span class="header-label">FIVE GENERATIONS. YOUR CHOICES.</span>
     <div class="header-actions">
-      <span class="region"><i></i>Kanto region</span>
-      <button id="account-button" class="text-button" type="button">Log in</button>
+      <span class="region"><i></i>Change theme</span>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" hidden>
         <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
         <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
@@ -27,32 +34,43 @@
     </div>
   </header>
   <nav class="trainer-nav" aria-label="Main navigation">
-    <a href="/" data-view="/" aria-current="page">Pokédex</a>
-    <a href="/teams" data-view="/teams">My Teams</a>
-    <a href="/favorites" data-view="/favorites">My Favourites</a>
-    <a href="/profile" data-view="/profile">Trainer Profile</a>
+    <a href="./" data-view="/" aria-current="page">National Pokédex</a>
+    <a href="#view=teams" data-view="/teams" data-requires-auth hidden>My Teams</a>
+    <a href="#view=favorites" data-view="/favorites" data-requires-auth hidden>My Favourites</a>
+    <a href="#view=profile" data-view="/profile" data-requires-auth hidden>Trainer Profile</a>
+    <span id="session-status" class="form-help" role="status">Checking session…</span>
+    <div id="guest-actions" class="guest-actions" hidden>
+      <button id="account-button" class="text-button" type="button">Log in</button>
+      <button id="register-button" class="text-button" type="button">Register</button>
+    </div>
     <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
   </nav>
   <main id="main">
     <p id="account-message" class="account-message" role="status" aria-live="polite" hidden></p>
     <section id="trainer-area" class="trainer-area" aria-labelledby="trainer-heading" hidden>
-      <p class="eyebrow">YOUR KANTO JOURNEY</p><h1 id="trainer-heading">Trainer Profile</h1>
+      <p class="eyebrow">YOUR DEXHAVEN JOURNEY</p><h1 id="trainer-heading">Trainer Profile</h1>
       <div id="account-content"></div>
     </section>
-    <noscript><p class="notice">Please enable JavaScript to load and explore the Pokédex.</p></noscript>
+    <noscript><p class="notice">Please enable JavaScript to explore Dexhaven’s National Pokédex.</p></noscript>
     <section class="hero" aria-labelledby="hero-title">
-      <div><p class="eyebrow">● &nbsp; GENERATION 01 · THE ORIGINAL 151</p>
-        <h1 id="hero-title">Big adventures.<br><span>Extraordinary Pokémon.</span></h1>
-        <p class="hero-description">Every journey starts with a little curiosity. Get to know the Pokémon that started it all.</p>
+      <div><p class="eyebrow">● &nbsp; GENERATIONS I–V · 649 POKÉMON</p>
+        <h1 id="hero-title">Look up Pokémon.<br><span>Show off your teams.</span></h1>
+        <p class="hero-description">Five regions. Countless combinations. Find your favourites and build your next team with 649 spectacular Pokémon.</p>
         <a class="explore-link" href="#collection">Explore the collection <span aria-hidden="true">↘</span></a>
       </div>
-      <div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="art-label">#025 / ELECTRIC</span>
-        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" alt="" width="280" height="280" fetchpriority="high">
-        <span class="art-caption">A familiar face. <span>An unforgettable beginning.</span></span>
+      <div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="art-label">THE SITE FOUNDERS</span>
+        <img src="./images/group-picture.png" alt="" width="280" height="280" fetchpriority="high">
+        <span class="art-caption">Lucas, Oscar, Jacob Jannick & Patrick. <span>IT Architecture Students.</span></span>
       </div>
     </section>
     <section id="collection" class="collection" aria-labelledby="collection-title">
-      <div class="section-heading"><div><p class="eyebrow">YOUR NEXT DISCOVERY</p><h2 id="collection-title">The Kanto collection<span>.</span></h2></div><span class="collection-total">001 — 151</span></div>
+      <div class="section-heading"><div><p class="eyebrow">YOUR NEXT DISCOVERY</p><h2 id="collection-title">The National Pokédex<span>.</span></h2></div><span class="collection-total">001 — 649</span></div>
+      <div class="generation-selector"><label for="generation">EXPLORE A GENERATION</label><select id="generation">
+        <option value="all">National Pokédex — All 649 Pokémon</option>
+        <option value="1">Generation I — Kanto</option><option value="2">Generation II — Johto</option>
+        <option value="3">Generation III — Hoenn</option><option value="4">Generation IV — Sinnoh</option>
+        <option value="5">Generation V — Unova</option>
+      </select></div>
       <div class="search-row">
         <div class="search-box"><span aria-hidden="true">⌕</span><label class="sr-only" for="search">Search by Pokémon name or number</label><input id="search" type="search" placeholder="Search by name or number…" autocomplete="off" aria-keyshortcuts="/"><kbd aria-hidden="true">/</kbd></div>
         <div class="sort-box"><label for="sort">Sort by</label><select id="sort"><option value="number">Pokédex number</option><option value="name">Name A–Z</option><option value="reverse">Number: high to low</option></select></div>
@@ -63,15 +81,15 @@
       <div id="error-state" class="notice" role="alert" hidden><div><strong>Some Pokémon are still out exploring.</strong><p id="error-message"></p></div><button id="retry" class="action-button" type="button">Try again ↻</button></div>
       <div id="pokemon-grid" class="pokemon-grid" role="group" aria-label="Pokémon collection" aria-busy="true"></div>
       <div id="empty-state" class="empty-state" hidden><h3>No Pokémon found</h3><p>Try another name, number, or type.</p><button id="empty-reset" class="action-button" type="button">Clear filters</button></div>
-      <p class="collection-end" id="collection-end" hidden>ALL 151. ENDLESS POSSIBILITIES.</p>
+      <p class="collection-end" id="collection-end" hidden>ALL 649. ENDLESS POSSIBILITIES.</p>
     </section>
   </main>
-  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>pokédex<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
+  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
   <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
   <dialog id="auth-dialog" aria-labelledby="auth-title">
     <button id="close-auth" class="close-button" type="button" aria-label="Close account form">×</button>
     <form id="auth-form" class="account-form">
-      <p class="eyebrow">WELCOME, TRAINER</p><h2 id="auth-title">Log in</h2>
+      <p class="eyebrow">WELCOME TO DEXHAVEN</p><h2 id="auth-title">Log in</h2>
       <label id="username-label" hidden>Username<input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+"></label>
       <label id="email-label" hidden>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254"></label>
       <label id="identifier-label">Username or email<input id="auth-identifier" name="identifier" autocomplete="username" maxlength="254" required></label>

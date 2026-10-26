@@ -32,7 +32,7 @@ function team(body, includeMembers = true) {
   const name = text(body.name, 'Team name', 1, 60);
   if (!includeMembers) return { name };
   if (!Array.isArray(body.pokemonIds) || body.pokemonIds.length > 6) fail('A team can have up to six Pokémon.');
-  const pokemonIds = body.pokemonIds.map(value => { if (typeof value !== 'number') fail('Pokémon IDs must be numbers.'); return id(value, 151); });
+  const pokemonIds = body.pokemonIds.map(value => { if (typeof value !== 'number') fail('Pokémon IDs must be numbers.'); return id(value, 649); });
   if (new Set(pokemonIds).size !== pokemonIds.length) fail('A team cannot contain duplicate Pokémon.');
   return { name, pokemonIds };
 }

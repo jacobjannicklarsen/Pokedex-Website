@@ -75,8 +75,8 @@ test('CSRF, origin checks, authentication, parameter validation and secret-file 
 test('private teams: max six, duplicates, replace/remove, ownership and favorites isolation',async t=>{
   const app=await setup(t);const alice=app.client(),bob=app.client();await register(alice,'alice');await register(bob,'bob');
   const created=await alice.call('/api/teams',{method:'POST',body:{name:'Kanto Six'}});assert.equal(created.status,201);const id=created.data.team.id;
-  for(const pokemonIds of [[1,1],[1,2,3,4,5,6,7],[0],[152],['25'],[1.5]])assert.equal((await alice.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Team',pokemonIds}})).status,400);
-  assert.equal((await alice.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Saved Six',pokemonIds:[1,4,7,25,133,151]}})).status,200);
+  for(const pokemonIds of [[1,1],[1,2,3,4,5,6,7],[0],[650],['25'],[1.5]])assert.equal((await alice.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Team',pokemonIds}})).status,400);
+  assert.equal((await alice.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Saved Six',pokemonIds:[1,152,252,387,494,649]}})).status,200);
   assert.equal((await bob.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Stolen',pokemonIds:[]}})).status,404);
   assert.equal((await bob.call(`/api/teams/${id}`,{method:'DELETE'})).status,404);
   assert.equal((await bob.call('/api/teams')).data.teams.length,0);
@@ -84,7 +84,10 @@ test('private teams: max six, duplicates, replace/remove, ownership and favorite
   assert.deepEqual((await alice.call('/api/teams')).data.teams[0].pokemonIds,[25,26]);
   for(let i=0;i<2;i++)assert.equal((await alice.call('/api/favorites/25',{method:'PUT'})).status,204);
   assert.deepEqual((await alice.call('/api/favorites')).data.pokemonIds,[25]);assert.deepEqual((await bob.call('/api/favorites')).data.pokemonIds,[]);
-  assert.equal((await alice.call('/api/favorites/152',{method:'PUT'})).status,400);
+  assert.equal((await alice.call('/api/favorites/649',{method:'PUT'})).status,204);
+  assert.deepEqual((await alice.call('/api/favorites')).data.pokemonIds,[25,649]);
+  assert.equal((await alice.call('/api/favorites/650',{method:'PUT'})).status,400);
+  await alice.call('/api/favorites/649',{method:'DELETE'});
   await alice.call('/api/favorites/25',{method:'DELETE'});assert.deepEqual((await alice.call('/api/favorites')).data.pokemonIds,[]);
   await alice.call(`/api/teams/${id}`,{method:'DELETE'});assert.equal((await alice.call('/api/teams')).data.teams.length,0);
 });

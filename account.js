@@ -2,11 +2,35 @@
 (() => {
   'use strict';
   const session = { user: null, csrf: '', favorites: new Set(), teams: [], ready: false };
-  let activeView = location.pathname;
+  const siteRoot = new URL('.', document.currentScript?.src || location.href);
+  const viewFromLocation = () => {
+    const hash = location.hash.match(/^#view=(teams|favorites|profile)$/);
+    return hash ? `/${hash[1]}` : ['/', '/teams', '/favorites', '/profile'].includes(location.pathname) ? location.pathname : '/';
+  };
+  let backendAvailable = false;
+  let activeView = viewFromLocation();
   let authMode = 'login';
   const authDialog = $('#auth-dialog');
   const content = $('#account-content');
   const pendingFavorites = new Set();
+  const teamSelectors = new Set();
+  let selectorRecovery;
+
+  function recoverSelectors() {
+    if (globalThis.PokemonSelector?.create) return Promise.resolve();
+    if (!selectorRecovery) {
+      selectorRecovery = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const url = new URL('pokemon-selector.js', siteRoot);
+        url.searchParams.set('reload', Date.now());
+        script.src = url.href;
+        script.onload = () => globalThis.PokemonSelector?.create ? resolve() : reject(new Error('The Pokémon editor did not initialize. Restart Express and refresh this page.'));
+        script.onerror = () => reject(new Error('The Pokémon editor could not load. Restart Express, then refresh this page. Existing teams can still be renamed or deleted.'));
+        document.head.append(script);
+      }).finally(() => { selectorRecovery = null; });
+    }
+    return selectorRecovery;
+  }
 
   function notice(message, error = false) {
     const node = $('#account-message');
@@ -24,7 +48,7 @@
     const headers = {};
     if (method !== 'GET') headers['X-CSRF-Token'] = session.csrf;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch(`/api${url}`, { method, credentials: 'same-origin', headers, body: form || (body !== undefined ? JSON.stringify(body) : undefined) });
+    const response = await fetch(new URL(`api${url}`, siteRoot), { method, credentials: 'same-origin', headers, body: form || (body !== undefined ? JSON.stringify(body) : undefined) });
     const data = response.status === 204 ? {} : await response.json().catch(() => ({ error: 'The account server is unavailable. Start the Express server and try again.' }));
     if (!response.ok) {
       if (response.status === 401 && session.user) {
@@ -37,7 +61,9 @@
   }
   async function refreshSession() {
     const data = await request('/auth/session');
+    backendAvailable = true;
     session.user = data.user; session.csrf = data.csrfToken;
+    session.ready = true; updateAccountUI();
     if (session.user) await loadPrivateData();
     else { session.teams = []; session.favorites.clear(); }
     session.ready = true; updateAccountUI();
@@ -47,8 +73,14 @@
     session.teams = teams.teams; session.favorites = new Set(favorites.pokemonIds);
   }
   function updateAccountUI() {
-    $('#account-button').textContent = session.user ? session.user.username : 'Log in';
-    $('#logout-button').hidden = !session.user;
+    const authenticated = session.ready && Boolean(session.user);
+    $('#logout-button').hidden = !authenticated;
+    $('#guest-actions').hidden = !session.ready || authenticated;
+    $('#session-status').hidden = session.ready;
+    document.querySelectorAll('[data-requires-auth]').forEach(link => { link.hidden = !authenticated; });
+    document.querySelectorAll('[data-view]').forEach(link => {
+      link.href = backendAvailable ? link.dataset.view : siteRoot.pathname + (link.dataset.view === '/' ? '' : `#view=${link.dataset.view.slice(1)}`);
+    });
     document.querySelectorAll('[data-favorite]').forEach(updateFavoriteButton);
   }
   function openAuth(mode = 'login') {
@@ -60,7 +92,7 @@
   }
   function setAuthMode() {
     const register = authMode === 'register';
-    $('#auth-title').textContent = register ? 'Create your trainer account' : 'Log in';
+    $('#auth-title').textContent = register ? 'Join Dexhaven' : 'Log in to Dexhaven';
     $('#auth-submit').textContent = register ? 'Register' : 'Log in';
     $('#auth-switch').textContent = register ? 'Already a trainer? Log in' : 'New here? Create an account';
     for (const field of ['username', 'email']) {
@@ -124,18 +156,27 @@
       if (pokemon) node.textContent = `${number(pokemon.id)} ${prettyName(pokemon.name)}`;
     });
     if (activeView === '/favorites' && session.user) renderFavoriteGrid();
+    teamSelectors.forEach(selector => selector.refresh());
   }
   function navigate(view, push = true) {
     activeView = ['/', '/teams', '/favorites', '/profile'].includes(view) ? view : '/';
-    if (push && location.pathname !== activeView) history.pushState({}, '', activeView);
+    if (push) {
+      const target = backendAvailable ? activeView : siteRoot.pathname + (activeView === '/' ? '' : `#view=${activeView.slice(1)}`);
+      if (location.pathname + location.hash !== target) history.pushState({}, '', target);
+    }
     $('.hero').hidden = activeView !== '/'; $('#collection').hidden = activeView !== '/';
     $('#trainer-area').hidden = activeView === '/';
     document.querySelectorAll('[data-view]').forEach(link => {
       if (link.dataset.view === activeView) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     });
     if (activeView !== '/') renderPage();
+    else {
+      teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
+      content.replaceChildren();
+    }
   }
   function renderPage() {
+    teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
     content.replaceChildren();
     $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile' })[activeView] || 'Trainer';
     if (!session.ready) { content.append(element('p', 'form-help', 'Loading your trainer account…')); return; }
@@ -170,7 +211,7 @@
         const tile = createCard(pokemon || { id, name: `Pokémon ${id}`, types: [], artwork: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png` });
         tile.dataset.placeholder = String(!pokemon);
         if (old) old.replaceWith(tile); else savedGrid.append(tile);
-      }
+      } else if (pokemon) updateCardTypes(old, pokemon);
     }
     if (!session.favorites.size && !savedGrid.querySelector('.form-help')) savedGrid.append(element('p', 'form-help', 'No favourites yet. Tap a heart in the Pokédex to save one.'));
   }
@@ -179,7 +220,7 @@
     const panel = element('div', 'trainer-panel profile-panel');
     if (user.avatarUrl) { const img = element('img', 'trainer-avatar'); img.src = user.avatarUrl; img.alt = `${user.username}'s profile picture`; panel.append(img); }
     else panel.append(element('span', 'trainer-avatar avatar-initial', user.username[0].toUpperCase()));
-    const identity = element('div'); identity.append(element('h2', '', user.username), element('p', 'form-help', `Kanto trainer · Joined ${new Date(user.createdAt).toLocaleDateString()}`), element('p', '', user.email));
+    const identity = element('div'); identity.append(element('h2', '', user.username), element('p', 'form-help', `Dexhaven trainer · Joined ${new Date(user.createdAt).toLocaleDateString()}`), element('p', '', user.email));
     panel.append(identity); content.append(panel);
     const form = element('form', 'account-form trainer-panel');
     const label = element('label', '', 'Trainer bio');
@@ -212,50 +253,84 @@
     const favorites = element('div', 'mini-roster'); [...session.favorites].forEach(id => favorites.append(miniPokemon(id)));
     content.append(favorites, action('View all favourites', () => navigate('/favorites'), 'text-button'));
   }
-  function pokemonSelect(selected = '') {
-    const select = element('select');
-    const empty = element('option', '', 'Empty slot'); empty.value = ''; select.append(empty);
-    for (let id = 1; id <= 151; id++) {
-      const option = element('option', '', `${number(id)} ${state.pokemon.has(id) ? prettyName(state.pokemon.get(id).name) : 'Pokémon'}`);
-      option.value = id; option.dataset.pokemonName = id; select.append(option);
-    }
-    select.value = String(selected); return select;
-  }
   function renderTeams() {
+    const selectorFactory = globalThis.PokemonSelector?.create;
+    if (!selectorFactory) {
+      const warning = element('div', 'trainer-panel');
+      warning.append(element('p', 'form-help', 'Pokémon selection could not load. You can still create, rename and delete teams. Restart Express and refresh if retrying does not help.'));
+      const retry = action('Retry Pokémon editor', async () => {
+        retry.disabled = true;
+        try { await recoverSelectors(); if (activeView === '/teams') renderPage(); notice('Pokémon editor loaded.'); }
+        catch (error) { notice(error.message, true); }
+        finally { retry.disabled = false; }
+      });
+      warning.append(retry); content.append(warning);
+    }
     const create = element('form', 'account-form trainer-panel team-create');
     const label = element('label', '', 'New team name'); const name = element('input'); name.name = 'name'; name.required = true; name.maxLength = 60; label.append(name);
     const submit = element('button', 'action-button', 'Create team'); submit.type = 'submit'; create.append(label, submit); content.append(create);
     create.addEventListener('submit', async event => {
       event.preventDefault(); submit.disabled = true;
-      try { await request('/teams', { method: 'POST', body: { name: name.value } }); await loadPrivateData(); notice('Team created. Choose up to six Pokémon and save.'); if (activeView === '/teams') renderPage(); }
+      try {
+        const { team } = await request('/teams', { method: 'POST', body: { name: name.value } });
+        session.teams.unshift(team);
+        notice('Team created. Choose up to six Pokémon and save.');
+        if (activeView === '/teams') renderPage();
+      }
       catch (error) { notice(error.message, true); } finally { submit.disabled = false; }
     });
-    if (!session.teams.length) content.append(element('p', 'form-help', 'Create your first team to start your Kanto journey.'));
+    if (!session.teams.length) content.append(element('p', 'form-help', 'Create your first team to start your Dexhaven journey.'));
     session.teams.forEach(team => {
       const form = element('form', 'trainer-panel team-editor');
+      form.dataset.teamId = team.id;
       const nameLabel = element('label', '', 'Team name'); const title = element('input'); title.value = team.name; title.required = true; title.maxLength = 60; nameLabel.append(title);
       form.append(nameLabel); const slots = element('div', 'team-slots');
-      const selects = [];
+      const selectors = [];
       for (let slot = 0; slot < 6; slot++) {
         const box = element('div', 'team-slot'); const preview = element('div');
-        const label = element('label', '', `Slot ${slot + 1}`); const select = pokemonSelect(team.pokemonIds[slot]); selects.push(select); label.append(select);
-        const update = () => { preview.replaceChildren(); if (select.value) preview.append(miniPokemon(Number(select.value))); else preview.append(element('span', 'empty-slot-art', '+')); };
-        select.addEventListener('change', update); update(); box.append(preview, label); slots.append(box);
+        const update = value => { preview.replaceChildren(); if (value) preview.append(miniPokemon(value)); else preview.append(element('span', 'empty-slot-art', '+')); };
+        if (!selectorFactory) {
+          const value = team.pokemonIds[slot] || null;
+          selectors.push({ value }); update(value);
+          box.append(preview, element('p', 'form-help', `Slot ${slot + 1} · Selection temporarily unavailable`));
+          slots.append(box); continue;
+        }
+        const selector = selectorFactory({
+          slot: slot + 1, selectedId: team.pokemonIds[slot], total: TOTAL,
+          getPokemon: id => state.pokemon.get(id), formatName: prettyName, makeArtwork: artwork,
+          excludedIds: () => new Set(selectors.filter(other => other !== selector).map(other => other.value).filter(Boolean)),
+          onChange(value) { update(value); selectors.forEach(other => other.refresh()); }
+        });
+        selectors.push(selector); teamSelectors.add(selector);
+        update(selector.value); box.append(preview, selector.element); slots.append(box);
       }
       const save = element('button', 'action-button', 'Save team'); save.type = 'submit';
       const remove = action('Delete team', async () => {
         if (!confirm(`Delete “${team.name}”? This cannot be undone.`)) return;
-        remove.disabled = true;
-        try { await request(`/teams/${team.id}`, { method: 'DELETE' }); await loadPrivateData(); notice('Team deleted.'); if (activeView === '/teams') renderPage(); }
-        catch (error) { notice(error.message, true); } finally { remove.disabled = false; }
-      }, 'text-button');
+        remove.disabled = true; save.disabled = true; notice('Deleting team…');
+        try {
+          await request(`/teams/${team.id}`, { method: 'DELETE' });
+          session.teams = session.teams.filter(saved => saved.id !== team.id);
+          notice('Team deleted.');
+          if (activeView === '/teams' || activeView === '/profile') renderPage();
+        } catch (error) { notice(error.message, true); }
+        finally { remove.disabled = false; save.disabled = false; }
+      }, 'text-button delete-team');
+      remove.setAttribute('aria-label', `Delete team ${team.name}`);
       const actions = element('div', 'team-actions'); actions.append(save, remove); form.append(slots, actions); content.append(form);
       form.addEventListener('submit', async event => {
         event.preventDefault();
-        const pokemonIds = selects.filter(select => select.value).map(select => Number(select.value));
+        const pokemonIds = selectors.map(selector => selector.value).filter(Boolean);
         if (new Set(pokemonIds).size !== pokemonIds.length) { notice('Choose each Pokémon only once per team.', true); return; }
         save.disabled = true; remove.disabled = true;
-        try { await request(`/teams/${team.id}`, { method: 'PUT', body: { name: title.value, pokemonIds } }); await loadPrivateData(); notice('Team saved.'); }
+        notice('Saving team…');
+        try {
+          const { team: saved } = await request(`/teams/${team.id}`, { method: 'PUT', body: { name: title.value, pokemonIds } });
+          session.teams = session.teams.map(existing => existing.id === team.id ? { ...existing, ...saved } : existing);
+          team.name = saved.name; team.pokemonIds = saved.pokemonIds;
+          remove.setAttribute('aria-label', `Delete team ${saved.name}`);
+          notice('Team saved.');
+        }
         catch (error) { notice(error.message, true); } finally { save.disabled = false; remove.disabled = false; }
       });
     });
@@ -282,8 +357,10 @@
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); navigate(link.dataset.view);
   }));
-  window.addEventListener('popstate', () => navigate(location.pathname, false));
+  window.addEventListener('popstate', () => navigate(viewFromLocation(), false));
+  window.addEventListener('hashchange', () => navigate(viewFromLocation(), false));
   $('#account-button').addEventListener('click', () => session.user ? navigate('/profile') : openAuth());
+  $('#register-button').addEventListener('click', () => openAuth('register'));
   $('#close-auth').addEventListener('click', () => authDialog.close());
   $('#auth-switch').addEventListener('click', () => { authMode = authMode === 'login' ? 'register' : 'login'; $('#auth-error').hidden = true; setAuthMode(); });
   $('#auth-form').addEventListener('submit', async event => {
@@ -294,17 +371,20 @@
       const body = authMode === 'register' ? { username: $('#auth-username').value, email: $('#auth-email').value, password: $('#auth-password').value } : { identifier: $('#auth-identifier').value, password: $('#auth-password').value };
       const data = await request(`/auth/${authMode}`, { method: 'POST', body });
       session.user = data.user; session.csrf = data.csrfToken; session.ready = true;
-      await loadPrivateData(); updateAccountUI(); authDialog.close(); $('#auth-form').reset();
-      notice(`Welcome, ${session.user.username}!`); navigate(activeView);
+      updateAccountUI(); authDialog.close(); $('#auth-form').reset();
+      notice(`Welcome, ${session.user.username}!`);
+      try { await loadPrivateData(); } catch (error) { notice(`Logged in, but trainer data could not be loaded: ${error.message}`, true); }
+      navigate(activeView);
     } catch (error) { $('#auth-error').textContent = error.message; $('#auth-error').hidden = false; }
     finally { $('#auth-submit').disabled = false; }
   });
   $('#logout-button').addEventListener('click', async () => {
     $('#logout-button').disabled = true;
-    try { await request('/auth/logout', { method: 'POST' }); session.user = null; session.csrf = ''; session.favorites.clear(); session.teams = []; updateAccountUI(); await refreshSession(); notice('Logged out.'); navigate('/'); }
+    try { await request('/auth/logout', { method: 'POST' }); session.user = null; session.csrf = ''; session.favorites.clear(); session.teams = []; updateAccountUI(); navigate('/'); notice('Logged out.'); await refreshSession(); }
     catch (error) { notice(error.message, true); } finally { $('#logout-button').disabled = false; }
   });
   globalThis.PokedexAccounts = { decorateCard, decorateDetails, onPokemonUpdate };
+  updateAccountUI();
   [...grid.children].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
   navigate(activeView, false);
   refreshSession().then(() => { if (activeView !== '/') renderPage(); }).catch(() => {

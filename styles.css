@@ -216,7 +216,34 @@ button:disabled { cursor:wait; opacity:.6; }
 .team-picker { width:100%; display:flex; align-items:end; gap:12px; padding-top:10px; }
 .team-picker label { flex:1; }
 .detail-account-message { width:100%; line-height:1.6; }
+.generation-selector { display:flex; align-items:center; gap:18px; padding:16px 18px; margin-bottom:18px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+.generation-selector label { color:var(--muted); font-size:10px; font-weight:600; letter-spacing:1.5px; }
+.generation-selector select { max-width:100%; flex:1; padding:4px 0; min-width:0; font-size:14px; }
+.detail-loading { padding:36px 32px; line-height:1.7; }
+.detail-loading h2 { padding-right:30px; }
+html.theme-ready .generation-selector { transition:background-color .22s,color .22s,border-color .22s; }
+@media (max-width:700px) { .generation-selector { flex-direction:column; align-items:stretch; gap:10px; } .generation-selector select { width:100%; } }
 :root[data-theme="light"] .favorite-button[aria-pressed="true"],:root[data-theme="light"] .avatar-initial { color:var(--accent-ink); }
 :root[data-theme="light"] .form-error { color:#99421d; }
 @media (max-width:1000px) { .trainer-nav { padding-inline:28px; } .team-slots { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (max-width:700px) { .trainer-nav { padding-inline:20px; gap:20px; } .header-actions { gap:8px; } .header-actions .region { display:none; } #account-button { max-width:80px; padding-inline:2px; } .trainer-panel { padding:18px; } .team-create { grid-template-columns:1fr; } .team-slots { grid-template-columns:repeat(2,minmax(0,1fr)); } .profile-panel { align-items:flex-start; gap:16px; } .trainer-avatar { width:72px; height:72px; } .profile-panel h2 { font-size:24px; } .account-form { padding:22px; } }
+
+.guest-actions { display:flex; gap:12px; margin-left:auto; }
+.guest-actions button,#session-status { white-space:nowrap; }
+#session-status { margin-left:auto; }
+.pokemon-selector { position:relative; min-width:0; }
+.pokemon-selector label { margin-bottom:8px; }
+.team-editor .selector-input { padding:10px 8px; }
+.selector-clear { font-size:11px; padding:8px 0; }
+.selector-popup { position:absolute; top:100%; inset-inline:0; z-index:20; border:1px solid var(--line); border-radius:8px; background:var(--panel); box-shadow:0 12px 26px #0003; overflow:hidden; }
+.selector-list { margin:0; padding:4px; max-height:250px; overflow-y:auto; overscroll-behavior:contain; list-style:none; }
+.selector-option { display:flex; align-items:center; gap:6px; padding:8px 4px; border-radius:5px; cursor:pointer; font-size:12px; }
+.selector-option img { width:28px; height:28px; object-fit:contain; flex-shrink:0; }
+.selector-option-text { display:grid; gap:3px; min-width:0; overflow-wrap:anywhere; }
+.selector-number,.selector-status,.selector-option small { color:var(--muted); font-size:10px; }
+.selector-option.is-active,.selector-option:not([aria-disabled="true"]):hover { background:var(--mint); color:#102820; }
+.selector-option.is-active .selector-number,.selector-option:not([aria-disabled="true"]):hover .selector-number { color:#294d3b; }
+.selector-option[aria-disabled="true"] { opacity:.65; cursor:not-allowed; }
+.selector-status { margin:0; padding:10px; border-top:1px solid var(--line); line-height:1.6; }
+html.theme-ready .selector-popup { transition:background-color .22s,color .22s,border-color .22s; }
+@media (max-width:700px) { .guest-actions { gap:12px; } .trainer-nav { gap:16px; } }
