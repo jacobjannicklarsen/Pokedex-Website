@@ -28,7 +28,7 @@ async function main() {
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['index.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['index.html','pokemon.html','trainers.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','artwork-fallback.svg','images/group-picture.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -74,7 +74,10 @@ async function main() {
   }
   async function check(name, fn) {
     try { await fn(); results.push({ name, passed: true }); console.log(`PASS ${name}`); }
-    catch (error) { results.push({ name, passed: false }); console.log(`FAIL ${name}: ${error.message}`); }
+    catch (error) {
+      results.push({ name, passed: false }); console.log(`FAIL ${name}: ${error.message}`);
+      console.log(await evaluate(`JSON.stringify({path:location.pathname,hash:location.hash,mode:window.qaMode,requests:window.qaRequests,message:document.querySelector('#account-message')?.textContent,retryHidden:document.querySelector('#trainer-catalog-retry')?.hidden,status:document.querySelector('#trainer-catalog-status')?.textContent})`).catch(()=> 'Diagnostic page state unavailable'));
+    }
   }
   async function waitFor(expression) {
     for(let i=0;i<100;i++){if(await evaluate(expression))return;await sleep(50);}
@@ -122,19 +125,47 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('#logout-button').hidden`),true);
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('#register-button')).display!=='none'`),true);
   });
-  for (let i = 0; i < 100; i++) { if (await evaluate(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy') === 'false'`)) break; await sleep(50); }
+  await check('dedicated homepage preserves hero, avoids catalogue requests and links to the National Pokédex', async () => {
+    assert.equal(await evaluate(`document.querySelector('#pokemon-grid')`),null);
+    assert.equal(await evaluate('window.qaRequests'),0);
+    assert.equal(await evaluate(`document.querySelector('.hero-art img').getAttribute('src')`),'./images/group-picture.png');
+    await waitFor(`document.querySelector('.hero-art img').naturalWidth>0`);
+    assert.equal(await evaluate(`document.querySelector('[aria-current="page"]').textContent`),'Home');
+    for (const width of [320,375,768,1280]) {
+      await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+      assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    }
+    await evaluate(`document.querySelector('.explore-link').click()`);
+    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false'`);
+    assert.equal(await evaluate('location.pathname'),'/pokemon.html');
+    assert.equal(await evaluate('document.title'),'National Pokédex — Dexhaven');
+  });
   await check('649 real DOM cards; 19 index requests and no eager full details', async () => {
     assert.equal(await evaluate(`document.querySelectorAll('.pokemon-card').length`), 649); assert.deepEqual(exceptions, []);
     assert.equal(await evaluate('window.qaRequests'),19);assert.equal(await evaluate('window.qaDetailRequests'),0);
   });
   await check('logged-out direct protected route shows a login prompt and Register opens registration',async()=>{
     await command('Page.navigate',{url:origin+'/teams'});
-    await waitFor(`document.querySelector('#account-content')?.textContent.includes('Log in or create')`);
+    await waitFor(`document.querySelector('#trainer-invitation')?.hidden===false`);
+    assert.equal(await evaluate('location.pathname'),'/trainers.html');
+    assert.equal(await evaluate('location.hash'),'#view=teams');
+    assert.equal(await evaluate('window.qaRequests'),0);
+    assert.equal(await evaluate(`document.querySelector('#trainer-area').hidden`),true);
+    for(const theme of ['light','dark']) {
+      await command('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:theme}]});
+      for(const width of [320,375,1280]) {
+        await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+        assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+      }
+    }
     assert.equal(await evaluate(`[...document.querySelectorAll('[data-requires-auth]')].every(n=>n.hidden)`),true);
-    await evaluate(`document.querySelector('#register-button').click()`);
+    await evaluate(`document.querySelector('#hub-login').click()`);
+    assert.equal(await evaluate(`document.querySelector('#auth-title').textContent`),'Log in to Dexhaven');
+    await evaluate(`document.querySelector('#close-auth').click();document.querySelector('#hub-register').click()`);
     assert.equal(await evaluate(`document.querySelector('#auth-dialog').open`),true);
     assert.equal(await evaluate(`document.querySelector('#auth-title').textContent`),'Join Dexhaven');
-    await evaluate(`document.querySelector('#close-auth').click();document.querySelector('[data-view="/"]').click()`);
+    await evaluate(`document.querySelector('#close-auth').click();document.querySelector('[data-page="pokemon"]').click()`);
+    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false'`);
   });
   await check('accessibility tree exposes search, sort, type group, and named cards', async () => {
     const { nodes } = await command('Accessibility.getFullAXTree');
@@ -212,8 +243,6 @@ async function main() {
     await evaluate(`document.querySelector('.card-art img').scrollIntoView()`);
     await sleep(200);
     assert.equal(await evaluate(`document.querySelector('.card-art img').getAttribute('src')`), 'artwork-fallback.svg');
-    assert.equal(await evaluate(`document.querySelector('.hero-art img').getAttribute('src')`), './images/group-picture.png');
-    assert.equal(await evaluate(`document.querySelector('.hero-art img').naturalWidth>0`),true);
   });
   for (const width of [320,375,700,768,1280]) {
     await check(`responsive geometry at ${width}px: no page overflow or clipped artwork`, async () => {
@@ -253,7 +282,7 @@ async function main() {
   await check('dark component styling matches the original stylesheet', async () => {
     await sleep(300);
     const equal = await evaluate(`(async()=>{
-      const selectors=['body','.pokemon-card','.type-badge','.search-box','#sort','.filter-chip','.action-button','dialog','.close-button','.hero-orbit','footer'];
+      const selectors=['body','.pokemon-card','.type-badge','.search-box','#sort','.filter-chip','.action-button','dialog','.close-button','footer'];
       const properties=['color','backgroundColor','borderTopColor','borderRadius','boxShadow','fontSize','paddingTop','paddingLeft'];
       const snapshot=()=>selectors.map(s=>{const c=getComputedStyle(document.querySelector(s));return properties.map(p=>c[p])});
       const current=snapshot();
@@ -280,7 +309,7 @@ async function main() {
       const holder=document.createElement('div');holder.className='pokemon-card';holder.append(badges(Object.keys(TYPE_COLORS)));document.body.append(holder);
       const values=[...holder.querySelectorAll('.type-badge')].map(n=>{const c=getComputedStyle(n);return {name:n.textContent,ratio:contrast(rgba(c.color),blend(rgba(c.backgroundColor),[255,255,255]))}});
       holder.remove();
-      for(const s of ['.hero-description','h1>span','.text-button']) {const c=getComputedStyle(document.querySelector(s));values.push({name:s,ratio:contrast(rgba(c.color),[243,248,245])})}
+      for(const s of ['h1>span','.text-button']) {const c=getComputedStyle(document.querySelector(s));values.push({name:s,ratio:contrast(rgba(c.color),[243,248,245])})}
       return values;
     })()`);
     assert.deepEqual(contrasts.filter(c=>c.ratio<4.5),[]);
@@ -316,6 +345,9 @@ async function main() {
     assert.equal(await evaluate(`document.cookie.includes('pokedex.sid')`),false,'session cookie must be HTTP-only');
   });
   await check('team creation, six slots, duplicate rejection, replacing and removing members', async () => {
+    await evaluate(`document.querySelector('[data-page="trainers"]').click()`);
+    await waitFor(`!!document.querySelector('.profile-panel') && state.pokemon.size===649 && !state.loading`);
+    assert.equal(await evaluate('location.pathname'),'/trainers.html');
     await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('.team-create input').value='Browser Team';document.querySelector('.team-create').requestSubmit()`);
     await waitFor(`document.querySelectorAll('.team-editor').length===1`);
     assert.equal(await evaluate(`document.querySelectorAll('.team-slot').length`),6);
@@ -333,7 +365,7 @@ async function main() {
     await selectSlot(1,'charm');
     await evaluate(`document.querySelector('.team-editor').requestSubmit()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Team saved.'`);
-    await evaluate(`document.querySelector('[data-view="/"]').click();document.querySelector('[data-view="/teams"]').click()`);
+    await evaluate(`document.querySelector('[data-view="/profile"]').click();document.querySelector('[data-view="/teams"]').click()`);
     assert.match(await evaluate(`document.querySelector('.team-slot [role="combobox"]').value`),/#004 Charmander/);
     assert.equal(await evaluate(`document.querySelectorAll('.team-slot [role="combobox"]')[1].value`),'');
   });
@@ -368,8 +400,22 @@ async function main() {
     assert.equal(await evaluate(`document.activeElement.value`),'');
     assert.equal(await evaluate('window.qaRequests'),requests,'search must not fetch full details');
   });
+  await check('Trainer Hub section links support history and direct reload with saved team members',async()=>{
+    await evaluate(`document.querySelector('[data-view="/profile"]').click();document.querySelector('[data-view="/favorites"]').click();history.back()`);
+    await waitFor(`location.hash==='#view=profile' && document.querySelector('#trainer-heading').textContent==='Trainer Profile'`);
+    await evaluate('history.forward()');
+    await waitFor(`location.hash==='#view=favorites' && document.querySelector('#trainer-heading').textContent==='My Favourites'`);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click()`);
+    await command('Page.reload');
+    await waitFor(`document.querySelector('.team-slot [role="combobox"]')?.value.includes('Charmander')`);
+    assert.equal(await evaluate('location.pathname'),'/trainers.html');
+    assert.equal(await evaluate('location.hash'),'#view=teams');
+    assert.equal(await evaluate(`document.querySelector('[data-view="/teams"]').getAttribute('aria-current')`),'page');
+    await waitFor(`state.pokemon.size===649 && !state.loading`);
+    assert.equal(await evaluate('window.qaRequests'),0);
+  });
   await check('missing selector script cannot block create/rename/delete; mutation success survives unrelated refresh failures',async()=>{
-    await evaluate(`delete globalThis.PokemonSelector;window.qaFailPrivateReads=true;document.querySelector('[data-view="/"]').click();document.querySelector('[data-view="/teams"]').click()`);
+    await evaluate(`delete globalThis.PokemonSelector;window.qaFailPrivateReads=true;document.querySelector('[data-view="/profile"]').click();document.querySelector('[data-view="/teams"]').click()`);
     assert.match(await evaluate(`document.querySelector('#account-content').textContent`),/selection could not load/);
     assert.equal(await evaluate(`document.querySelectorAll('.delete-team').length`),1);
     assert.equal(await evaluate(`document.querySelector('.team-slot .mini-pokemon').textContent.includes('Charmander')`),true);
@@ -396,20 +442,30 @@ async function main() {
     assert.deepEqual(exceptions,[]);
   });
   await check('card/detail favourites, dedicated page and profile bio/avatar upload', async () => {
-    await evaluate(`document.querySelector('[data-view="/"]').click();document.querySelector('#pokemon-grid [data-favorite="649"]').click()`);
+    await evaluate(`document.querySelector('[data-page="pokemon"]').click()`);
+    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false' && !document.querySelector('#logout-button').hidden`);
+    await evaluate(`document.querySelector('#pokemon-grid [data-favorite="649"]').click()`);
     await waitFor(`document.querySelector('#pokemon-grid [data-favorite="649"]').getAttribute('aria-pressed')==='true'`);
     await evaluate(`document.querySelector('button[data-id="1"]').click()`);
     await waitFor(`!!document.querySelector('#detail-content [data-favorite="1"]')`);
     await evaluate(`document.querySelector('#detail-content [data-favorite="1"]').click()`);
     await waitFor(`document.querySelector('#detail-content [data-favorite="1"]').getAttribute('aria-pressed')==='true'`);
-    await evaluate(`dialog.close();document.querySelector('[data-view="/favorites"]').click()`);
+    await evaluate(`dialog.close();document.querySelector('[data-page="trainers"]').click()`);
+    await waitFor(`!!document.querySelector('.profile-panel') && state.pokemon.size===649 && !state.loading`);
+    await evaluate(`document.querySelector('[data-view="/favorites"]').click()`);
     assert.equal(await evaluate(`document.querySelectorAll('#favorite-grid .pokemon-card').length`),2);
     await evaluate(`document.querySelector('[data-view="/profile"]').click();const bio=document.querySelector('textarea[name="bio"]');bio.value='My browser-tested trainer bio';bio.closest('form').requestSubmit()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Trainer info saved.'`);
+    assert.equal(await evaluate(`document.querySelector('[data-profile-bio]').textContent`),'My browser-tested trainer bio');
     const png=await require('sharp')({create:{width:4,height:4,channels:3,background:'#80e5b8'}}).png().toBuffer();
     await evaluate(`(()=>{const input=document.querySelector('input[type="file"]');const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob('${png.toString('base64')}'),c=>c.charCodeAt(0))],'avatar.png',{type:'image/png'}));input.files=data.files;input.closest('form').requestSubmit()})()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Profile picture updated.'`);
     assert.match(await evaluate(`document.querySelector('img.trainer-avatar').getAttribute('src')`),/^\/media\/avatars\/[0-9a-f-]+\.webp$/);
+    await waitFor(`document.querySelector('#header-avatar').naturalWidth>0`);
+    assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')===document.querySelector('img.trainer-avatar').getAttribute('src')`),true);
+    assert.equal(await evaluate(`document.querySelector('#header-profile').hidden`),false);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('#header-profile').click()`);
+    assert.equal(await evaluate(`document.querySelector('#trainer-heading').textContent`),'Trainer Profile');
   });
   await check('authenticated pages fit mobile and desktop in both themes', async () => {
     for(const theme of ['dark','light']) {
@@ -431,6 +487,9 @@ async function main() {
   await check('logout/login retains private data; direct page reload and deletion work', async () => {
     await evaluate(`document.querySelector('#logout-button').click()`);
     await waitFor(`!document.querySelector('#guest-actions').hidden && document.querySelector('#logout-button').hidden`);
+    assert.equal(await evaluate(`document.querySelector('#trainer-invitation').hidden`),false);
+    assert.equal(await evaluate(`document.querySelector('#trainer-area').hidden`),true);
+    assert.equal(await evaluate(`document.querySelector('#account-content').children.length`),0);
     assert.equal(await evaluate(`[...document.querySelectorAll('[data-requires-auth]')].every(n=>n.hidden)`),true);
     await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='browser@example.test';document.querySelector('#auth-password').value='browser test password 123';document.querySelector('#auth-form').requestSubmit()`);
     await waitFor(`!document.querySelector('#logout-button').hidden`);
@@ -440,35 +499,76 @@ async function main() {
     await waitFor('window.qaSessionPending===true');
     assert.equal(await evaluate(`[...document.querySelectorAll('[data-requires-auth]')].every(n=>n.hidden)`),true);
     await waitFor(`document.querySelector('textarea[name="bio"]')?.value==='My browser-tested trainer bio'`);
+    await waitFor(`state.pokemon.size===649 && !state.loading`);
+    await check('authenticated navigation across all three pages preserves session, theme and trainer tools', async () => {
+      const theme = await evaluate('document.documentElement.dataset.theme');
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid')`),null);
+      await evaluate(`document.querySelector('[data-page="pokemon"]').click()`);
+      await waitFor(`document.querySelector('#logout-button')?.hidden===false && state.pokemon.size===649 && !state.loading`);
+      assert.equal(await evaluate('document.documentElement.dataset.theme'),theme);
+      await evaluate(`document.querySelector('[data-page="home"]').click()`);
+      await waitFor(`!!document.querySelector('.hero') && document.querySelector('#logout-button')?.hidden===false`);
+      assert.equal(await evaluate('document.documentElement.dataset.theme'),theme);
+      assert.equal(await evaluate('window.qaRequests'),0);
+      assert.equal(await evaluate(`document.querySelector('#account-content')`),null);
+      await evaluate(`document.querySelector('#header-profile').click()`);
+      await waitFor(`!!document.querySelector('.profile-panel') && state.pokemon.size===649 && !state.loading`);
+      assert.equal(await evaluate('location.pathname'),'/trainers.html');
+      assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')===document.querySelector('img.trainer-avatar').getAttribute('src')`),true);
+      await evaluate(`document.querySelector('[data-view="/teams"]').click()`);
+      assert.equal(await evaluate(`document.querySelectorAll('.team-slot [role="combobox"]').length`),6);
+    });
     await evaluate(`document.querySelector('[data-view="/teams"]').click()`);
     assert.equal(await evaluate(`document.querySelector('.team-editor input').value`),'Browser Team');
-    await evaluate(`document.querySelector('.team-actions .text-button').click()`);
+    await evaluate(`document.querySelector('.delete-team').click()`);
     await waitFor(`document.querySelectorAll('.team-editor').length===0`);
     await evaluate(`document.querySelector('[data-view="/favorites"]').click();document.querySelector('#favorite-grid [data-favorite="649"]').click()`);
     await waitFor(`document.querySelectorAll('#favorite-grid .pokemon-card').length===1`);
     assert.deepEqual(exceptions,[]);
   });
+  await check('Trainer Hub catalogue outage preserves favourites and recovers through retry',async()=>{
+    await evaluate(`Object.keys(localStorage).filter(k=>k.startsWith('dexhaven-index-v2-')).forEach(k=>localStorage.removeItem(k))`);
+    const offline=await command('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaMode='offline'`});
+    try {
+      await command('Page.navigate',{url:origin+'/trainers.html?qa=outage#view=favorites'});
+      await waitFor(`document.querySelector('#trainer-catalog-retry')?.hidden===false`);
+    } finally { await command('Page.removeScriptToEvaluateOnNewDocument',{identifier:offline.identifier}); }
+    assert.equal(await evaluate(`document.querySelectorAll('#favorite-grid .pokemon-card').length`),1);
+    assert.equal(await evaluate('state.pokemon.size'),0);
+    await evaluate(`window.qaMode='ok';document.querySelector('#trainer-catalog-retry').click()`);
+    await waitFor(`state.pokemon.size===649 && !state.loading && document.querySelector('#trainer-catalog-status').hidden`);
+    assert.equal(await evaluate(`document.querySelector('#favorite-grid .card-name').textContent`),'Bulbasaur');
+    await evaluate(`document.querySelector('#favorite-grid .pokemon-card').click()`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Bulbasaur'`);
+    await evaluate('dialog.close()');
+    assert.deepEqual(exceptions,[]);
+  });
   await check('GitHub Pages project-path preview: no backend, correct brand/hero, generations, details and hash navigation',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/'});
-    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false'`);
+    await waitFor(`!!document.querySelector('.hero-art img')`);
     assert.match(await evaluate('document.title'),/^Dexhaven — /);
     assert.deepEqual(await evaluate(`[...document.querySelectorAll('.brand')].map(n=>n.textContent)`),['dexhaven.','dexhaven.']);
-    assert.equal(await evaluate(`document.querySelectorAll('.pokemon-card').length`),649);
+    assert.equal(await evaluate('window.qaRequests'),0);
     assert.equal(await evaluate(`document.querySelector('.hero-art img').getAttribute('src')`),'./images/group-picture.png');
+    await evaluate(`document.querySelector('.explore-link').click()`);
+    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false'`);
+    assert.equal(await evaluate(`document.querySelectorAll('.pokemon-card').length`),649);
+    assert.equal(await evaluate('location.pathname'),'/preview/Pokedex-Website/pokemon.html');
     await evaluate(`document.querySelector('#generation').value='5';document.querySelector('#generation').dispatchEvent(new Event('change'));document.querySelector('#search').value='#649';document.querySelector('#search').dispatchEvent(new Event('input'))`);
     assert.deepEqual(await evaluate(`[...grid.children].map(n=>Number(n.dataset.id))`),[649]);
     await evaluate(`grid.querySelector('.pokemon-card').click()`);
     await waitFor(`document.querySelectorAll('#detail-content .stat').length===6`);
     assert.equal(await evaluate(`document.querySelector('#detail-name').textContent`),'Genesect');
     await evaluate(`dialog.close()`);
-    await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/#view=teams'});
-    await waitFor(`document.querySelector('#account-content').textContent.includes('Log in or create')`);
-    assert.equal(await evaluate('location.pathname'),'/preview/Pokedex-Website/');
+    await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/pokemon.html#view=teams'});
+    await waitFor(`document.querySelector('#trainer-invitation')?.hidden===false`);
+    assert.equal(await evaluate('location.pathname'),'/preview/Pokedex-Website/trainers.html');
     assert.equal(await evaluate('location.hash'),'#view=teams');
     await command('Page.reload');
     await waitFor(`document.querySelector('#trainer-heading')?.textContent==='My Teams'`);
-    await evaluate(`document.querySelector('[data-view="/"]').click()`);
-    assert.equal(await evaluate('location.pathname'),'/preview/Pokedex-Website/');
+    await evaluate(`document.querySelector('[data-page="pokemon"]').click()`);
+    await waitFor(`document.querySelector('#pokemon-grid')?.getAttribute('aria-busy')==='false'`);
+    assert.equal(await evaluate('location.pathname'),'/preview/Pokedex-Website/pokemon.html');
     assert.equal(await evaluate(`document.querySelector('#collection').hidden`),false);
     assert.deepEqual(exceptions,[]);
   });

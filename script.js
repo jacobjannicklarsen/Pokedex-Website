@@ -119,6 +119,7 @@ function matches(pokemon) {
 }
 
 function render() {
+  if (!grid) { globalThis.PokedexAccounts?.onPokemonUpdate(); return; }
   const visible = [...state.pokemon.values()].filter(matches).sort((a, b) => {
     if (state.sort === 'name') return prettyName(a.name).localeCompare(prettyName(b.name));
     return state.sort === 'reverse' ? b.id - a.id : a.id - b.id;
@@ -279,13 +280,22 @@ async function fetchPokemon(id) {
   }
 }
 
-async function loadPokemon() {
-  if (state.loading) return;
+let catalogueRequest;
+function loadPokemon() {
+  // The collection and trainer tools share one in-flight catalogue request.
+  if (catalogueRequest) return catalogueRequest;
+  if (state.pokemon.size === TOTAL && state.typesLoaded.size === Object.keys(TYPE_COLORS).length) return Promise.resolve();
+  catalogueRequest = loadCatalogue().finally(() => { catalogueRequest = null; });
+  return catalogueRequest;
+}
+async function loadCatalogue() {
   state.loading = true;
-  $('#error-state').hidden = true;
-  $('#load-status').hidden = false;
-  $('#load-message').textContent = 'Loading the National Pokédex index…';
-  grid.setAttribute('aria-busy', 'true');
+  if (grid) {
+    $('#error-state').hidden = true;
+    $('#load-status').hidden = false;
+    $('#load-message').textContent = 'Loading the National Pokédex index…';
+    grid.setAttribute('aria-busy', 'true');
+  }
   render();
   let failed = false;
   try {
@@ -328,7 +338,7 @@ async function loadPokemon() {
           });
           state.typesLoaded.add(type); consecutiveFailures = 0;
         } catch { failed = true; if (++consecutiveFailures >= CONCURRENCY) stop = true; }
-        $('#load-message').textContent = `Indexing Pokémon types… ${state.typesLoaded.size} / ${Object.keys(TYPE_COLORS).length}`;
+        if (grid) $('#load-message').textContent = `Indexing Pokémon types… ${state.typesLoaded.size} / ${Object.keys(TYPE_COLORS).length}`;
         scheduleRender();
       }
     }
@@ -336,11 +346,13 @@ async function loadPokemon() {
   } catch { failed = true;
   } finally {
     state.loading = false;
-    $('#load-status').hidden = true;
-    grid.setAttribute('aria-busy', 'false');
-    if (failed || state.typesLoaded.size !== Object.keys(TYPE_COLORS).length) {
-      $('#error-state').hidden = false;
-      $('#error-message').textContent = state.pokemon.size ? 'Some type data couldn’t be loaded. Name, number and generation search still work; type matches may be incomplete. Retry to finish the index.' : 'The Pokémon index couldn’t be loaded. Check your connection and try again.';
+    if (grid) {
+      $('#load-status').hidden = true;
+      grid.setAttribute('aria-busy', 'false');
+      if (failed || state.typesLoaded.size !== Object.keys(TYPE_COLORS).length) {
+        $('#error-state').hidden = false;
+        $('#error-message').textContent = state.pokemon.size ? 'Some type data couldn’t be loaded. Name, number and generation search still work; type matches may be incomplete. Retry to finish the index.' : 'The Pokémon index couldn’t be loaded. Check your connection and try again.';
+      }
     }
     render();
   }
@@ -374,56 +386,69 @@ async function indexResource(key, url, compact, valid) {
 }
 
 // Include current typings, including types introduced after Generation I.
-const filters = $('#type-filters');
-['all', ...Object.keys(TYPE_COLORS)].forEach((type) => {
-  const chip = element('button', 'filter-chip');
-  chip.type = 'button';
-  chip.dataset.type = type;
-  chip.setAttribute('aria-pressed', String(type === 'all'));
-  if (type !== 'all') {
-    chip.style.setProperty('--type-color', TYPE_COLORS[type]);
-    const dot = element('span', 'type-dot');
-    dot.setAttribute('aria-hidden', 'true');
-    chip.append(dot);
-  }
-  chip.append(document.createTextNode(type === 'all' ? 'All types' : prettyName(type)));
-  filters.append(chip);
-});
-filters.addEventListener('click', (event) => {
-  const chip = event.target.closest('button[data-type]');
-  if (!chip) return;
-  state.type = chip.dataset.type;
-  render();
-});
-$('#search').addEventListener('input', (event) => { state.query = event.target.value; render(); });
-$('#sort').addEventListener('change', (event) => { state.sort = event.target.value; render(); });
-$('#generation').addEventListener('change', (event) => {
-  state.generation = GENERATIONS.some(g => g.id === event.target.value) ? event.target.value : 'all'; render();
-});
-$('#reset').addEventListener('click', resetFilters);
-$('#empty-reset').addEventListener('click', resetFilters);
-$('#retry').addEventListener('click', loadPokemon);
-grid.addEventListener('click', (event) => {
-  const card = event.target.closest('button[data-id]');
-  if (card) showDetails(state.pokemon.get(Number(card.dataset.id)));
-});
-$('#close-dialog').addEventListener('click', () => dialog.close());
-dialog.addEventListener('close', () => { detailRevision++; });
-dialog.addEventListener('click', (event) => {
-  if (event.target !== dialog) return;
-  const rect = dialog.getBoundingClientRect();
-  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
-});
-document.addEventListener('keydown', (event) => {
-  if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !document.querySelector('dialog[open]') && !$('#collection').hidden && !event.target.closest('input, textarea, select, [contenteditable]')) {
-    event.preventDefault();
-    $('#search').focus();
-  }
-});
+function initializeCollection() {
+  if (!grid) return;
+  const filters = $('#type-filters');
+  ['all', ...Object.keys(TYPE_COLORS)].forEach((type) => {
+    const chip = element('button', 'filter-chip');
+    chip.type = 'button';
+    chip.dataset.type = type;
+    chip.setAttribute('aria-pressed', String(type === 'all'));
+    if (type !== 'all') {
+      chip.style.setProperty('--type-color', TYPE_COLORS[type]);
+      const dot = element('span', 'type-dot');
+      dot.setAttribute('aria-hidden', 'true');
+      chip.append(dot);
+    }
+    chip.append(document.createTextNode(type === 'all' ? 'All types' : prettyName(type)));
+    filters.append(chip);
+  });
+  filters.addEventListener('click', (event) => {
+    const chip = event.target.closest('button[data-type]');
+    if (!chip) return;
+    state.type = chip.dataset.type;
+    render();
+  });
+  $('#search').addEventListener('input', (event) => { state.query = event.target.value; render(); });
+  $('#sort').addEventListener('change', (event) => { state.sort = event.target.value; render(); });
+  $('#generation').addEventListener('change', (event) => {
+    state.generation = GENERATIONS.some(g => g.id === event.target.value) ? event.target.value : 'all'; render();
+  });
+  $('#reset').addEventListener('click', resetFilters);
+  $('#empty-reset').addEventListener('click', resetFilters);
+  $('#retry').addEventListener('click', loadPokemon);
+  grid.addEventListener('click', (event) => {
+    const card = event.target.closest('button[data-id]');
+    if (card) showDetails(state.pokemon.get(Number(card.dataset.id)));
+  });
+}
+
+function initializeDetails() {
+  if (!dialog) return;
+  $('#close-dialog').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => { detailRevision++; });
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (grid && event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !document.querySelector('dialog[open]') && !$('#collection').hidden && !event.target.closest('input, textarea, select, [contenteditable]')) {
+      event.preventDefault();
+      $('#search').focus();
+    }
+  });
+}
 // Native dialog supplies Escape, focus trapping, and focus restoration.
-const heroArtwork = document.querySelector('.hero-art img');
-const fallbackHero = () => { heroArtwork.src = 'artwork-fallback.svg'; };
-heroArtwork.addEventListener('error', fallbackHero, { once: true });
-// The hero may have failed before this deferred script executed.
-if (heroArtwork.complete && heroArtwork.naturalWidth === 0) fallbackHero();
-loadPokemon();
+function initializeHero() {
+  const heroArtwork = document.querySelector('.hero-art img');
+  if (!heroArtwork) return;
+  const fallbackHero = () => { heroArtwork.src = 'artwork-fallback.svg'; };
+  heroArtwork.addEventListener('error', fallbackHero, { once: true });
+  // The hero may have failed before this deferred script executed.
+  if (heroArtwork.complete && heroArtwork.naturalWidth === 0) fallbackHero();
+}
+initializeCollection();
+initializeDetails();
+initializeHero();
+if (grid) loadPokemon();

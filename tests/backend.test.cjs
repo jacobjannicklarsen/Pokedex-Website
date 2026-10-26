@@ -42,6 +42,23 @@ async function register(client, suffix='one') {
   return client.call('/api/auth/register',{method:'POST',body:{username:`trainer_${suffix}`,email:`${suffix}@example.test`,password:'a sufficiently long test password'}});
 }
 
+test('public homepage and Pokédex serve without authentication; legacy trainer routes remain available',async t=>{
+  const app=await setup(t),client=app.client();
+  for(const route of ['/','/index.html']) {
+    const page=await client.call(route,{raw:true});assert.equal(page.status,200);
+    assert.match(page.data,/class="hero"/);assert.ok(!page.data.includes('id="pokemon-grid"'));
+  }
+  const page=await client.call('/pokemon.html',{raw:true});assert.equal(page.status,200);
+  assert.match(page.data,/<title>National Pokédex — Dexhaven<\/title>/);
+  assert.match(page.data,/id="pokemon-grid"/);
+  for(const route of ['/trainers.html','/teams','/favorites','/profile']) {
+    const hub=await client.call(route,{raw:true});assert.equal(hub.status,200);
+    assert.match(hub.data,/<title>Trainer Hub — Dexhaven<\/title>/);
+    assert.match(hub.data,/id="trainer-invitation"/);
+  }
+  assert.equal((await client.call('/dashboard.html')).status,404);
+});
+
 test('registration, Argon2id, cookies, session rotation, login/logout and validation',async t=>{
   const app=await setup(t);const client=app.client();
   const init=await client.call('/api/auth/session');const anonymous=client.state.cookie;

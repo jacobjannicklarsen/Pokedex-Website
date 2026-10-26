@@ -33,6 +33,11 @@ h1 { font-size:clamp(34px,3.5vw,49px); line-height:1.18; letter-spacing:-2px; ma
 .art-caption { position:absolute; bottom:0; font-size:11px; }
 .art-caption span { color:var(--muted); }
 .collection { padding-top:36px; border-top:1px solid var(--line); }
+#collection-title { font-size:30px; letter-spacing:-1px; }
+.home-features { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; padding-block:36px; border-top:1px solid var(--line); }
+.home-features h2 { font-size:22px; }
+.home-features article>p:not(.eyebrow) { color:var(--muted); line-height:1.8; }
+@media (max-width:700px) { .home-features { grid-template-columns:1fr; gap:24px; } #collection-title { font-size:24px; } }
 .section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:26px; }
 .section-heading .eyebrow { color:var(--muted); margin-bottom:10px; font-size:9px; }
 h2 { font-size:29px; letter-spacing:-1px; font-weight:500; margin:0; }
@@ -137,6 +142,8 @@ footer p {
 
 /* Theme additions leave the original dark palette and component styles intact. */
 .header-actions { display:flex; align-items:center; gap:18px; }
+.header-profile { display:grid; place-items:center; width:36px; height:36px; flex-shrink:0; overflow:hidden; border:2px solid var(--mint); border-radius:50%; background:var(--panel); color:var(--text); font-weight:600; }
+.header-profile img { width:100%; height:100%; object-fit:cover; }
 .theme-toggle { display:grid; place-items:center; width:40px; height:40px; padding:9px; border:1px solid var(--line); border-radius:50%; background:var(--panel); color:var(--mint); }
 .theme-toggle:hover { border-color:var(--mint); }
 .theme-toggle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
@@ -188,6 +195,14 @@ button:disabled { cursor:wait; opacity:.6; }
 .account-message.is-error { border-color:#d39779; }
 .trainer-area { padding-block:36px; }
 .trainer-area>h1 { margin-bottom:24px; }
+.hub-intro { padding-top:36px; }
+.hub-intro .hero-description { max-width:600px; }
+.hub-nav { display:flex; flex-wrap:wrap; gap:12px 28px; border-bottom:1px solid var(--line); }
+.hub-nav a { padding:14px 0; color:var(--muted); }
+.hub-nav a[aria-current] { color:var(--text); border-bottom:2px solid var(--mint); }
+.trainer-invitation { max-width:760px; margin-block:28px 48px; }
+.trainer-invitation>p:not(.eyebrow) { color:var(--muted); line-height:1.8; max-width:600px; }
+.profile-biography { white-space:pre-wrap; line-height:1.7; }
 .trainer-panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:24px; margin-block:18px; }
 .account-form { display:grid; gap:18px; padding:32px; }
 .account-form h2 { padding-right:22px; }

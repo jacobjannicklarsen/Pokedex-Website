@@ -3,11 +3,12 @@
   'use strict';
   const session = { user: null, csrf: '', favorites: new Set(), teams: [], ready: false };
   const siteRoot = new URL('.', document.currentScript?.src || location.href);
+  const isTrainerHub = document.body.dataset.page === 'trainers';
+  const viewTarget = view => `${new URL('trainers.html', siteRoot).pathname}#view=${view.slice(1) || 'profile'}`;
   const viewFromLocation = () => {
     const hash = location.hash.match(/^#view=(teams|favorites|profile)$/);
-    return hash ? `/${hash[1]}` : ['/', '/teams', '/favorites', '/profile'].includes(location.pathname) ? location.pathname : '/';
+    return hash ? `/${hash[1]}` : isTrainerHub ? '/profile' : '/';
   };
-  let backendAvailable = false;
   let activeView = viewFromLocation();
   let authMode = 'login';
   const authDialog = $('#auth-dialog');
@@ -61,7 +62,6 @@
   }
   async function refreshSession() {
     const data = await request('/auth/session');
-    backendAvailable = true;
     session.user = data.user; session.csrf = data.csrfToken;
     session.ready = true; updateAccountUI();
     if (session.user) await loadPrivateData();
@@ -79,9 +79,27 @@
     $('#session-status').hidden = session.ready;
     document.querySelectorAll('[data-requires-auth]').forEach(link => { link.hidden = !authenticated; });
     document.querySelectorAll('[data-view]').forEach(link => {
-      link.href = backendAvailable ? link.dataset.view : siteRoot.pathname + (link.dataset.view === '/' ? '' : `#view=${link.dataset.view.slice(1)}`);
+      link.href = viewTarget(link.dataset.view);
     });
+    const profile = $('#header-profile');
+    const avatar = $('#header-avatar');
+    const initial = $('#header-avatar-initial');
+    profile.href = viewTarget('/profile');
+    profile.setAttribute('aria-label', authenticated ? `Open ${session.user.username}'s trainer profile` : 'Open trainer profile');
+    profile.title = authenticated ? session.user.username : '';
+    initial.textContent = authenticated ? session.user.username[0].toUpperCase() : '';
+    const avatarUrl = authenticated ? session.user.avatarUrl : null;
+    if (!avatarUrl) {
+      avatar.hidden = true; avatar.removeAttribute('src'); initial.hidden = false;
+    } else if (avatar.getAttribute('src') !== avatarUrl) {
+      avatar.hidden = false; initial.hidden = true; avatar.src = avatarUrl;
+    }
     document.querySelectorAll('[data-favorite]').forEach(updateFavoriteButton);
+    if (isTrainerHub) {
+      $('#trainer-invitation').hidden = !session.ready || authenticated;
+      $('#trainer-session-loading').hidden = session.ready;
+      $('#trainer-area').hidden = !authenticated;
+    }
   }
   function openAuth(mode = 'login') {
     authMode = mode;
@@ -159,41 +177,50 @@
     teamSelectors.forEach(selector => selector.refresh());
   }
   function navigate(view, push = true) {
-    activeView = ['/', '/teams', '/favorites', '/profile'].includes(view) ? view : '/';
+    if (!isTrainerHub) {
+      if (view !== '/') location.assign(viewTarget(view));
+      return;
+    }
+    activeView = ['/teams', '/favorites', '/profile'].includes(view) ? view : '/profile';
     if (push) {
-      const target = backendAvailable ? activeView : siteRoot.pathname + (activeView === '/' ? '' : `#view=${activeView.slice(1)}`);
+      const target = viewTarget(activeView);
       if (location.pathname + location.hash !== target) history.pushState({}, '', target);
     }
-    $('.hero').hidden = activeView !== '/'; $('#collection').hidden = activeView !== '/';
-    $('#trainer-area').hidden = activeView === '/';
     document.querySelectorAll('[data-view]').forEach(link => {
       if (link.dataset.view === activeView) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
     });
-    if (activeView !== '/') renderPage();
-    else {
-      teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
-      content.replaceChildren();
-    }
+    renderPage();
+  }
+  let trainerCatalogueStarted = false;
+  async function loadTrainerCatalogue() {
+    trainerCatalogueStarted = true;
+    const status = $('#trainer-catalog-status');
+    const retry = $('#trainer-catalog-retry');
+    status.hidden = false; retry.hidden = true;
+    status.querySelector('span').textContent = 'Loading Pokémon for your trainer tools…';
+    await loadPokemon();
+    const complete = state.pokemon.size === TOTAL && state.typesLoaded.size === Object.keys(TYPE_COLORS).length;
+    status.hidden = complete; retry.hidden = complete;
+    if (!complete) status.querySelector('span').textContent = 'Some Pokémon data could not load. Existing teams and favourites are preserved. Retry to finish loading names and types.';
   }
   function renderPage() {
+    if (!isTrainerHub) return;
     teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
     content.replaceChildren();
     $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile' })[activeView] || 'Trainer';
     if (!session.ready) { content.append(element('p', 'form-help', 'Loading your trainer account…')); return; }
-    if (!session.user) {
-      const gate = element('div', 'trainer-panel');
-      gate.append(element('p', '', 'Log in or create a trainer account to save teams and favourites.'), action('Log in', () => openAuth()), action('Create an account', () => openAuth('register'), 'text-button'));
-      content.append(gate); return;
-    }
+    if (!session.user) return;
+    if (!trainerCatalogueStarted) loadTrainerCatalogue();
     if (activeView === '/teams') renderTeams();
     if (activeView === '/favorites') {
       content.append(element('p', 'form-help', 'Your saved Pokémon. Select a card to see its details.'));
+      const browse = element('a', 'explore-link', 'Explore the National Pokédex'); browse.href = 'pokemon.html'; content.append(browse);
       const grid = element('div', 'pokemon-grid'); grid.id = 'favorite-grid';
       grid.addEventListener('click', event => {
         const button = event.target.closest('.pokemon-card');
         if (!button) return;
         const pokemon = state.pokemon.get(Number(button.dataset.id));
-        if (pokemon) showDetails(pokemon); else notice('Pokémon data is not loaded yet. Return to the Pokédex and retry loading.', true);
+        if (pokemon) showDetails(pokemon); else notice('Pokémon data is not loaded yet. Use Retry Pokémon data above to finish loading.', true);
       });
       content.append(grid); renderFavoriteGrid();
     }
@@ -221,6 +248,7 @@
     if (user.avatarUrl) { const img = element('img', 'trainer-avatar'); img.src = user.avatarUrl; img.alt = `${user.username}'s profile picture`; panel.append(img); }
     else panel.append(element('span', 'trainer-avatar avatar-initial', user.username[0].toUpperCase()));
     const identity = element('div'); identity.append(element('h2', '', user.username), element('p', 'form-help', `Dexhaven trainer · Joined ${new Date(user.createdAt).toLocaleDateString()}`), element('p', '', user.email));
+    const biography = element('p', 'profile-biography', user.bio || 'Your story is still unwritten. Add a biography below.'); biography.dataset.profileBio = ''; identity.append(biography);
     panel.append(identity); content.append(panel);
     const form = element('form', 'account-form trainer-panel');
     const label = element('label', '', 'Trainer bio');
@@ -228,7 +256,7 @@
     const save = element('button', 'action-button', 'Save trainer info'); save.type = 'submit';
     form.append(label, save); form.addEventListener('submit', async event => {
       event.preventDefault(); save.disabled = true;
-      try { const data = await request('/profile', { method: 'PATCH', body: { bio: bio.value } }); session.user = data.user; notice('Trainer info saved.'); }
+      try { const data = await request('/profile', { method: 'PATCH', body: { bio: bio.value } }); session.user = data.user; biography.textContent = data.user.bio || 'Your story is still unwritten. Add a biography below.'; notice('Trainer info saved.'); }
       catch (error) { notice(error.message, true); } finally { save.disabled = false; }
     });
     const avatarForm = element('form', 'account-form trainer-panel');
@@ -241,7 +269,7 @@
       const selected = file.files[0];
       if (!selected || selected.size > 2 * 1024 * 1024 || !['image/jpeg','image/png','image/webp'].includes(selected.type)) { notice('Choose a JPEG, PNG or WebP image no larger than 2 MB.', true); return; }
       upload.disabled = true; const data = new FormData(); data.append('avatar', selected);
-      try { const result = await request('/profile/avatar', { method: 'POST', form: data }); session.user = result.user; notice('Profile picture updated.'); if (activeView === '/profile') renderPage(); }
+      try { const result = await request('/profile/avatar', { method: 'POST', form: data }); session.user = result.user; updateAccountUI(); notice('Profile picture updated.'); if (activeView === '/profile') renderPage(); }
       catch (error) { notice(error.message, true); } finally { upload.disabled = false; }
     });
     content.append(form, avatarForm, element('h2', 'account-subheading', `Teams · ${session.teams.length}`));
@@ -384,8 +412,18 @@
     catch (error) { notice(error.message, true); } finally { $('#logout-button').disabled = false; }
   });
   globalThis.PokedexAccounts = { decorateCard, decorateDetails, onPokemonUpdate };
+  $('#header-profile').addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); navigate('/profile');
+  });
+  $('#header-avatar').addEventListener('error', () => {
+    $('#header-avatar').hidden = true; $('#header-avatar-initial').hidden = false;
+  });
+  $('#trainer-catalog-retry')?.addEventListener('click', loadTrainerCatalogue);
+  $('#hub-login')?.addEventListener('click', () => openAuth());
+  $('#hub-register')?.addEventListener('click', () => openAuth('register'));
   updateAccountUI();
-  [...grid.children].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
+  [...(grid?.children || [])].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
   navigate(activeView, false);
   refreshSession().then(() => { if (activeView !== '/') renderPage(); }).catch(() => {
     session.ready = true;

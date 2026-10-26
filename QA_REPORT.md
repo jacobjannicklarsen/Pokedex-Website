@@ -1,6 +1,6 @@
 # Pokédex QA review
 
-This report records successive project stages. The **Dexhaven v0.2.0 expansion** section at the end describes the current version and latest verification; earlier sections document previous reviews.
+This report records successive project stages. The **Dexhaven v0.2.2 Trainer Hub** section at the end describes the current version and latest verification; earlier sections document previous reviews.
 
 Reviewed search, filtering, sorting, details, loading, API failures, cache behavior, accessibility, keyboard interaction, and responsive geometry. The design and existing features are preserved; no dependencies were added.
 
@@ -162,3 +162,35 @@ Quick manual flow: start Express; verify only guest navigation; choose Register 
 - Confirmed no uncaught browser exceptions during the final fixture run, and syntax checks passed. No code was pushed/published. Real screen-reader, touch and cross-browser checks remain manual.
 
 For the repaired running local app: hard-refresh with Ctrl+Shift+R, open My Teams, create or rename a team, select/save members, then choose Delete team and confirm. The server was already restarted during this repair.
+
+## Dexhaven v0.2.1 restructuring
+
+Verified on 26 October 2026. Earlier results above describe their respective development stages.
+
+- Initial working tree was clean on `dev/v0.2.0`; the branch was preserved. Git's ownership check required a per-command `safe.directory` override for this checkout; no global Git settings were changed.
+- Moved the collection section from `index.html` into the new complete `pokemon.html` document. The homepage retains the original hero heading, introduction, founder artwork/caption, header/footer and design, with small introductory sections. Both pages have public navigation and optional accounts; unfinished Trainers/Dashboard pages are not linked.
+- Shared collection, detail and hero initialization now guards absent components. Homepage startup makes zero catalogue requests. Trainer tools on that page load the same catalogue lazily, reuse in-flight requests and expose loading/error/retry feedback. Pokémon detail dialogs remain available for trainer favourites on either page.
+- `npm.cmd test`: **37 passed, one skipped, zero failed**. Added coverage for both Express public pages, preserved trainer routes, the split HTML/shared layout/version metadata, absent collection/hero/dialog nodes, lazy trainer loading and concurrent load coalescing. Existing 649-species, filters, sorting, detail, cache, selector, theme and API/security tests pass.
+- `npm.cmd run test:browser`: **33/33 passed**. Headless Chrome verifies homepage navigation, zero homepage catalogue requests, all 649 cards, generation/search/type/sort combinations, details, keyboard controls, error recovery, registration/login/logout, private links, teams, selector recovery, favourites, profile/avatar, session/theme continuity between public pages and reloads, homepage trainer catalogue failure/retry without losing favourites, and static preview under `/preview/Pokedex-Website/`. Geometry checks cover 320–1280px. No uncaught browser exceptions were observed.
+- Chrome's debugging connection timed out before tests in the sandbox. Running the unchanged browser-launch mechanism outside the sandbox allowed the suite to execute. Browser fixtures use isolated in-memory account/session repositories and temporary uploads, not the configured MySQL database.
+- `node tests/live-pokeapi.cjs`: **passed** outside the network-restricted sandbox; exactly three read-only GETs verify the 649-species list, Dragon membership and Genesect details/artwork. The initial sandbox attempt failed to fetch.
+- Real MySQL integration remains opt-in and was **not run for v0.2.1**. No database schema, credentials, uploads or production records were modified. Tests exercise the existing repository/session contracts with fixtures; they do not establish live database behavior.
+- Package and lockfile project versions are 0.2.1; dependency versions and package name are unchanged. Documentation and local release notes were updated. No commit, push, Git release, deployment or publishing was performed.
+- Syntax checks passed for `script.js`, `account.js` and the browser harness. Both HTML pages passed unique-ID, UTF-8 and relative local link/asset checks; `git diff --check` passed.
+
+Before release: restart the local Express server to load the new route allowlist. Visit http://localhost:3000/ and http://localhost:3000/pokemon.html; verify an existing MySQL-backed account, avatar, teams and favourites across page navigation and reloads. Real touch-device, screen-reader and Safari/Firefox checks remain manual. The existing project implements no advanced statistic filters; six detail stats and all existing collection filters are preserved.
+
+## Dexhaven v0.2.2 Trainer Hub
+
+Verified on 26 October 2026. Work continues on the existing `dev/v0.2.0` branch, preserving the uncommitted v0.2.1 changes and header avatar enhancement.
+
+- Added `trainers.html` with a shared introduction, guest sign-in invitation and authenticated Profile, My Teams and My Favourites section navigation. Reused the existing account renderers, forms, API requests, searchable selectors, validation and error handling. Profile now also displays the saved biography alongside the existing identity/avatar and team/favourite summaries.
+- Removed trainer-management containers and team-selector script loading from `index.html` and `pokemon.html`. Shared login/session/avatar controls and Pokémon account actions still work on public pages. The header avatar navigates to the hub Profile section. The hub alone initializes its private interfaces and loads catalogue data after authentication.
+- All three pages have consistent public navigation, header/footer and theme behavior. Direct section links use `trainers.html#view=profile`, `#view=teams` and `#view=favorites`. Legacy Express trainer routes redirect to those links; old public-page hash bookmarks navigate to the hub. Repository-subpath static previews remain supported.
+- `npm.cmd test`: **37 passed, one opt-in MySQL test skipped, zero failed**. Updated route, layout, version and trainer-markup assertions. Existing authentication, authorization, CSRF, upload processing, team restrictions, catalogue, selector and theme checks pass.
+- `npm.cmd run test:browser`: **34/34 passed** in headless Chrome, with deterministic PokéAPI data and isolated in-memory account/session repositories. Checks include guest invitation buttons and mobile geometry in both themes; registration/login/logout; biography editing; avatar upload and immediate header updates; team create/save/rename/delete and selector recovery; favourites/details; session/theme continuity across all three pages; section history, direct reloads and saved data restoration; catalogue outage/retry; and static repository-subpath navigation. No uncaught browser exceptions were observed.
+- Browser geometry covers 320–1280px. Updated the harness to wait for session restoration after full page navigation and to target team deletion independently of guest controls. The outage test explicitly loads a new document so injected network failure applies. Chrome runs outside the sandbox because its debugging connection times out inside it.
+- Separately ran the opt-in real-MySQL suite with `RUN_MYSQL_TESTS=1`: **one passed**. It verifies six-slot/duplicate/ID constraints, ownership, transaction rollback and concurrent saves, favourites, cross-instance session persistence and team deletion cascades. It creates uniquely named test accounts and deletes only their records and its own test session afterward. Existing accounts, teams, favourites and uploaded files were not changed; no schema migration was executed.
+- Updated package/lockfile project versions to **0.2.2** and refreshed README, Windows setup, API page-route documentation and release notes. Dependency versions and the project/public names are unchanged. No commit, push, Git release or deployment was created.
+
+Local review: restart Express, then visit http://localhost:3000/trainers.html. As a guest, check the invitation and login/registration buttons. Sign in with an existing account and verify the displayed profile/avatar/biography, teams and favourites. Refresh each hub section; navigate through Home and National Pokédex; test both themes and logout. Touch devices, screen-reader announcements and Safari/Firefox remain manual checks.

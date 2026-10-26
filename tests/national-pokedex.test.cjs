@@ -17,11 +17,11 @@ class Node {
   replaceChildren(...nodes){this.children=[];this.append(...nodes);}
   showModal(){this.open=true;}
 }
-function setup({failures=new Set(),mode='ok',blocked=false}={}){
+function setup({failures=new Set(),mode='ok',blocked=false,collection=true,hero=true,details=true}={}){
   const nodes=new Map(),storage=new Map(),calls=[];let active=0,maxActive=0;
   const fixture=createPokeFixture();
   const context=vm.createContext({
-    document:{querySelector(selector){if(!nodes.has(selector))nodes.set(selector,new Node());return nodes.get(selector);},querySelectorAll(){return nodes.get('#type-filters')?.children||[];},createElement(){return new Node();},createTextNode(text){const n=new Node();n.textContent=text;return n;},addEventListener(){}},
+    document:{querySelector(selector){if((!collection&&selector==='#pokemon-grid')||(!hero&&selector==='.hero-art img')||(!details&&selector==='#pokemon-dialog'))return null;if(!nodes.has(selector))nodes.set(selector,new Node());return nodes.get(selector);},querySelectorAll(){return nodes.get('#type-filters')?.children||[];},createElement(){return new Node();},createTextNode(text){const n=new Node();n.textContent=text;return n;},addEventListener(){}},
     AbortController,clearTimeout,setTimeout:(fn,ms)=>setTimeout(fn,mode==='timeout'&&ms===12000?1:ms),requestAnimationFrame:fn=>setTimeout(fn,0),
     localStorage:{getItem(k){if(blocked)throw Error('Blocked');return storage.get(k)||null;},setItem(k,v){if(blocked)throw Error('Blocked');storage.set(k,v);}},
     fetch:async(url,options)=>{
@@ -39,6 +39,23 @@ function setup({failures=new Set(),mode='ok',blocked=false}={}){
   return {context,nodes,storage,calls,run:code=>vm.runInContext(code,context),maxActive:()=>maxActive};
 }
 const ids=app=>app.nodes.get('#pokemon-grid').children.map(c=>Number(c.dataset.id));
+
+test('homepage skips collection initialization; trainer catalogue loads lazily and coalesces callers',async()=>{
+  const app=setup({collection:false});
+  assert.equal(app.calls.length,0);
+  assert.equal(app.nodes.has('#search'),false);
+  await Promise.all([app.run('loadPokemon()'),app.run('loadPokemon()')]);
+  assert.equal(app.calls.length,19);
+  assert.equal(app.run('state.pokemon.size'),649);
+  assert.equal(app.nodes.has('#error-state'),false);
+  await app.run('loadPokemon()');assert.equal(app.calls.length,19);
+  await app.run('showDetails(state.pokemon.get(649))');
+  assert.equal(app.nodes.get('#detail-content').children[0].children[2].textContent,'Genesect');
+});
+test('collection and shared scripts tolerate absent hero and detail dialog',async()=>{
+  const app=setup({hero:false,details:false});await app.context.ready;
+  assert.equal(ids(app).length,649);
+});
 
 test('649 species, 19 bounded index requests, and no eager detail requests',async()=>{
   const app=setup();await app.context.ready;

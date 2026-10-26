@@ -151,7 +151,10 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     res.set('Cache-Control', 'public, max-age=86400');
     res.sendFile(path.join(config.uploadDir, req.params.filename));
   });
-  for (const page of ['/', '/profile', '/teams', '/favorites']) app.get(page, (req, res) => res.sendFile(path.join(root, 'index.html')));
+  app.get('/pokemon.html', (req, res) => res.sendFile(path.join(root, 'pokemon.html')));
+  app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
+  for (const view of ['profile', 'teams', 'favorites']) app.get(`/${view}`, (req, res) => res.redirect(302, `trainers.html#view=${view}`));
+  for (const page of ['/', '/index.html']) app.get(page, (req, res) => res.sendFile(path.join(root, 'index.html')));
   app.use((req, res) => res.status(404).json({ error: 'Page not found.' }));
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
