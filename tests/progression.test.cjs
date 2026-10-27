@@ -55,6 +55,25 @@ function fakePool() {
   };
   return{pool:{getConnection:async()=>connection},calls,records,awards,setFail(value){failAward=value;}};
 }
+test('96 unique achievements have reachable thresholds, categories and permanent historical awards',()=>{
+  assert.equal(logic.definitions.length,96);assert.equal(new Set(logic.definitions.map(a=>a.key)).size,96);
+  const full=logic.statistics(rows(range(1,649)),Array.from({length:5},()=>({memberCount:6})),range(1,100));
+  assert.equal(logic.eligible(full,Array.from({length:5},()=>({memberCount:6}))).length,96);
+  for(const definition of logic.definitions){assert.ok(['bronze','silver','gold','legendary'].includes(definition.rarity));assert.ok(definition.goal>0);assert.ok(definition.category);}
+  for(const type of require('../pokemon-data').types){
+    const ids=require('../data/pokemon-summary.json').pokemon.filter(p=>p.types.includes(type)).map(p=>p.id);
+    assert.ok(!logic.eligible(logic.statistics(rows(ids.slice(0,4))),[]).includes(`type-${type}-scout`));
+    assert.ok(logic.eligible(logic.statistics(rows(ids.slice(0,5))),[]).includes(`type-${type}-scout`));
+    assert.ok(!logic.eligible(logic.statistics(rows(ids.slice(0,-1))),[]).includes(`type-${type}-master`));
+    assert.ok(logic.eligible(logic.statistics(rows(ids)),[]).includes(`type-${type}-master`));
+  }
+  const saved=logic.definitions.map(d=>({key:d.key,unlockedAt:'2026-10-27T10:00:00Z'}));
+  assert.equal(logic.achievements(logic.statistics([]),[],saved).filter(a=>a.unlockedAt).length,96);
+});
+test('reconciling known achievements avoids repeated INSERTs and preserves their timestamps',async()=>{
+  const fake=fakePool(),repo=new ProgressionRepository(fake.pool);const first=await repo.set(42,25,'caught');fake.calls.length=0;
+  const repeat=await repo.snapshot(42);assert.ok(!fake.calls.some(c=>c.sql?.startsWith('INSERT INTO user_achievements')));assert.deepEqual(repeat.achievements,first.achievements);
+});
 test('SQL collection writes lock the user and commit records/awards atomically with parameterized ownership',async()=>{
   const fake=fakePool(),repo=new ProgressionRepository(fake.pool);
   const result=await repo.set(42,25,'caught');assert.equal(result.statistics.national.caught,1);assert.equal(result.achievements.filter(a=>a.unlockedAt).length,2);
@@ -62,8 +81,10 @@ test('SQL collection writes lock the user and commit records/awards atomically w
   const insert=fake.calls.find(c=>c.sql?.startsWith('INSERT INTO user_pokedex'));assert.deepEqual(insert.params,[42,25]);assert.match(insert.sql,/COALESCE\(caught_at/);
   assert.ok(fake.calls.includes('commit'));assert.equal(fake.calls.at(-1),'release');
   await repo.remove(42,25);assert.equal(fake.records.size,0);assert.equal(fake.awards.size,2);
+  // Seed nine catches so the next mutation earns a genuinely new milestone.
+  for (const row of rows(range(1,9))) fake.records.set(row.pokemonId,row);
   fake.setFail(true);fake.calls.length=0;await assert.rejects(repo.set(42,649,'caught'),/award failed/);
-  assert.equal(fake.records.size,0);assert.equal(fake.awards.size,2);assert.ok(fake.calls.includes('rollback'));assert.ok(!fake.calls.includes('commit'));assert.equal(fake.calls.at(-1),'release');
+  assert.equal(fake.records.size,9);assert.equal(fake.records.has(649),false);assert.equal(fake.awards.size,2);assert.ok(fake.calls.includes('rollback'));assert.ok(!fake.calls.includes('commit'));assert.equal(fake.calls.at(-1),'release');
 });
 test('team awards skip only a missing pre-migration table; real database failures propagate',async()=>{
   await awardTeamBuilder({execute:async()=>{const e=Error('missing');e.code='ER_NO_SUCH_TABLE';throw e;}},1);

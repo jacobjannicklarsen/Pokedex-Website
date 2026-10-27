@@ -9,6 +9,7 @@ function createPokeFixture(encyclopedia = {}) {
   function key(url) {
     const path = new URL(String(url)).pathname;
     if (path.includes('/pokemon-species/')) return 'species';
+    const ability = path.match(/\/ability\/([^/]+)/); if(ability)return `ability-${ability[1]}`;
     const type = path.match(/\/type\/([^/]+)/); if(type)return `type-${type[1]}`;
     return `pokemon-${Number(path.match(/\/pokemon\/(\d+)/)?.[1])}`;
   }

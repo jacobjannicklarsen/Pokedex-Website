@@ -1,4 +1,8 @@
-# Dexhaven v0.6.0 — Trainer Community & Advanced Team Analysis
+# Dexhaven v0.6.1 — Pokémon Sprites & Trainer Card Studio Expansion
+
+Version **0.6.1** adds verified Generation V sprites, expanded card presets and colours, and shared fixes for Hexagon frames and Sparkles. See [the implementation report](IMPLEMENTATION_v0.6.1.md) and [manual database upgrade](database/MIGRATION_v0.6.1.md). No migration, release or deployment runs automatically.
+
+Biography now has one editor and an explicit **Show biography publicly** setting. Existing databases require the [manual single-biography migration](database/MIGRATION_single-biography.md); old public text is archived and sharing starts off. Trainer Hub puts picture editing above Biography and offers All/Caught search sources in each team editor.
 
 The public website is **Dexhaven**; the development project remains **Pokédex Website** and its MySQL database remains **pokedex_app**. Explore all **649 species from Generations I–V** with the existing vanilla HTML/CSS/JavaScript frontend and Node.js/Express/MySQL backend. Trainer accounts, profiles, uploads, multiple six-member teams, favourites and both themes are preserved. No frontend framework or build step.
 
@@ -29,7 +33,12 @@ The existing catalogue needs internet on its first uncached index load. Dashboar
 
 ## Project structure
 
-- `community.html`, `community.js`: opt-in trainer directory, public profiles/teams, owner-only sharing settings and saved-profile preview.
+- `about.html`: team introduction built with the shared header, account navigation, footer, stylesheet and scripts. The homepage founders artwork links here. Served publicly through Express and static previews.
+- `avatar-cropper.js`: local circular picture preview with drag, zoom, arrow-key positioning, reset and cancel. The existing authenticated upload API validates the selected source-pixel crop after applying photo orientation, then saves a 256×256 WebP. No database migration is needed.
+
+The achievement catalogue now contains **96 milestones**, with a rarity-styled Hall of Fame and configurable trainer cards. See [TRAINER_STYLE.md](TRAINER_STYLE.md) for the studio, privacy/API behavior and testing, plus the [manual decoration migration](database/MIGRATION_profile-decorations.md). Existing awards are preserved; no migration is applied automatically.
+
+- `community.html`, `community.js`: searchable opt-in trainer directory with large decorated public cards, approved avatars/bios, featured partners and shared-team previews; public profiles/teams, owner-only sharing settings and saved-profile preview.
 - `team-analysis-data.js`, `team-analysis.js`, `data/type-chart.json`: shared exact modern matchup calculations, interactive Chart.js views, accessible matrices/tables and official 18-type data.
 - `server/community.js`, `server/community-repository.js`: strict public projections/validation and transactional settings/sharing queries.
 - `database/migrations/v0.6.0-trainer-community.sql`, `database/MIGRATION_v0.6.0.md`: additive manual-only settings migration and Workbench instructions.

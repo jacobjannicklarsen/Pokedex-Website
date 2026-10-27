@@ -1,5 +1,7 @@
 # Dexhaven v0.4.0 — Pokémon Encyclopedia
 
+Ability badges in the shared Overview now show English effect descriptions on hover, keyboard focus or tap. Escape dismisses the tooltip before closing the dialog. Ability resources load only on interaction through the shared bounded scheduler and seven-day validated cache, with retries after failures and English flavour-text fallback when effect text is absent. Descriptions use current PokéAPI ability data.
+
 The shared Pokémon dialog now contains **Overview**, **Base Stats**, **Evolutions**, **Moves**, **Type Matchups** and **Pokédex Information** sections. It is available from the National Pokédex, Trainer Hub favourites, dashboard rankings and comparison cards. The main catalogue and trainer API still accept only National species #001–649.
 
 ## Usage and local review

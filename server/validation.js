@@ -41,4 +41,11 @@ function collectionStatus(body) {
   if (Object.keys(body).some(key => key !== 'status') || !['seen', 'caught'].includes(body.status)) fail('Choose a Seen or Caught status. Use DELETE to remove a registration.');
   return body.status;
 }
-module.exports = { HttpError, fail, object, text, id, registration, login, team, collectionStatus };
+function avatarCrop(value,width,height) {
+  if(value===undefined)return null;
+  let crop;try{crop=JSON.parse(value);}catch{fail('Invalid picture crop. Adjust your picture and try again.');}
+  object(crop);
+  if(Object.keys(crop).length!==3||Object.keys(crop).some(k=>!['x','y','size'].includes(k))||![crop.x,crop.y,crop.size].every(Number.isSafeInteger)||crop.x<0||crop.y<0||crop.size<1||crop.x+crop.size>width||crop.y+crop.size>height)fail('The picture crop must fit inside the uploaded image.');
+  return {left:crop.x,top:crop.y,width:crop.size,height:crop.size};
+}
+module.exports = { HttpError, fail, object, text, id, registration, login, team, collectionStatus, avatarCrop };

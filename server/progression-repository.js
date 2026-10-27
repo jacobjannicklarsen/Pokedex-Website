@@ -14,8 +14,11 @@ class ProgressionRepository {
     const teams = teamRows.map(t => ({ id: t.id, memberCount: Number(t.members) }));
     const [favoriteRows] = await connection.execute('SELECT pokemon_id FROM favorites WHERE user_id = ?', [userId]);
     const statistics = logic.statistics(collection, teams, favoriteRows);
-    for (const key of logic.eligible(statistics, teams)) await logic.award(connection, userId, key);
-    const [awards] = await connection.execute("SELECT achievement_key AS `key`, DATE_FORMAT(unlocked_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS unlockedAt FROM user_achievements WHERE user_id = ? ORDER BY achievement_key", [userId]);
+    const awardQuery = "SELECT achievement_key AS `key`, DATE_FORMAT(unlocked_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS unlockedAt FROM user_achievements WHERE user_id = ? ORDER BY achievement_key";
+    let [awards] = await connection.execute(awardQuery, [userId]);
+    const saved = new Set(awards.map(a=>a.key)), missing = logic.eligible(statistics,teams).filter(key=>!saved.has(key));
+    for (const key of missing) await logic.award(connection, userId, key);
+    if(missing.length) [awards] = await connection.execute(awardQuery, [userId]);
     return { collection, statistics, achievements: logic.achievements(statistics, teams, awards) };
   }
   async transaction(userId, mutation) {

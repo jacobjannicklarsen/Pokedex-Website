@@ -4,11 +4,14 @@ const { defaults } = require('../../server/community');
 const { HttpError } = require('../../server/validation');
 const logic = require('../../server/progression');
 class MemoryCommunity {
-  constructor(repo) { this.repo=repo;this.saved=new Map();this.shares=new Map(); }
+  constructor(repo) { this.repo=repo;this.saved=new Map();this.shares=new Map();this.decorations=new Map(); }
+  async decoration(id){return structuredClone(this.decorations.get(id)||require('../../server/decorations').defaults());}
+  async earnedBadges(id){const keys=this.repo.awards.get(id)||new Map();return logic.definitions.filter(d=>keys.has(d.key)).map(({key,name,description,icon,rarity,category})=>({key,name,description,icon,rarity,category}));}
+  async saveDecoration(id,value){const earned=new Set((await this.earnedBadges(id)).map(b=>b.key));if(value.pinnedBadges.some(key=>!earned.has(key)))throw new HttpError(400,'Only your earned achievements can be pinned.');this.decorations.set(id,structuredClone(value));return structuredClone(value);}
   async settings(id) { const s={...(this.saved.get(id)||defaults())};if(s.featuredTeamId&&!this.repo.savedTeams.some(t=>t.id===s.featuredTeamId))s.featuredTeamId=null;return s; }
   async saveSettings(id,value) {if(value.featuredTeamId!==null&&!this.repo.savedTeams.some(t=>t.id===value.featuredTeamId&&t.userId===id))throw new HttpError(404,'Featured team not found.');this.saved.set(id,{...value});return {...value};}
   async findTrainer(name) {const u=this.repo.users.find(u=>u.username.toLowerCase()===name.toLowerCase());return u&&(await this.settings(u.id)).enabled?{...u}:null;}
-  async directory(after,limit=24) {const rows=[];for(const u of this.repo.users)if(u.id>after&&(await this.settings(u.id)).enabled)rows.push(u);rows.sort((a,b)=>a.id-b.id);return {trainers:rows.slice(0,limit).map(u=>({username:u.username})),next:rows.length>limit?rows[limit-1].id:null};}
+  async directory(after,query='') {const all=[];for(const u of this.repo.users)if((await this.settings(u.id)).enabled&&u.username.toLowerCase().includes(query.toLowerCase()))all.push(u);all.sort((a,b)=>a.id-b.id);const rows=all.filter(u=>u.id>after),trainers=[];for(const u of rows.slice(0,24)){const settings=await this.settings(u.id),teams=await this.publicTeams(u.id),featured=teams.find(t=>t.id===settings.featuredTeamId)||teams[0];trainers.push(require('../../server/community').directoryCard(u,settings,await this.decoration(u.id),teams.length,featured));}return {trainers,next:rows.length>24?rows[23].id:null,total:all.length};}
   owned(userId,id) {const t=this.repo.savedTeams.find(t=>t.id===id&&t.userId===userId);if(!t)throw new HttpError(404,'Team not found.');return t;}
   async teamSettings(userId,id){this.owned(userId,id);return {...(this.shares.get(id)||{visibility:'private',shareId:null})};}
   async share(userId,id,visibility){this.owned(userId,id);const result={visibility,shareId:this.shares.get(id)?.shareId||crypto.randomUUID()};this.shares.set(id,result);return {...result};}

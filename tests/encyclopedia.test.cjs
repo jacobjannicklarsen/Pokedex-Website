@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
 const data=require('../encyclopedia-data');
-const fixture=require('./fixtures/encyclopedia.json').resources;
+const fixture={...require('./fixtures/encyclopedia.json').resources,...require('./fixtures/abilities.json').resources};
 const types=Object.keys(require('../pokemon-data').summarize(require('../data/pokemon-summary.json').pokemon).types);
 
 test('real standard, branching, later-generation and standalone evolution families validate across five generations',()=>{
@@ -79,6 +79,19 @@ function context({storage=new Map(),blocked=false,mode='ok'}={}) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../encyclopedia-data.js'),'utf8'),sandbox);
   return{api:sandbox.PokemonEncyclopediaData,calls,storage,max:()=>max};
 }
+test('ability descriptions use English effects and fallbacks, validate responses and reuse compact caches',async()=>{
+  const overgrow=fixture['ability/overgrow'];assert.equal(data.valid('ability',overgrow),true);
+  assert.match(data.abilityDescription(overgrow),/Grass.*1.5/);
+  assert.match(data.abilityDescription(fixture['ability/chlorophyll']),/Speed|speed/);
+  assert.equal(data.abilityDescription({effect_entries:[],flavor_text_entries:[{language:{name:'fr'},flavor_text:'Français'},{language:{name:'en'},flavor_text:'English\n fallback\ftext'}]}),'English fallback text');
+  assert.equal(data.abilityDescription({effect_entries:[{language:{name:'en'},short_effect:'',effect:'Full effect'}],flavor_text_entries:[]}),'Full effect');
+  assert.match(data.abilityDescription({effect_entries:[],flavor_text_entries:[]}),/No English description/);
+  assert.equal(data.valid('ability',{...overgrow,effect_entries:[{language:{name:'en'},effect:3,short_effect:'Invalid'}]}),false);
+  const app=context();await Promise.all([app.api.get('ability','overgrow'),app.api.get('ability','overgrow')]);assert.equal(app.calls.length,1);
+  const next=context({storage:app.storage});await next.api.get('ability','overgrow');assert.equal(next.calls.length,0);
+  const failure=context({mode:'http'});await assert.rejects(failure.api.get('ability','chlorophyll'));await assert.rejects(failure.api.get('ability','chlorophyll'));assert.equal(failure.calls.length,2);
+});
+
 test('shared resources coalesce, queue at most four requests, persist and reuse caches across page contexts',async()=>{
   const app=context();
   await Promise.all([app.api.get('evolution-chain',67),app.api.get('evolution-chain',67)]);assert.equal(app.calls.length,1);

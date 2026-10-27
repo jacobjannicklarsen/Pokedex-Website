@@ -26,13 +26,14 @@ const server = http.createServer();
 async function main() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const app = await createApp({repo:new MemoryRepository(),store:new session.MemoryStore(),config:{origin,uploadDir,production:false,trustProxy:false,secret:'browser-fixture-only-secret-'.repeat(4)}});
+  const fixtureRepo=new MemoryRepository();
+  const app = await createApp({repo:fixtureRepo,store:new session.MemoryStore(),config:{origin,uploadDir,production:false,trustProxy:false,secret:'browser-fixture-only-secret-'.repeat(4)}});
   server.on('request',(req,res)=>{
     const prefix='/preview/Pokedex-Website/';
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -53,10 +54,22 @@ async function main() {
   let nextId = 0;
   const pending = new Map();
   const exceptions = [];
+  const spriteFailures=new Set(),spriteRequests=[];
+  async function spriteResponse(event){
+    const url=new URL(event.request.url),match=url.pathname.match(/\/(\d+)\.(gif|png)$/);
+    const game=url.pathname.includes('/versions/generation-v/');
+    const kind=url.pathname.includes('/icons/')?'party':url.pathname.includes('/animated/')?'animated':'static';
+    spriteRequests.push({url:url.href,kind});
+    const filename=match&&path.join(__dirname,'fixtures/sprites',`${Number(match[1])}-${kind}.${kind==='animated'?'gif':'png'}`);
+    if(game&&filename&&fs.existsSync(filename)&&!spriteFailures.has(kind)){
+      await command('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:kind==='animated'?'image/gif':'image/png'}],body:fs.readFileSync(filename).toString('base64')});
+    }else await command('Fetch.failRequest',{requestId:event.requestId,errorReason:'Failed'});
+  }
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
+    if(message.method==='Fetch.requestPaused'){spriteResponse(message.params).catch(error=>exceptions.push(error.message));return;}
     if (message.method === 'Page.javascriptDialogOpening') command('Page.handleJavaScriptDialog',{accept:true}).catch(()=>{});
-    if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.text);
+    if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description||message.params.exceptionDetails.text);
     if (!message.id) return;
     const request = pending.get(message.id);
     if (!request) return;
@@ -99,12 +112,13 @@ async function main() {
   async function selectSlot(slot,query) {await searchSlot(slot,query);await key('Enter','Enter');}
   await command('Runtime.enable'); await command('Page.enable'); await command('Network.enable');
   await command('Page.bringToFront');
-  await command('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*raw.githubusercontent.com*'] });
+  await command('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*'] });
+  await command('Fetch.enable',{patterns:[{urlPattern:'*raw.githubusercontent.com*',requestStage:'Request'}]});
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.qaRequests = 0; window.qaDetailRequests = 0; window.qaMode = 'ok'; window.qaSummaryRequests=0;window.qaSummaryMode='ok';
     window.qaResourceRequests={};window.qaResourceFailures=[];window.qaResourceDelay={};
     window.qaProgressReads=0;window.qaFailCollectionRead=false;window.qaFailCollectionWrite=false;
-    const fixture = (${createPokeFixture.toString()})(${JSON.stringify(encyclopediaFixture.resources)});
+    const fixture = (${createPokeFixture.toString()})(${JSON.stringify({...encyclopediaFixture.resources,...require('./fixtures/abilities.json').resources})});
     const originalFetch = window.fetch;
     window.fetch = async (url, options) => {
       const requestPath = new URL(String(url),location.href).pathname;
@@ -136,6 +150,8 @@ async function main() {
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await command('Page.navigate', { url: origin });
+  if(process.env.QA_STUDIO_ONLY){await require('./support/card-baseline.cjs')({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});await require('./support/studio-expansion.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo,uploadDir,spriteFailures,spriteRequests});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_CARD_BASELINE){await require('./support/card-baseline.cjs')({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});return;}
   await check('trainer navigation stays hidden while authentication is loading, then exposes Login/Register only',async()=>{
     await waitFor('window.qaSessionPending===true');
     assert.equal(await evaluate(`[...document.querySelectorAll('[data-requires-auth]')].every(n=>n.hidden)`),true);
@@ -145,6 +161,39 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('#home-auth-actions').hidden`),false);
     assert.equal(await evaluate(`document.querySelector('#logout-button').hidden`),true);
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('#register-button')).display!=='none'`),true);
+  });
+  await check('founders link opens rebuilt About page with shared layout, themes and responsive navigation',async()=>{
+    await waitFor(`document.querySelector('.hero-art img')?.naturalWidth>0`);
+    const image=await evaluate(`(()=>{const i=document.querySelector('.hero-art img');return{width:i.getBoundingClientRect().width,base:parseFloat(getComputedStyle(i).width),mask:getComputedStyle(i).maskImage,dot:getComputedStyle(document.querySelector('.art-label'),'::before').content,background:getComputedStyle(document.body).backgroundColor,font:getComputedStyle(document.body).fontFamily}})()`);
+    assert.ok(Math.abs(image.width/image.base-.92)<.001);assert.match(image.mask,/linear-gradient/);assert.ok(['none','normal'].includes(image.dot));
+    await evaluate(`document.querySelector('.hero-art').focus()`);await key('Enter','Enter');
+    await waitFor(`document.querySelector('#about-title')`);assert.equal(await evaluate('location.pathname'),'/about.html');
+    assert.equal(await evaluate(`getComputedStyle(document.body).backgroundColor`),image.background);
+    assert.equal(await evaluate(`getComputedStyle(document.body).fontFamily`),image.font);
+    assert.match(await evaluate(`getComputedStyle(document.querySelector('#about-title')).fontFamily`),/Space Grotesk/);
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.about-team-list h3')].map(n=>n.textContent)`),['Lucas','Oscar','Jacob Jannick','Patrick']);
+    assert.match(await evaluate(`document.querySelector('.about-team-section').textContent`),/IT Architecture students at Erhvervsakademi København/);
+    assert.equal(await evaluate(`document.querySelector('.trainer-nav [aria-current="page"]').textContent`),'About');
+    assert.equal(await evaluate(`document.querySelector('.site-header .brand')!==null && document.querySelector('#auth-dialog')!==null`),true);
+    assert.equal(await evaluate(`document.querySelector('link[href="about.css"],script[src="about.js"]')`),null);
+    assert.equal(await evaluate(`/portfolio/i.test(document.body.textContent)`),false);
+    assert.equal(await evaluate('document.documentElement.dataset.theme'),'dark');
+    await waitFor(`document.querySelector('#theme-toggle')?.hidden===false`);
+    await evaluate(`document.querySelector('#theme-toggle').click()`);assert.equal(await evaluate(`localStorage.getItem('pokedex-theme')`),'light');
+    for(const theme of ['dark','light']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`About ${theme} ${width}px`);}
+    }
+    if(process.env.QA_SCREENSHOT_DIR){fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});let shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'about-restyled.png'),Buffer.from(shot.data,'base64'));await evaluate(`document.querySelector('#about-team-title').scrollIntoView({block:'start',behavior:'instant'})`);shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'about-team.png'),Buffer.from(shot.data,'base64'));}
+    await command('Emulation.setDeviceMetricsOverride',{width:375,height:900,deviceScaleFactor:1,mobile:false});
+    assert.equal(await evaluate(`document.querySelector('.trainer-nav [data-page="home"]').getBoundingClientRect().width>0`),true);
+    await evaluate(`document.querySelector('.trainer-nav [data-page="home"]').click()`);
+    await waitFor(`document.querySelector('.hero-art')`);assert.equal(await evaluate('document.documentElement.dataset.theme'),'light');
+    await evaluate(`localStorage.removeItem('pokedex-theme')`);await command('Page.reload');
+    await waitFor(`document.querySelector('#guest-actions')?.hidden===false`);
+    await command('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
+    if(process.env.QA_SCREENSHOT_DIR){fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'founders-hero.png'),Buffer.from(shot.data,'base64'));}
+    assert.deepEqual(exceptions,[]);
   });
   await check('dedicated homepage preserves hero, avoids catalogue requests and links to the National Pokédex', async () => {
     await evaluate(`document.querySelector('#home-register').click()`);
@@ -291,6 +340,28 @@ async function main() {
     assert.equal(await evaluate(`document.activeElement.dataset.id`), '1', 'focus returns to opener');
     await key('/','Slash',{text:'/'}); assert.equal(await evaluate(`document.activeElement.id`), 'search');
   });
+  await check('ability descriptions load only on hover/focus, support touch and Escape, cache and retry',async()=>{
+    await evaluate(`showDetails(state.pokemon.get(1))`);
+    await waitFor(`document.querySelector('#detail-content .ability')`);
+    assert.equal(await evaluate(`window.qaResourceRequests['ability/overgrow']||0`),0);
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:2,y:2});
+    const point=await evaluate(`(async()=>{const b=document.querySelector('#detail-content .ability');b.scrollIntoView({block:'center',behavior:'instant'});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const r=b.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+    await waitFor(`document.querySelector('#detail-content [role="tooltip"]:not([hidden])')?.textContent.includes('1.5')`);
+    assert.match(await evaluate(`document.querySelector('#detail-content [role="tooltip"]:not([hidden])').textContent`),/Grass/);
+    await evaluate(`document.querySelector('#detail-content .ability').focus()`);await key('Escape','Escape');
+    assert.equal(await evaluate('dialog.open'),true);
+    assert.equal(await evaluate(`document.querySelector('#detail-content [role="tooltip"]').hidden`),true);
+    await evaluate(`window.qaResourceFailures.push('ability/chlorophyll');document.querySelectorAll('#detail-content .ability')[1].focus()`);
+    await waitFor(`document.querySelector('#detail-content [role="tooltip"]:not([hidden])')?.textContent.includes('could not load')`);
+    await evaluate(`window.qaResourceFailures=[];document.querySelectorAll('#detail-content .ability')[1].click()`);
+    await waitFor(`document.querySelector('#detail-content [role="tooltip"]:not([hidden])')?.textContent.match(/Speed|speed/)`);
+    await evaluate(`dialog.close();showDetails(state.pokemon.get(1))`);await waitFor(`document.querySelector('#detail-content .ability')`);
+    await evaluate(`document.querySelector('#detail-content .ability').focus()`);
+    await waitFor(`document.querySelector('#detail-content [role="tooltip"]:not([hidden])')?.textContent.includes('1.5')`);
+    assert.equal(await evaluate(`window.qaResourceRequests['ability/overgrow']`),1);
+    await evaluate(`document.querySelector('#close-dialog').click()`);
+  });
   await check('backdrop closes dialog; inside clicks keep it open', async () => {
     await evaluate(`document.querySelector('button[data-id="1"]').click();document.querySelector('#detail-name').click()`);
     assert.equal(await evaluate(`dialog.open`), true);
@@ -411,6 +482,12 @@ async function main() {
     await waitFor(`document.querySelectorAll('.team-editor').length===1`);
     assert.equal(await evaluate(`document.querySelectorAll('.team-slot').length`),6);
     assert.equal(await evaluate(`document.querySelectorAll('.team-slot select').length`),0);
+    await waitFor(`TrainerProgress.caughtState().ready`);
+    await evaluate(`document.querySelectorAll('.team-source button')[1].click()`);
+    await searchSlot(0,'#1');
+    assert.equal(await evaluate(`document.querySelectorAll('.team-slot [role="option"]').length`),0);
+    assert.match(await evaluate(`document.querySelector('.team-source .form-help').textContent`),/No caught/);
+    await evaluate(`document.querySelectorAll('.team-source button')[0].click()`);
     await selectSlot(0,'bulba');await selectSlot(1,'#649');
     await evaluate(`document.querySelector('.team-editor').requestSubmit()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Team saved.'`);
@@ -526,6 +603,39 @@ async function main() {
     await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('#header-profile').click()`);
     assert.equal(await evaluate(`document.querySelector('#trainer-heading').textContent`),'Trainer Profile');
   });
+  await check('avatar framing previews zoom, pointer/keyboard movement, reset/cancel and uploads the selected crop',async()=>{
+    await command('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,deviceScaleFactor:1,mobile:false});
+    const oldAvatar=await evaluate(`document.querySelector('#header-avatar').getAttribute('src')`);
+    const sharp=require('sharp');const green=await sharp({create:{width:200,height:300,channels:3,background:'green'}}).png().toBuffer(),blue=await sharp({create:{width:200,height:300,channels:3,background:'blue'}}).png().toBuffer();
+    const photo=await sharp({create:{width:600,height:300,channels:3,background:'red'}}).composite([{input:green,left:200,top:0},{input:blue,left:400,top:0}]).png().toBuffer();
+    const choose=async()=>evaluate(`(()=>{const input=document.querySelector('input[name="avatar"]'),files=new DataTransfer();files.items.add(new File([Uint8Array.from(atob('${photo.toString('base64')}'),c=>c.charCodeAt(0))],'wide.png',{type:'image/png'}));input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await choose();await waitFor(`document.querySelector('.avatar-editor')?.hidden===false && document.querySelector('input[name="avatar"]').closest('form').querySelector('[type="submit"]').disabled===false`);
+    assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')`),oldAvatar);
+    await evaluate(`document.querySelector('.avatar-zoom input').value='2';document.querySelector('.avatar-zoom input').dispatchEvent(new Event('input'));document.querySelector('.avatar-crop-preview').scrollIntoView({block:'center',behavior:'instant'})`);
+    await sleep(80);
+    const point=await evaluate(`(()=>{const r=document.querySelector('.avatar-crop-preview').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',buttons:1,clickCount:1});
+    for(const dx of [60,160,260]){await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:point.x+dx,y:point.y,button:'left',buttons:1});await sleep(30);}
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x+260,y:point.y,button:'left',buttons:0,clickCount:1});
+    const dragged=await evaluate(`(()=>{const c=document.querySelector('.avatar-crop-preview');return {pixel:[...c.getContext('2d').getImageData(256,256,1,1).data],status:document.querySelector('.avatar-editor [role="status"]').textContent,width:c.getBoundingClientRect().width}})()`);
+    assert.ok(dragged.pixel[0]>200,JSON.stringify(dragged));
+    await evaluate(`document.querySelector('.avatar-crop-preview').focus()`);await key('ArrowRight','ArrowRight');
+    assert.match(await evaluate(`document.querySelector('.avatar-editor [role="status"]').textContent`),/200%/);
+    await evaluate(`[...document.querySelectorAll('.avatar-editor button')].find(b=>b.textContent==='Reset framing').click()`);assert.equal(await evaluate(`document.querySelector('.avatar-zoom input').value`),'1');
+    await evaluate(`[...document.querySelectorAll('.avatar-editor button')].find(b=>b.textContent==='Cancel picture').click()`);
+    assert.equal(await evaluate(`document.querySelector('.avatar-editor').hidden`),true);assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')`),oldAvatar);
+    await choose();await waitFor(`document.querySelector('.avatar-editor')?.hidden===false && document.querySelector('.avatar-crop-preview')?.width===512 && document.querySelector('input[name="avatar"]').closest('form').querySelector('[type="submit"]').disabled===false`);
+    for(const theme of ['dark','light']){if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);for(const width of [320,375,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}}
+    await evaluate(`document.querySelector('.avatar-zoom input').value='4';document.querySelector('.avatar-zoom input').dispatchEvent(new Event('input'));document.querySelector('.avatar-crop-preview').focus()`);
+    for(let i=0;i<60;i++)await key('ArrowRight','ArrowRight');
+    assert.equal(await evaluate(`(()=>{const c=document.querySelector('.avatar-crop-preview').getContext('2d');return [[10,10],[256,256],[500,500]].every(([x,y])=>c.getImageData(x,y,1,1).data[0]>200)})()`),true);
+    await evaluate(`document.querySelector('input[name="avatar"]').closest('form').requestSubmit()`);
+    await waitFor(`document.querySelector('#header-avatar').getAttribute('src')!==${JSON.stringify(oldAvatar)} && document.querySelector('#account-message').textContent==='Profile picture updated.'`);
+    const saved=await evaluate(`(async()=>{const r=await fetch(document.querySelector('#header-avatar').getAttribute('src'));return [...new Uint8Array(await r.arrayBuffer())];})()`);
+    const stats=await sharp(Buffer.from(saved)).stats();assert.ok(stats.channels[0].mean>200);assert.ok(stats.channels[2].mean<30);
+    assert.deepEqual(exceptions,[]);
+  });
   await check('authenticated pages fit mobile and desktop in both themes', async () => {
     for(const theme of ['dark','light']) {
       if(await evaluate(`document.documentElement.dataset.theme`) !== theme) await evaluate(`document.querySelector('#theme-toggle').click()`);
@@ -610,16 +720,21 @@ async function main() {
   });
   await check('personal card/detail status controls and collection filters combine with every public filter',async()=>{
     await command('Page.navigate',{url:origin+'/pokemon.html?qa=collection'});
-    await waitFor(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.disabled===false && !state.loading && state.statData?.size===649`);
+    await waitFor(`document.querySelector('#pokemon-grid [data-collection-id="25"] button')?.disabled===false && !state.loading && state.statData?.size===649`);
     assert.equal(await evaluate('window.qaProgressReads'),1);
+    assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')`),null);
+    assert.equal(await evaluate(`document.querySelectorAll('#pokemon-grid [data-collection-id="25"] button').length`),3);
+    assert.equal(await evaluate(`document.querySelectorAll('#pokemon-grid [data-collection-id="25"] [aria-pressed="true"]').length`),1);
     const set=async(id,status,where='#pokemon-grid')=>{
-      await evaluate(`(()=>{const select=document.querySelector('${where} [data-collection-id="${id}"] select');select.value='${status}';select.dispatchEvent(new Event('change',{bubbles:true}))})()`);
-      await waitFor(`document.querySelector('${where} [data-collection-id="${id}"] select')?.disabled===false && document.querySelector('${where} [data-collection-id="${id}"] select').value==='${status}'`);
+      await evaluate(`document.querySelector('${where} [data-collection-id="${id}"] [data-collection-status="${status}"]').click()`);
+      await waitFor(`document.querySelector('${where} [data-collection-id="${id}"] button')?.disabled===false && document.querySelector('${where} [data-collection-id="${id}"]').dataset.status==='${status}'`);
     };
     const filter=async value=>evaluate(`document.querySelector('#collection-filter').value='${value}';document.querySelector('#collection-filter').dispatchEvent(new Event('change'))`);
     await set(25,'seen');await filter('seen');assert.deepEqual(await evaluate('[...grid.children].map(n=>Number(n.dataset.id))'),[25]);
     await filter('caught');assert.equal(await evaluate('grid.children.length'),0);assert.equal(await evaluate(`document.querySelector('#empty-state').hidden`),false);
     await evaluate('showDetails(state.pokemon.get(25))');await set(25,'caught','#detail-content');
+    assert.match(await evaluate(`document.querySelector('.achievement-toast')?.textContent||''`),/First Catch/);
+    await evaluate(`document.querySelector('.achievement-toast button').click()`);
     assert.deepEqual(await evaluate('[...grid.children].map(n=>Number(n.dataset.id))'),[25]);
     const first=await evaluate(`fetch('/api/pokedex').then(r=>r.json())`);assert.equal(first.statistics.national.seen,1);assert.equal(first.statistics.national.caught,1);
     await set(25,'caught','#detail-content');
@@ -632,11 +747,37 @@ async function main() {
     await evaluate('resetFilters()');await filter('not-seen');assert.equal(await evaluate('grid.children.length'),646);
     await filter('not-caught');assert.equal(await evaluate('grid.children.length'),647);
     await evaluate('resetFilters()');assert.equal(await evaluate('grid.children.length'),649);
-    await evaluate(`window.qaFailCollectionWrite=true;const select=document.querySelector('#pokemon-grid [data-collection-id="445"] select');select.value='seen';select.dispatchEvent(new Event('change'))`);
+    await evaluate(`window.qaFailCollectionWrite=true;document.querySelector('#pokemon-grid [data-collection-id="445"] [data-collection-status="seen"]').click()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Fixture collection save failure'`);
-    assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="445"] select').value`),'caught');
+    assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="445"]').dataset.status`),'caught');
     await evaluate('window.qaFailCollectionWrite=false');
     assert.deepEqual(exceptions,[]);
+  });
+  await check('caught team search excludes Seen, preserves drafts and handles collection failure without falling back',async()=>{
+    await command('Page.navigate',{url:origin+'/trainers.html#view=teams'});
+    await waitFor(`document.querySelector('.team-create') && TrainerProgress.caughtState().ready`);
+    await evaluate(`document.querySelector('.team-create input').value='Caught selector QA';document.querySelector('.team-create').requestSubmit()`);
+    await waitFor(`document.querySelectorAll('.team-editor').length===1`);
+    await selectSlot(1,'#1');
+    await evaluate(`document.querySelectorAll('.team-source button')[1].click()`);
+    await searchSlot(0,'#443');
+    assert.equal(await evaluate(`document.querySelectorAll('.team-slot')[0].querySelectorAll('[role="option"]').length`),0,'Seen is not Caught');
+    await searchSlot(0,'#25');await key('Enter','Enter');
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.team-slot .selector-input')].slice(0,2).map(n=>n.value.slice(0,4))`),['#025','#001']);
+    await evaluate(`window.qaFailCollectionRead=true;TrainerProgress.refresh()`);
+    await waitFor(`!!TrainerProgress.caughtState().error`);
+    await searchSlot(2,'#445');
+    assert.equal(await evaluate(`document.querySelectorAll('.team-slot')[2].querySelectorAll('[role="option"]').length`),0,'failed collection never shows the full catalogue');
+    await evaluate(`window.qaFailCollectionRead=false;document.querySelector('.team-source .text-button').click()`);
+    await waitFor(`TrainerProgress.caughtState().ready`);
+    await selectSlot(2,'#445');
+    await evaluate(`document.querySelector('.team-editor').requestSubmit()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Team saved.'`);
+    await command('Page.reload');
+    await waitFor(`document.querySelectorAll('.team-slot .selector-input').length===6 && TrainerProgress.caughtState().ready`);
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.team-slot .selector-input')].slice(0,3).map(n=>n.value.slice(0,4))`),['#025','#001','#445']);
+    await evaluate(`document.querySelector('.delete-team').click()`);
+    await waitFor(`document.querySelectorAll('.team-editor').length===0`);
   });
   await check('private progress shows correct national/generation/type counts and server-earned achievements',async()=>{
     await command('Page.navigate',{url:origin+'/trainers.html#view=progress'});
@@ -649,7 +790,7 @@ async function main() {
     const dragon=await evaluate(`[...document.querySelectorAll('#account-content tbody tr')].find(n=>n.children[0].textContent==='Dragon')?.textContent`);assert.match(dragon,/Dragon21/);
     assert.equal(await evaluate(`document.querySelectorAll('.recent-registration').length`),3);
     await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
-    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),8);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),96);
     assert.match(await evaluate(`document.querySelector('[data-achievement="first-catch"]').textContent`),/Unlocked/);
     assert.match(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"]').textContent`),/Locked/);
     await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('.team-create input').value='Progression Six';document.querySelector('.team-create').requestSubmit()`);
@@ -697,7 +838,7 @@ async function main() {
       await evaluate(`window.qaFailCollectionRead=false;document.querySelector('#collection-retry').click()`);
       await waitFor(`document.querySelector('#collection-filter').disabled===false`);
       await evaluate(`TrainerProgress.update(25,'caught')`);
-      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'caught');
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'caught');
     }finally{await command('Page.removeScriptToEvaluateOnNewDocument',{identifier:failure.identifier});}
   });
   await check('collection status synchronizes in a second tab without sharing private records in browser storage',async()=>{
@@ -711,26 +852,26 @@ async function main() {
       await command('Network.enable',{},attached.sessionId);
       await command('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*raw.githubusercontent.com*','*pokeapi.co*']},attached.sessionId);
       await command('Page.navigate',{url:origin+'/pokemon.html'},attached.sessionId);
-      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.disabled===false`);
-      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'caught');
+      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"] button')?.disabled===false`);
+      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'caught');
       await evaluate(`TrainerProgress.update(25,'seen')`);
-      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.value==='seen'`);
+      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"]')?.dataset.status==='seen'`);
       await evaluate(`document.querySelector('#logout-button').click()`);
       await waitFor(`document.querySelector('#guest-actions').hidden===false`);
       await otherWait(`document.querySelector('#collection-filter')?.disabled===true && document.querySelector('#guest-actions').hidden===false`);
       assert.equal(await otherEvaluate(`[...document.querySelectorAll('[data-collection-id]')].every(n=>n.hidden)`),true);
       await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='browser@example.test';document.querySelector('#auth-password').value='browser test password 123';document.querySelector('#auth-form').requestSubmit()`);
       await waitFor(`document.querySelector('#collection-filter').disabled===false`);
-      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'seen');
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'seen');
       await evaluate(`(async()=>{const session=await(await fetch('/api/auth/session')).json();const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrfToken},body:JSON.stringify({username:'progress_other',email:'progress.other@example.test',password:'other trainer password 123'})});if(!response.ok)throw Error('Other trainer registration failed');localStorage.setItem('dexhaven-progress-change','qa-other-trainer-'+Date.now())})()`);
       await otherWait(`document.querySelector('#header-profile')?.title==='progress_other' && document.querySelector('#collection-filter').disabled===false`);
-      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'not-registered');
+      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'not-registered');
       await waitFor(`document.querySelector('#header-profile').title==='progress_other' && document.querySelector('#collection-filter').disabled===false`);
-      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'not-registered');
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'not-registered');
       await evaluate(`(async()=>{const session=await(await fetch('/api/auth/session')).json();const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrfToken},body:JSON.stringify({identifier:'browser@example.test',password:'browser test password 123'})});if(!response.ok)throw Error('Original trainer login failed');localStorage.setItem('dexhaven-progress-change','qa-original-trainer-'+Date.now())})()`);
       await otherWait(`document.querySelector('#header-profile')?.title==='browser_trainer' && document.querySelector('#collection-filter').disabled===false`);
       await waitFor(`document.querySelector('#header-profile').title==='browser_trainer' && document.querySelector('#collection-filter').disabled===false`);
-      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'seen');
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"]').dataset.status`),'seen');
     }finally{await command('Target.closeTarget',{targetId:other.targetId});await command('Page.bringToFront');}
     assert.deepEqual(exceptions,[]);
   });
@@ -823,6 +964,19 @@ async function main() {
         await sleep(100);
         assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${theme} ${width}`);
         assert.equal(await evaluate(`[...document.querySelectorAll('canvas')].every(n=>n.getBoundingClientRect().width<=n.parentElement.getBoundingClientRect().width+1)`),true);
+        // Every horizontal type row must track Y, regardless of its bar length or pointer X.
+        const typePoints=await evaluate(`(()=>{const c=Chart.getChart('type-chart');c.canvas.scrollIntoView({block:'center'});const r=c.canvas.getBoundingClientRect();return c.getDatasetMeta(0).data.map((bar,index)=>({index,x:r.left+c.chartArea.left+4,y:r.top+bar.y,farX:r.left+c.chartArea.right-4}));})()`);
+        for(const point of typePoints) {
+          for(const x of [point.x,point.farX]) {
+            await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y:point.y});
+            await waitFor(`Chart.getChart('type-chart').tooltip.opacity>0 && Chart.getChart('type-chart').tooltip.dataPoints?.[0]?.dataIndex===${point.index}`);
+            assert.equal(await evaluate(`Chart.getChart('type-chart').tooltip.dataPoints[0].label`),analytics.types[point.index][0].toUpperCase()+analytics.types[point.index].slice(1));
+          }
+        }
+        const first=typePoints[0];
+        await command('Input.dispatchMouseEvent',{type:'mousePressed',x:first.x,y:first.y,button:'left',clickCount:1});
+        await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:first.x,y:first.y,button:'left',clickCount:1});
+        await waitFor(`Chart.getChart('type-chart').tooltip.dataPoints?.[0]?.dataIndex===0`);
         await evaluate(`document.querySelector('#comparison-selectors [role="combobox"]').focus()`);
         assert.equal(await evaluate(`(()=>{const r=document.querySelector('#comparison-selectors .selector-popup').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})()`),true);
         await key('Escape','Escape');
@@ -1027,10 +1181,15 @@ async function main() {
   await check('public profile settings start private; saved preview safely renders approved fields and featured Pokémon',async()=>{
     await evaluate(`document.querySelector('[data-view="/profile"]').click()`);
     await waitFor(`document.querySelector('.community-settings form')`);
+    assert.equal(await evaluate(`document.querySelectorAll('textarea[name="bio"]').length`),1);
+    assert.equal(await evaluate(`document.querySelector('[name="publicBio"]')`),null);
+    assert.equal(await evaluate(`Boolean(document.querySelector('input[name="avatar"]').compareDocumentPosition(document.querySelector('textarea[name="bio"]')) & Node.DOCUMENT_POSITION_FOLLOWING)`),true);
     assert.equal(await evaluate(`document.querySelector('.community-settings [name="enabled"]').checked`),false);
     await evaluate(`(()=>{const input=document.querySelector('.community-settings [role="combobox"]');input.focus();input.value='#6';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await key('Enter','Enter');
-    await evaluate(`(()=>{const f=document.querySelector('.community-settings form');f.querySelector('[name="publicBio"]').value='<img src=x onerror=alert(1)> Trainer story';f.querySelector('[name="enabled"]').checked=true;f.querySelector('[name="shareFavorites"]').checked=true;f.querySelector('[name="shareProgress"]').checked=true;f.querySelector('[name="shareAchievements"]').checked=true;f.querySelector('[name="shareAvatar"]').checked=true;f.requestSubmit();})()`);
+    await evaluate(`(()=>{const bio=document.querySelector('textarea[name="bio"]');bio.value='<img src=x onerror=alert(1)> Trainer story';bio.closest('form').requestSubmit();})()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Trainer info saved.'`);
+    await evaluate(`(()=>{const f=document.querySelector('.community-settings form');f.querySelector('[name="shareBio"]').checked=true;f.querySelector('[name="enabled"]').checked=true;f.querySelector('[name="shareFavorites"]').checked=true;f.querySelector('[name="shareProgress"]').checked=true;f.querySelector('[name="shareAchievements"]').checked=true;f.querySelector('[name="shareAvatar"]').checked=true;f.requestSubmit();})()`);
     await waitFor(`document.querySelector('#account-message').textContent==='Public profile settings saved.'`);
     await evaluate(`[...document.querySelectorAll('.community-settings button')].find(b=>b.textContent==='Preview saved public profile').click()`);
     await waitFor(`document.querySelector('.public-preview .public-identity')`);
@@ -1103,9 +1262,87 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('.community-directory').textContent.includes('browser_trainer')`),false);
     assert.deepEqual(exceptions,[]);
   });
+  await check('expanded achievement vault filters all 96 medals and supports categories and earned status',async()=>{
+    await command('Page.navigate',{url:origin+'/trainers.html#view=achievements'});
+    await waitFor(`document.querySelectorAll('.achievement-card').length===96`);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card[data-rarity="legendary"]').length>0`),true);
+    await evaluate(`document.querySelector('[data-achievement-filter="types"]').click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),57);
+    await evaluate(`document.querySelector('[data-achievement-filter="unlocked"]').click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card:not(.unlocked)').length`),0);
+    await evaluate(`document.querySelector('[data-achievement-filter="all"]').click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),96);
+    for(const theme of ['light','dark']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}
+    }
+  });
+  await check('decoration studio previews, resets, saves and persists curated cards and earned badge pins',async()=>{
+    await evaluate(`document.querySelector('[data-view="/profile"]').click()`);
+    await waitFor(`document.querySelector('.decoration-form')`);
+    await evaluate(`(()=>{const f=document.querySelector('.decoration-form');f.querySelector('[name="palette"][value="violet"]').click();f.querySelector('[name="pattern"][value="constellation"]').click();f.querySelector('[name="frame"][value="halo"]').click();f.querySelector('[name="effect"][value="shimmer"]').click();const title=f.querySelector('[name="title"]');title.value='<b>Master of little legends</b>';title.dispatchEvent(new Event('input'));const motto=f.querySelector('[name="motto"]');motto.value='Every adventure starts with a first catch.';motto.dispatchEvent(new Event('input'));f.querySelector('[name="pinnedBadges"][value="first-catch"]').click();})()`);
+    assert.equal(await evaluate(`document.querySelector('.decoration-preview').dataset.palette`),'violet');
+    assert.equal(await evaluate(`document.querySelector('.decoration-preview .trainer-title-ribbon b')`),null);
+    assert.match(await evaluate(`document.querySelector('.decoration-preview .trainer-title-ribbon').textContent`),/<b>/);
+    await evaluate(`document.querySelector('.decoration-form').requestSubmit()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Trainer decorations saved.'`);
+    await command('Page.reload');await waitFor(`document.querySelector('.decoration-form')`);
+    assert.equal(await evaluate(`document.querySelector('.profile-panel').dataset.palette`),'violet');
+    assert.match(await evaluate(`document.querySelector('.profile-panel .showcase-badge').textContent`),/First Catch/);
+    await evaluate(`document.querySelector('.decoration-form [name="palette"][value="ocean"]').click();[...document.querySelectorAll('.decoration-form button')].find(b=>b.textContent==='Reset preview').click()`);
+    assert.equal(await evaluate(`document.querySelector('.decoration-preview').dataset.palette`),'violet');
+    await evaluate(`(()=>{const f=document.querySelector('.community-settings form');f.querySelector('[name="enabled"]').checked=true;f.querySelector('[name="shareAchievements"]').checked=true;f.requestSubmit();})()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Public profile settings saved.'`);
+    await command('Page.navigate',{url:origin+'/trainer/browser_trainer'});await waitFor(`document.querySelector('.public-identity')?.dataset.palette==='violet'`);
+    assert.match(await evaluate(`document.querySelector('.public-identity .showcase-badge').textContent`),/First Catch/);
+    assert.equal(await evaluate(`parseFloat(getComputedStyle(document.querySelector('.public-identity')).paddingTop)`),110);
+    for(const theme of ['dark','light']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}
+    }
+    if(process.env.QA_SCREENSHOT_DIR){fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'decorated-trainer.png'),Buffer.from(shot.data,'base64'));}
+    await command('Page.navigate',{url:origin+'/trainers.html#view=profile'});await waitFor(`document.querySelector('.decoration-form')`);
+    for(const width of [320,375,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}
+    assert.deepEqual(exceptions,[]);
+  });
+  await check('community discovery shows rich public cards, real partners/teams, global search and pagination without self-links',async()=>{
+    const privacy=require('../server/community'),cosmetics=require('../server/decorations');
+    const existing=fixtureRepo.users.find(u=>u.username==='browser_trainer');await fixtureRepo.updateBio(existing.id,'Collecting little legends, one discovery at a time.');await fixtureRepo.community.saveSettings(existing.id,{...await fixtureRepo.community.settings(existing.id),shareBio:true});await fixtureRepo.community.saveDecoration(existing.id,{...cosmetics.defaults(),palette:'violet',pattern:'constellation',frame:'halo',title:'Little legends collector'});
+    const sharp=require('sharp'),crypto=require('node:crypto');
+    for(const [username,palette,partner,name,ids,bio]of [['mira_ocean','ocean',7,'Tide runners',[7,25,133],'Water teams, coastal journeys and a soft spot for Squirtle.'],['ember_roamer','sunset',4,'Campfire crew',[4,1,25,6],'Exploring Kanto with a team that feels like home.']]){
+      const u=await fixtureRepo.createUser({username,email:`${username}@example.test`},'directory-fixture-only');const filename=crypto.randomUUID()+'.webp';fs.writeFileSync(path.join(uploadDir,filename),await sharp({create:{width:128,height:128,channels:3,background:palette==='ocean'?'#327fb8':'#c57548'}}).webp().toBuffer());await fixtureRepo.updateAvatar(u.id,filename);
+      await fixtureRepo.updateBio(u.id,bio);const t=await fixtureRepo.createTeam(u.id,name);await fixtureRepo.saveTeam(u.id,t.id,{name,pokemonIds:ids});await fixtureRepo.community.share(u.id,t.id,'public');await fixtureRepo.community.saveSettings(u.id,{...privacy.defaults(),enabled:true,shareAvatar:true,shareBio:true,featuredPokemonId:partner,featuredTeamId:t.id});await fixtureRepo.community.saveDecoration(u.id,{...cosmetics.defaults(),palette,pattern:palette==='ocean'?'waves':'constellation',frame:'halo',title:palette==='ocean'?'A heart for Water types':'A little fire, a lot of heart'});
+    }
+    const hidden=await fixtureRepo.createUser({username:'hidden_trainer',email:'hidden@example.test'},'directory-fixture-only');await fixtureRepo.updateBio(hidden.id,'PRIVATE DIRECTORY TEST');
+    for(let i=0;i<25;i++){const u=await fixtureRepo.createUser({username:`traveler_${String(i).padStart(2,'0')}`,email:`traveler${i}@example.test`},'directory-fixture-only');await fixtureRepo.community.saveSettings(u.id,{...privacy.defaults(),enabled:true});}
+    await command('Page.navigate',{url:origin+'/community.html'});await waitFor(`document.querySelectorAll('.trainer-directory-card').length===24 && document.querySelector('.community-directory').getAttribute('aria-busy')==='false'`);
+    assert.equal(await evaluate(`document.querySelector('#community-intro a[href="community.html"]')`),null);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-trainer="hidden_trainer"]').length`),0);
+    assert.equal(await evaluate(`document.querySelector('[data-trainer="mira_ocean"] .directory-avatar img').getAttribute('src')`),'/api/public/trainers/mira_ocean/avatar');
+    await waitFor(`document.querySelector('[data-trainer="mira_ocean"] [data-public-pokemon-name="7"]')?.textContent.includes('Squirtle')`);
+    assert.match(await evaluate(`document.querySelector('[data-trainer="mira_ocean"]').textContent`),/Tide runners/);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-trainer="mira_ocean"] .directory-mini-roster>*').length`),6);
+    assert.equal(await evaluate(`document.querySelector('.community-directory').textContent.includes('PRIVATE DIRECTORY TEST')`),false);
+    await evaluate(`document.querySelector('.community-load-more').click()`);await waitFor(`document.querySelectorAll('.trainer-directory-card').length===28`);
+    assert.equal(await evaluate(`document.querySelector('.community-load-more').hidden`),true);
+    for(const theme of ['dark','light']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});await sleep(80);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${theme} community ${width}px ${await evaluate('document.documentElement.scrollWidth')}`);}
+      if(process.env.QA_SCREENSHOT_DIR){fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});await sleep(300);await evaluate(`document.querySelector('.community-directory-heading').scrollIntoView({block:'start',behavior:'instant'})`);const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,`community-directory-${theme}.png`),Buffer.from(shot.data,'base64'));}
+    }
+    await evaluate(`document.querySelector('#community-search').value='mira';document.querySelector('.community-search').requestSubmit()`);await waitFor(`document.querySelectorAll('.trainer-directory-card').length===1 && document.querySelector('.trainer-directory-card').dataset.trainer==='mira_ocean'`);
+    assert.match(await evaluate(`document.querySelector('.community-directory-info').textContent`),/1 of 1/);
+    await evaluate(`document.querySelector('#community-search').value='nobody_here';document.querySelector('.community-search').requestSubmit()`);await waitFor(`document.querySelector('.community-message h3')?.textContent==='No trainer found. Yet.'`);
+    await evaluate(`document.querySelector('.community-message button').click()`);await waitFor(`document.querySelectorAll('.trainer-directory-card').length===24`);
+    await evaluate(`document.querySelector('[data-trainer="mira_ocean"] .directory-card-actions a').click()`);await waitFor(`document.querySelector('.public-profile-name')?.textContent==='mira_ocean'`);
+    assert.equal(await evaluate(`document.querySelector('#community-intro').hidden`),true);assert.equal(await evaluate(`document.querySelector('.public-profile-hero .trainer-avatar').getBoundingClientRect().width>=112`),true);
+    await evaluate(`document.querySelector('.community-back-link').click()`);await waitFor(`document.querySelector('.community-directory[aria-busy="false"]')`);
+    assert.deepEqual(exceptions,[]);
+  });
+  await require('./support/studio-expansion.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo,uploadDir,spriteFailures,spriteRequests});
   await check('static community preview gives a clear backend-required state without exposing private data',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/community.html'});
-    await waitFor(`document.querySelector('#community-content h2')?.textContent==='Shared content unavailable'`);
+    await waitFor(`document.querySelector('.community-error')`);
     assert.match(await evaluate(`document.querySelector('#community-content').textContent`),/Express backend|Static preview/);
     assert.equal(await evaluate(`document.querySelector('#header-profile').hidden`),true);
     assert.deepEqual(exceptions,[]);

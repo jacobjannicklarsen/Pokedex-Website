@@ -1,12 +1,14 @@
 # Express API
 
+Trainer cosmetics: authenticated `GET /api/profile/decorations` returns `{decoration,choices,badges}`; `PUT` accepts only the complete curated style/title/motto/pinned-badge object with existing CSRF/origin checks. Pins must be earned by the session owner. Public profiles expose styling, with pins only when achievement sharing is enabled. See [TRAINER_STYLE.md](../TRAINER_STYLE.md) for the full contract and unexecuted additive migration. Progression now returns 96 definitions with rarity/category metadata while retaining existing award keys/dates.
+
 ## Trainer community (v0.6.0)
 
 Requires the reviewed [manual community migration](../database/MIGRATION_v0.6.0.md) after v0.5.0. Missing rows mean private; every sharing flag defaults to false. Nothing is published automatically. See [COMMUNITY.md](../COMMUNITY.md) for complete JSON projections, settings validation, privacy rules and calculations.
 
 | Method | Endpoint | Access / result |
 | --- | --- | --- |
-| GET | `/api/public/trainers?after=ID` | Public, bounded 24-profile opt-in directory; `{trainers:[{username}],next}` |
+| GET | `/api/public/trainers?q=name&after=ID` | Public, bounded 24-profile opt-in directory with literal partial username search; `{trainers:[publicCard],next,total}` |
 | GET | `/api/public/trainers/:username` | Public, enabled profile's approved projection only; `{profile}` |
 | GET | `/api/public/trainers/:username/teams` | Public, enabled profile's shared teams only; `{teams}` |
 | GET | `/api/public/trainers/:username/avatar` | Public WebP only while both profile/picture sharing are enabled |
@@ -20,7 +22,7 @@ Requires the reviewed [manual community migration](../database/MIGRATION_v0.6.0.
 
 Public API reads precede private-auth middleware, use explicit field allowlists and visibility predicates, and are limited to 120 requests/minute/IP/process. Profile disable removes the profile/directory entry; independent public teams must be revoked separately. Disabling/deleting a team makes its old UUID URL return 404. UUIDs never confer editing rights. Settings/sharing writes use session-derived ownership, bound values, row locks/transactions and existing CSRF/origin checks. Unknown/private resources return 404, malformed inputs 400, missing auth 401, bad CSRF 403, throttling 429 and absent schema 503. Public and private responses remain `no-store`. Public statistics expose approved aggregates only, never raw collection records/recent activity or private settings.
 
-Settings require exactly `{enabled,publicBio,featuredPokemonId,featuredTeamId,shareAvatar,shareFavorites,shareProgress,shareAchievements}` with actual boolean flags, 0–500 character public biography, nullable species ID 1–649 and nullable owned featured-team ID. Only independently public featured teams appear publicly. The existing private biography/email are never copied into public JSON. Existing usernames remain unique and immutable in the UI; invalid or obsolete profile names fail gracefully.
+Settings require exactly `{enabled,shareBio,featuredPokemonId,featuredTeamId,shareAvatar,shareFavorites,shareProgress,shareAchievements}` with actual boolean flags, nullable species ID 1–649 and nullable owned featured-team ID. Only independently public featured teams appear publicly. Biography comes from users.bio only when shareBio is true; email is never public. There is no publicBio input. PATCH /api/profile edits the single Biography (0–500 characters). Existing installations require the manual database/migrations/single-biography.sql migration; reads safely hide biography until it is applied. Existing usernames remain unique and immutable in the UI; invalid or obsolete profile names fail gracefully.
 
 Pages `/community.html`, `/trainer/:username` and `/team/:shareId` serve the community shell; clean routes require Express. Static previews show a backend-required explanation. Analysis shares the existing Encyclopedia's modern multiplier logic and the bundled official type chart; draft analysis also works privately in the browser. See [COMMUNITY.md](../COMMUNITY.md#team-analysis-calculations).
 
@@ -61,7 +63,7 @@ First call `GET /api/auth/session` with cookies enabled. It returns `{ user, csr
 | POST | `/api/auth/logout` | 204; destroys session and clears cookie |
 | GET | `/api/profile` | Current user's profile; never another user's private data |
 | PATCH | `/api/profile` | `{bio}` (0–500 characters) → `{user}` |
-| POST | `/api/profile/avatar` | Multipart `avatar`; one JPEG/PNG/WebP, ≤2 MB and ≤16 MP → `{user}` |
+| POST | `/api/profile/avatar` | Multipart `avatar`; one JPEG/PNG/WebP, ≤2 MB and ≤16 MP; optional `crop` JSON `{x,y,size}` in upright source-image pixels → `{user}` |
 | GET | `/api/teams` | `{teams:[{id,name,created_at,pokemonIds}]}` owned by current user |
 | POST | `/api/teams` | `{name}` (1–60 characters) → 201 `{team}` |
 | PUT | `/api/teams/:id` | `{name,pokemonIds:[1,25]}` → `{team}`; atomically replaces name and complete roster |
@@ -75,3 +77,15 @@ All profile/team/favourite endpoints require authentication. Team member IDs are
 Statuses: 400 invalid data; 401 unauthenticated/invalid login; 403 missing or invalid CSRF/disallowed origin; 404 absent or unowned team; 409 conflicting username/email; 413 upload/request too large; 429 rate limited; 503 unavailable database; 500 unexpected server error. Password hashes, SQL errors and secrets are never returned.
 
 Sessions persist in the `sessions` MySQL table with a seven-day rolling TTL. Expired sessions are ignored and pruned at startup/hourly. Passwords use Argon2id through node-argon2. Uploads are decoded with a pixel limit, rotated, stripped of input metadata, resized to 256×256 and re-encoded as WebP with a random server-generated filename. Old avatar files are removed after the database update succeeds. Since v0.6.0, original `/media/avatars/:filename` URLs require the matching authenticated owner and use `no-store`; optional public pictures use a separate revocable `/api/public/trainers/:username/avatar` route. No avatar files are replaced by the upgrade.
+
+
+Avatar framing: the optional multipart `crop` field is a bounded JSON object `{x,y,size}` with integer square coordinates in the original picture after EXIF orientation is applied. Express rejects extra fields, malformed/out-of-bounds crops and invalid images before replacing the avatar. Omitting crop retains the legacy centre crop. The browser preview supports drag, zoom, arrows, reset/cancel; only an explicit upload changes the saved picture. The original file still has the existing 2 MB/16 MP limits, and the stored output remains a metadata-stripped 256 by 256 WebP. No schema migration is required.
+
+
+## Trainer Card Studio v0.6.1
+
+Authenticated GET /api/profile/decorations returns {decoration,choices,badges}; PUT saves a complete validated decoration to the session owner. Legacy bodies with the original seven keys remain accepted and gain defaults. New optional fields: accentColor/borderColor/frameColor (null or #RRGGBB), borderStyle (solid/double/dashed/etched), titleStyle (ribbon/pill/minimal). See trainer-card-config.js for the exact curated palettes, backgrounds, frames and effects. Arbitrary CSS/HTML/URLs and extra fields are rejected, and pins still require earned owner awards.
+
+Public decoration projections expose these cosmetic values only through already enabled public profiles/cards. They cannot publish hidden content. No changes to authentication, uploads, teams or collection APIs. Pre-upgrade reads normalize old rows; expanded writes require database/migrations/v0.6.1-trainer-studio.sql and return 503 with guidance if fields/checks are missing. The migration is manual only.
+
+Sprites are client image assets selected from existing species IDs; the utility adds no API endpoints and no private data fields. The Express allowlist explicitly serves trainer-card-config.js, trainer-cards.css, sprite-availability.js and pokemon-sprites.js. Development scripts, manifests under tests, SQL and server source remain private.

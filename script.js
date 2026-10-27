@@ -186,10 +186,35 @@ function renderDetails(pokemon) {
     measures.append(group);
   });
   const abilities = element('div', 'ability-list');
-  pokemon.abilities.forEach((ability) => {
-    const item = element('span', 'ability', prettyName(ability.name));
+  pokemon.abilities.forEach((ability, index) => {
+    const host = element('span', 'ability-host');
+    const item = element('button', 'ability', prettyName(ability.name)); item.type = 'button';
     if (ability.hidden) item.append(element('small', '', 'Hidden ability'));
-    abilities.append(item);
+    const tooltip = element('span', 'ability-tooltip', 'Loading ability description…'); tooltip.id = `ability-description-${pokemon.id}-${index}`; tooltip.setAttribute('role', 'tooltip'); tooltip.setAttribute('aria-live', 'polite'); tooltip.hidden = true;
+    item.setAttribute('aria-describedby', tooltip.id);
+    let pending = false, loaded = false, pinned = false, hideTimer;
+    const hide = () => { clearTimeout(hideTimer); tooltip.hidden = true; };
+    const show = async () => {
+      clearTimeout(hideTimer);
+      abilities.querySelectorAll('[role="tooltip"]').forEach(other => { if (other !== tooltip) other.hidden = true; });
+      tooltip.hidden = false;
+      if (pending || loaded) return;
+      pending = true; tooltip.textContent = 'Loading ability description…';
+      try {
+        const api = globalThis.PokemonEncyclopediaData;
+        if (!api) throw Error('Ability data is unavailable.');
+        const resource = await api.get('ability', ability.name);
+        tooltip.textContent = `${prettyName(ability.name)}: ${api.abilityDescription(resource)}`; loaded = true;
+      } catch { tooltip.textContent = 'Ability description could not load. Hover, focus or tap again to retry.'; }
+      finally { pending = false; }
+    };
+    host.addEventListener('pointerenter', show);
+    host.addEventListener('pointerleave', () => { if (!pinned && document.activeElement !== item) hideTimer = setTimeout(hide, 120); });
+    item.addEventListener('focus', show);
+    item.addEventListener('blur', () => { pinned = false; hide(); });
+    item.addEventListener('click', () => { pinned = !pinned; if (pinned) show(); else hide(); });
+    item.addEventListener('keydown', event => { if (event.key === 'Escape' && !tooltip.hidden) { event.preventDefault(); event.stopPropagation(); pinned = false; hide(); } });
+    host.append(item, tooltip); abilities.append(host);
   });
   body.append(measures, element('h3', '', 'Abilities'), abilities, element('h3', '', 'Base stats'));
   const statLabels = { hp: 'HP', attack: 'Attack', defense: 'Defense', 'special-attack': 'Sp. Attack', 'special-defense': 'Sp. Defense', speed: 'Speed' };

@@ -18,6 +18,7 @@
   }
   function valid(kind, p) {
     if (!p || !Number.isInteger(p.id) || p.id < 1) return false;
+    if (kind === 'ability') return typeof p.name === 'string' && Array.isArray(p.effect_entries) && p.effect_entries.every(e => typeof e.language?.name === 'string' && typeof e.effect === 'string' && typeof e.short_effect === 'string') && Array.isArray(p.flavor_text_entries) && p.flavor_text_entries.every(e => typeof e.language?.name === 'string' && typeof e.flavor_text === 'string');
     if (kind === 'pokemon') return Array.isArray(p.moves) && p.moves.every(m => typeof m?.move?.name === 'string' && resourceId(m.move.url, 'move') && Array.isArray(m.version_group_details));
     if (kind === 'pokemon-species') return typeof p.name === 'string' && Array.isArray(p.flavor_text_entries) && Array.isArray(p.egg_groups) && (p.evolution_chain === null || Boolean(resourceId(p.evolution_chain?.url, 'evolution-chain')));
     if (kind === 'evolution-chain') {
@@ -29,6 +30,7 @@
     return false;
   }
   function compact(kind, p) {
+    if (kind === 'ability') return { id: p.id, name: p.name, effect_entries: p.effect_entries.filter(e => e.language.name === 'en'), flavor_text_entries: p.flavor_text_entries.filter(e => e.language.name === 'en') };
     if (kind === 'pokemon') return { id: p.id, base_experience: p.base_experience ?? null, moves: p.moves.map(m => ({ move: m.move, version_group_details: m.version_group_details.filter(d => versionGroups.some(g => g.name === d.version_group?.name)) })).filter(m => m.version_group_details.length) };
     if (kind === 'type') return { id: p.id, name: p.name, damage_relations: p.damage_relations };
     if (kind === 'move') return { id: p.id, name: p.name, type: p.type, damage_class: p.damage_class, power: p.power ?? null, accuracy: p.accuracy ?? null, pp: p.pp ?? null, past_values: p.past_values };
@@ -51,7 +53,7 @@
     }
   }
   function get(kind, id) {
-    if (!['pokemon', 'pokemon-species', 'evolution-chain', 'move', 'type'].includes(kind) || !/^[a-z0-9-]+$/.test(String(id))) return Promise.reject(Error('Unsupported PokéAPI resource.'));
+    if (!['pokemon', 'pokemon-species', 'evolution-chain', 'move', 'type', 'ability'].includes(kind) || !/^[a-z0-9-]+$/.test(String(id))) return Promise.reject(Error('Unsupported PokéAPI resource.'));
     const key = `${kind}-${id}`;
     if (memory.has(key)) return Promise.resolve(memory.get(key));
     if (pending.has(key)) return pending.get(key);
@@ -136,7 +138,11 @@
   }
   const descriptions = species => (species.flavor_text_entries || []).filter(e => e.language?.name === 'en' && typeof e.flavor_text === 'string').map(e => ({ game: e.version?.name || 'unspecified', text: e.flavor_text.replace(/[\f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim() })).filter(e => e.text).filter((e, i, all) => all.findIndex(other => other.game === e.game && other.text === e.text) === i);
   const gender = rate => rate === -1 ? 'Genderless' : Number.isInteger(rate) && rate >= 0 && rate <= 8 ? `${(8 - rate) * 12.5}% male · ${rate * 12.5}% female` : 'Not recorded';
-  const api = { versionGroups, resourceId, valid, get, remember, requirements, learnset, moveValues, matchups, descriptions, gender };
+  function abilityDescription(ability) {
+    const english = ability.effect_entries?.find(e => e.language?.name === 'en');
+    return (english?.short_effect || english?.effect || ability.flavor_text_entries?.find(e => e.language?.name === 'en')?.flavor_text || 'No English description is available for this ability.').replace(/[\f\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const api = { versionGroups, resourceId, valid, get, remember, requirements, learnset, moveValues, matchups, descriptions, gender, abilityDescription };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.PokemonEncyclopediaData = api;
 })();

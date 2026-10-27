@@ -15,7 +15,9 @@
   const content = $('#account-content');
   const pendingFavorites = new Set();
   const teamSelectors = new Set();
+  const caughtFilters = new Set();
   let selectorRecovery;
+  let avatarEditor;
 
   function recoverSelectors() {
     if (globalThis.PokemonSelector?.create) return Promise.resolve();
@@ -111,7 +113,7 @@
     }
     globalThis.TrainerProgress?.setUser(authenticated ? session.user : null, {
       authReady: session.ready, request, notice, login: () => openAuth(),
-      onChange() { if (grid) render(); if (['/progress', '/achievements'].includes(activeView)) renderPage(); },
+      onChange() { caughtFilters.forEach(refresh => refresh()); if (grid) render(); if (['/progress', '/achievements'].includes(activeView)) renderPage(); },
       async onExternal() {
         const previous = session.user?.id;
         try { await refreshSession(); }
@@ -187,7 +189,7 @@
   function miniPokemon(id) {
     const box = element('div', 'mini-pokemon');
     const pokemon = state.pokemon.get(id) || { id, name: `Pokémon ${id}`, artwork: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png` };
-    box.append(artwork(pokemon));
+    box.append(PokemonSprites.create(id,{kind:'party',name:prettyName(pokemon.name),pokemon}));
     const name = element('span', '', `${number(id)} ${prettyName(pokemon.name)}`); name.dataset.pokemonName = id;
     box.append(name); return box;
   }
@@ -229,7 +231,8 @@
   }
   function renderPage() {
     if (!isTrainerHub) return;
-    teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
+    avatarEditor?.destroy();avatarEditor=null;
+    teamSelectors.forEach(selector => selector.close()); teamSelectors.clear(); caughtFilters.clear();
     content.replaceChildren();
     globalThis.DexhavenTeamAnalysis?.cleanup();
     $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile', '/progress': 'Pokédex Progress', '/achievements': 'Achievements' })[activeView] || 'Trainer';
@@ -283,10 +286,10 @@
     const biography = element('p', 'profile-biography', user.bio || 'Your story is still unwritten. Add a biography below.'); biography.dataset.profileBio = ''; identity.append(biography);
     panel.append(identity); content.append(panel);
     const form = element('form', 'account-form trainer-panel');
-    const label = element('label', '', 'Trainer bio');
+    const label = element('label', '', 'Biography');
     const bio = element('textarea'); bio.name = 'bio'; bio.maxLength = 500; bio.rows = 4; bio.value = user.bio; label.append(bio);
     const save = element('button', 'action-button', 'Save trainer info'); save.type = 'submit';
-    form.append(label, save); form.addEventListener('submit', async event => {
+    form.append(label, element('p', 'form-help', 'Your one biography for Dexhaven. Control who can see it with Show biography publicly below.'), save); form.addEventListener('submit', async event => {
       event.preventDefault(); save.disabled = true;
       try { const data = await request('/profile', { method: 'PATCH', body: { bio: bio.value } }); session.user = data.user; biography.textContent = data.user.bio || 'Your story is still unwritten. Add a biography below.'; notice('Trainer info saved.'); }
       catch (error) { notice(error.message, true); } finally { save.disabled = false; }
@@ -295,17 +298,32 @@
     const fileLabel = element('label', '', 'Change profile picture');
     const file = element('input'); file.type = 'file'; file.name = 'avatar'; file.accept = 'image/jpeg,image/png,image/webp'; file.required = true; fileLabel.append(file);
     const upload = element('button', 'action-button', 'Upload picture'); upload.type = 'submit';
-    avatarForm.append(fileLabel, element('p', 'form-help', 'JPEG, PNG or WebP. Maximum 2 MB and 16 megapixels. Images are cropped to a square.'), upload);
+    avatarForm.append(fileLabel, element('p', 'form-help', 'JPEG, PNG or WebP. Maximum 2 MB and 16 megapixels. Choose a picture, then drag and zoom to adjust your avatar.'), upload);
+    const cropper=globalThis.AvatarCropper?.create({container:avatarForm,onReady:ready=>{upload.disabled=!ready;},onCancel:()=>{file.value='';}});avatarEditor=cropper;
+    upload.disabled=true;
+    if(!cropper)avatarForm.append(element('p','form-error','The picture editor could not load. Refresh this page before uploading.'));
+    file.addEventListener('change',async()=>{if(!file.files[0]){cropper?.clear();return;}try{await cropper?.load(file.files[0]);}catch{/* The editor displays a readable error; the current picture stays saved. */}});
+    avatarForm.append(upload);
     avatarForm.addEventListener('submit', async event => {
       event.preventDefault();
       const selected = file.files[0];
       if (!selected || selected.size > 2 * 1024 * 1024 || !['image/jpeg','image/png','image/webp'].includes(selected.type)) { notice('Choose a JPEG, PNG or WebP image no larger than 2 MB.', true); return; }
-      upload.disabled = true; const data = new FormData(); data.append('avatar', selected);
-      try { const result = await request('/profile/avatar', { method: 'POST', form: data }); session.user = result.user; updateAccountUI(); notice('Profile picture updated.'); if (activeView === '/profile') renderPage(); }
-      catch (error) { notice(error.message, true); } finally { upload.disabled = false; }
+      if(!cropper){notice('The picture editor could not load. Refresh this page before uploading.',true);return;}
+      upload.disabled=true;
+      try {
+        await cropper.load(selected);
+        if(session.user?.id!==user.id||!avatarForm.isConnected)return;
+        const crop=cropper.getCrop();if(!crop)throw Error('Choose a valid picture first.');
+        upload.disabled=true;file.disabled=true;cropper.setBusy(true);
+        const data=new FormData();data.append('avatar',selected);data.append('crop',JSON.stringify(crop));
+        const result=await request('/profile/avatar',{method:'POST',form:data});
+        if(session.user?.id!==user.id||!avatarForm.isConnected)return;
+        session.user=result.user;updateAccountUI();notice('Profile picture updated.');if(activeView==='/profile')renderPage();
+      }catch(error){if(session.user?.id===user.id&&avatarForm.isConnected)notice(error.message,true);}finally{file.disabled=false;cropper.setBusy(false);upload.disabled=!cropper.getCrop();}
     });
-    content.append(form, avatarForm);
+    content.append(avatarForm, form);
     globalThis.DexhavenCommunity?.settings(content, { user, teams: session.teams, request, notice, currentUserId: () => session.user?.id, trackSelector: selector => teamSelectors.add(selector) });
+    globalThis.TrainerDecorations?.mount(content, panel, {user,request,notice,currentUserId:()=>session.user?.id});
     content.append(element('h2', 'account-subheading', `Teams · ${session.teams.length}`));
     session.teams.forEach(team => {
       const summary = element('div', 'trainer-panel'); summary.append(element('h3', '', team.name));
@@ -349,6 +367,27 @@
       const nameLabel = element('label', '', 'Team name'); const title = element('input'); title.value = team.name; title.required = true; title.maxLength = 60; nameLabel.append(title);
       form.append(nameLabel); const slots = element('div', 'team-slots');
       const selectors = [];
+      let caughtOnly = false;
+      const source = element('div', 'team-source');
+      source.setAttribute('role', 'group'); source.setAttribute('aria-label', 'Choose team search source');
+      const allButton = action('All Pokémon', () => { caughtOnly = false; refreshSource(); });
+      const caughtButton = action('Caught Pokémon', () => { caughtOnly = true; refreshSource(); });
+      const sourceHelp = element('p', 'form-help'); sourceHelp.setAttribute('role', 'status');
+      const retryCollection = action('Retry collection', () => globalThis.TrainerProgress?.refresh(), 'text-button');
+      const collection = () => globalThis.TrainerProgress?.caughtState() || {ready:false,ids:new Set(),error:'Collection could not load. Refresh this page.'};
+      function refreshSource() {
+        const state = collection();
+        allButton.setAttribute('aria-pressed', String(!caughtOnly));
+        caughtButton.setAttribute('aria-pressed', String(caughtOnly));
+        sourceHelp.textContent = caughtOnly
+          ? !state.ready ? state.error || 'Loading your caught Pokémon…'
+            : state.ids.size ? `Search your ${state.ids.size} caught Pokémon. Existing team members stay in place.` : 'No caught Pokémon yet. Mark Pokémon as Caught in the National Pokédex, or choose All Pokémon.'
+          : 'Search the full National Pokédex, or choose from your caught Pokémon.';
+        retryCollection.hidden = !caughtOnly || !state.error;
+        selectors.forEach(selector => selector.refresh?.());
+      }
+      source.append(allButton, caughtButton, sourceHelp, retryCollection); form.append(source);
+      caughtFilters.add(refreshSource); refreshSource();
       let analysisOpen = false;
       const analysisPanel = element('section'); analysisPanel.hidden = true;
       const updateAnalysis = () => { if (analysisOpen) globalThis.DexhavenTeamAnalysis?.render(analysisPanel, selectors.map(s => s.value).filter(Boolean)); };
@@ -364,6 +403,7 @@
         const selector = selectorFactory({
           slot: slot + 1, selectedId: team.pokemonIds[slot], total: TOTAL,
           getPokemon: id => state.pokemon.get(id), formatName: prettyName, makeArtwork: artwork,
+          eligibleIds: () => caughtOnly ? collection().ready ? collection().ids : new Set() : null,
           excludedIds: () => new Set(selectors.filter(other => other !== selector).map(other => other.value).filter(Boolean)),
           onChange(value) { update(value); selectors.forEach(other => other.refresh()); updateAnalysis(); }
         });

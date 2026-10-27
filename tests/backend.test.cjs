@@ -180,6 +180,26 @@ test('profile fields, image sniffing/size limits, re-encoding and previous-file 
   const second=await upload(png,'image/png');assert.equal(second.status,200);await assert.rejects(fs.access(file));
 });
 
+test('avatar upload applies chosen square crop, rejects invalid crops without changing the saved image',async t=>{
+ const app=await setup(t),client=app.client();await register(client,'crop');
+ const blue=await sharp({create:{width:20,height:20,channels:3,background:'blue'}}).png().toBuffer();
+ const picture=await sharp({create:{width:40,height:20,channels:3,background:'red'}}).composite([{input:blue,left:20,top:0}]).png().toBuffer();
+ const upload=async(crop,extra=false)=>{const form=new FormData();form.append('avatar',new Blob([picture],{type:'image/png'}),'wide.png');form.append(extra?'userId':'crop',typeof crop==='string'?crop:JSON.stringify(crop));return client.call('/api/profile/avatar',{method:'POST',form});};
+ const saved=await upload({x:20,y:0,size:20});assert.equal(saved.status,200);
+ const file=path.join(app.uploadDir,path.basename(saved.data.user.avatarUrl));
+ const stats=await sharp(await fs.readFile(file)).stats();assert.ok(stats.channels[2].mean>200);assert.ok(stats.channels[0].mean<30);
+ for(const crop of ['bad',{x:0,y:0,size:41},{x:0,y:0,size:0},{x:0,y:0,size:20,userId:2}])assert.equal((await upload(crop)).status,400);
+ assert.equal((await upload('2',true)).status,400);
+ assert.equal((await client.call('/api/profile')).data.user.avatarUrl,saved.data.user.avatarUrl);await fs.access(file);
+});
+test('avatar crop coordinates use the EXIF-oriented photo dimensions',async t=>{
+ const app=await setup(t),client=app.client();await register(client,'orientation');
+ const blue=await sharp({create:{width:12,height:12,channels:3,background:'blue'}}).png().toBuffer();
+ const photo=await sharp({create:{width:24,height:12,channels:3,background:'red'}}).composite([{input:blue,left:12,top:0}]).jpeg({quality:100,chromaSubsampling:'4:4:4'}).withMetadata({orientation:6}).toBuffer();
+ const form=new FormData();form.append('avatar',new Blob([photo],{type:'image/jpeg'}),'phone.jpg');form.append('crop',JSON.stringify({x:0,y:12,size:12}));
+ const result=await client.call('/api/profile/avatar',{method:'POST',form});assert.equal(result.status,200);
+ const stats=await sharp(await fs.readFile(path.join(app.uploadDir,path.basename(result.data.user.avatarUrl)))).stats();assert.ok(stats.channels[2].mean>200);assert.ok(stats.channels[0].mean<30);
+});
 test('production session cookie is Secure; rate limits return JSON',async t=>{
   const app=await setup(t,{production:true,authLimit:1});const client=app.client();
   const init=await client.call('/api/auth/session');assert.match(init.headers.get('set-cookie'),/; Secure/i);

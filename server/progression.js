@@ -33,6 +33,23 @@ const definitions = [
   { key: 'national-pokedex-master', name: 'National Pokédex Master', description: 'Catch all 649 National Pokédex species.', icon: '♛', goal: 649, metric: s => s.national.caught },
   { key: 'team-builder', name: 'Team Builder', description: 'Save a full team containing six Pokémon.', icon: '⬡', goal: 6, metric: (s, teams) => Math.max(0, ...teams.map(t => t.pokemonIds?.length ?? t.memberCount ?? 0)) }
 ];
+const pretty = value => value[0].toUpperCase() + value.slice(1);
+const add = (key, name, description, icon, goal, metric, category, rarity) => definitions.push({key,name,description,icon,goal,metric,category,rarity});
+for (const [goal,name,rarity] of [[10,'Curious Explorer','bronze'],[50,'Field Researcher','silver'],[100,'Seasoned Explorer','silver'],[250,'World Wanderer','gold'],[500,'Living Encyclopedia','gold'],[649,'Seen It All','legendary']]) add(`seen-${goal}`,name,`Register ${goal} different Pokémon as Seen or Caught.`,'◎',goal,s=>s.national.seen,'exploration',rarity);
+for (const [goal,name,rarity] of [[10,'A Promising Start','bronze'],[50,'Half Century','silver'],[150,'Collector’s Vault','gold'],[250,'Grand Collection','gold'],[500,'Legend in the Making','legendary']]) add(`caught-${goal}`,name,`Have ${goal} different Pokémon marked Caught.`,'◒',goal,s=>s.national.caught,'collection',rarity);
+for (const g of pokemon.generations) {
+  add(`region-${g.id}-trailblazer`,`${g.name} Trailblazer`,`Catch 10 species introduced in ${g.name}.`,'✧',10,s=>s.generations.find(row=>row.id===g.id).caught,'regions','silver');
+  if(g.id!==1) add(`region-${g.id}-complete`,`${g.name} Completionist`,`Catch all ${g.end-g.start+1} species introduced in ${g.name}.`,'♜',g.end-g.start+1,s=>s.generations.find(row=>row.id===g.id).caught,'regions','gold');
+}
+for (const type of pokemon.types) {
+  const total=snapshot.pokemon.filter(p=>p.types.includes(type)).length;
+  for(const [suffix,goal,title,rarity] of [['scout',5,'Scout','bronze'],['specialist',15,'Specialist','silver'],['master',total,'Master','gold']]) add(`type-${type}-${suffix}`,`${pretty(type)} ${title}`,`Have ${goal}${suffix==='master'?' (all)':''} ${pretty(type)}-type species marked Caught. Dual types count toward both types.`,'✦',goal,s=>s.types.find(row=>row.type===type).caught,'types',rarity);
+}
+for(const [goal,name,rarity] of [[1,'A Favourite Found','bronze'],[10,'Fan Club','bronze'],[25,'Heart Collector','silver'],[50,'Full of Favourites','gold'],[100,'One Hundred Hearts','legendary']]) add(`favorites-${goal}`,name,`Save ${goal} favourite Pokémon.`,'♥',goal,s=>s.favorites,'favourites',rarity);
+for(const [goal,name,rarity] of [[1,'First Lineup','bronze'],[3,'Team Tactician','silver'],[5,'Roster Architect','gold']]) add(`teams-${goal}`,name,`Own ${goal} saved Pokémon teams.`,'⬡',goal,s=>s.teams,'teams',rarity);
+for(const [goal,name,rarity] of [[3,'Across the Regions','silver'],[4,'Four Horizons','gold'],[5,'Five-Region Explorer','legendary']]) add(`regions-visited-${goal}`,name,`Register a species from ${goal} different introduction regions.`,'✥',goal,s=>s.generations.filter(g=>g.seen>0).length,'exploration',rarity);
+for(const [goal,name,rarity] of [[6,'Elemental Apprentice','bronze'],[12,'Elemental Adept','silver'],[18,'Every Element','legendary']]) add(`type-diversity-${goal}`,name,`Catch species representing ${goal} different types.`,'❖',goal,s=>s.types.filter(t=>t.caught>0).length,'types',rarity);
+definitions.forEach(d=>{d.category ||= d.key==='team-builder'?'teams':d.key.includes('completionist')||d.key==='regional-master'?'regions':'collection';d.rarity ||= d.key==='national-pokedex-master'?'legendary':['first-encounter','first-catch'].includes(d.key)?'bronze':d.key==='pokemon-collector'?'silver':'gold';});
 function achievements(stats, teams, saved = []) {
   const unlocked = new Map(saved.map(row => [row.key ?? row.achievement_key, iso(row.unlockedAt ?? row.unlocked_at)]));
   return definitions.map(({ metric, ...definition }) => ({ ...definition, current: metric(stats, teams), unlockedAt: unlocked.get(definition.key) || null }));

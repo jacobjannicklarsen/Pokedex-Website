@@ -1,6 +1,6 @@
 # Pokédex QA review
 
-This report records successive project stages. The **Dexhaven v0.6.0 trainer community** section at the end describes the current version and latest verification; earlier sections document previous reviews.
+This report records successive project stages. The **Dexhaven v0.6.1 sprites and Trainer Card Studio** section at the end describes the current version and latest verification; earlier sections document previous reviews.
 
 Reviewed search, filtering, sorting, details, loading, API failures, cache behavior, accessibility, keyboard interaction, and responsive geometry. The design and existing features are preserved; each development stage below records its dependency and verification scope.
 
@@ -259,3 +259,55 @@ Verified on 27 October 2026 on branch dev/v0.6.0, preserving the existing uncomm
 - npm.cmd run test:browser: **58/58 passed** in isolated real headless Chrome. Retains all prior checks and adds draft analysis/update-without-saving, charts/matrix, public settings/preview/literal biography rendering, sharing/copyable link and logged-out deep links, visibility revocation, optional public picture/sections, public mobile layouts/both themes/keyboard scrolling, chart-library failure and static backend-required handling. Two-account browser session switching and existing auth/profile/upload/team/favourite/progression/catalogue/Encyclopedia/dashboard checks remain. No uncaught script exceptions were observed.
 - Browser QA exposed an initial hub-data readiness race and narrow-screen canvas overflow; both were fixed and the complete suite then passed. Visually inspected community-team.png from the isolated QA screenshot directory; external artwork/fonts are intentionally blocked by the harness and existing image fallbacks render.
 - Reviewed additive migration SQL without executing it. Schema matching and SQL mocks do not validate an installed MySQL server. Follow database/MIGRATION_v0.6.0.md and COMMUNITY.md for backup, manual execution, original-record counts, constraints and real-account persistence checks. Real touch/screen-reader and Safari/Firefox checks remain manual.
+
+
+## Achievement vault and trainer-card decorations
+
+Verified on 27 October 2026. Expanded eight achievements to 96 with preserved keys/dates, four rarity tiers, category/status filters and dismissible unlock celebrations. Added curated live-preview trainer cards (eight palettes, six banners, six frames, finishing effects, title/motto and up to three earned badge pins) to private/public profiles. Earned pins are server-validated and omitted publicly unless achievement sharing is enabled. Existing status-toggle, ability-tooltip and chart-hitbox work was retained.
+
+- npm.cmd test: **78 passed, one opt-in live-MySQL test skipped, zero failed**. Covers all reachable award criteria, type thresholds, historical retention, reconciliation without redundant writes, two-account decoration ownership/validation/CSRF, forged pins, public privacy and migration consistency.
+- npm.cmd run test:browser: **61/61 passed** with isolated fixtures. Includes existing regressions plus the 96-badge vault, filtering, unlock toast/dismissal, decoration preview/reset/save/reload, literal custom text, earned pins, public rendering, both themes and responsive widths. An existing hover check now scrolls instantly before moving the pointer to avoid a smooth-scroll timing race.
+- Visually inspected the decorated public trainer card; corrected shared panel padding so name/avatar/content sit below the banner. External artwork/fonts are blocked by the harness and use fallbacks.
+- Prepared database/migrations/profile-decorations.sql and its Workbench guide without executing them. No live records, schema, avatars, version numbers, commits, remote branches, deployments or releases were changed by this enhancement. Actual MySQL save/restart persistence and schema constraints remain manual checks after the approved migration. Real screen-reader/touch/Safari/Firefox checks remain manual.
+
+
+## Avatar picture framing
+
+Added a circular local drag/zoom preview, keyboard positioning, reset/cancel and server-applied source-pixel crops with EXIF orientation handling. Existing upload authentication, limits, output size, owner-only images and cleanup remain. No migration or live database test was run.
+
+- Targeted crop/geometry/API/security checks: **17/17 passed**. Tests cover portrait/landscape bounds, zoom/pan math, malformed/forged crops, actual saved crop pixels, phone orientation and preserving an existing avatar after invalid requests.
+- Full isolated Chrome suite: **63/63 passed**, including pointer dragging, keyboard repositioning, reset/cancel, responsive previews/both themes and comparing saved image pixels against the chosen crop.
+- The full automated suite has one unrelated founder-artwork checksum failure: images/group-picture.png changed on disk during this work, and the historical test still expects its previous bytes. The new artwork and test baseline were left unchanged. The opt-in live MySQL test remains skipped.
+
+
+## Community discovery redesign
+
+Replaced the username-only listing with decorated trainer cards containing approved avatars (or initials), public biographies/titles, featured partners and shared-team previews. Added bounded global username search, result totals, load-more pagination, useful empty/error states and whole-card profile links with a separate team action. Fixed Community metadata, removed the Public trainers self-link, and gave profile/team pages route-aware back-navigation and larger profile identity headers. No schema migration, live database write, deployment or release was performed.
+
+- Community API/calculation/privacy suite: **14/14 passed**, including two-account privacy, rich-card allowlists, literal wildcard search, pagination, public-team revocation and bounded batch SQL reads.
+- Isolated Chrome suite: **64/64 passed**, covering cards/approved avatar URLs/partner names/lineups, search and clear, pagination across 28 fixture trainers, profile navigation, both themes and 320/375/768/1280px geometry. Visually reviewed the dark/light directory screenshots; profile photos are synthetic fixture images and external artwork uses fallback images in this harness. No fixture profiles are added to the production database.
+- The full automated suite continues to flag the existing founders-artwork checksum mismatch after the user changed that image; the artwork and historical baseline remain untouched. Live MySQL tests remain opt-in and were not executed.
+
+
+## Single Biography and caught-team search
+
+Profile now has one Biography editor, with avatar editing above it. The adjacent public-profile settings offer Show biography publicly; the separate public text editor and publicBio API input have been removed. Public profiles, directory cards and saved owner previews derive the text from users.bio only when explicitly approved. Old public text stays archived, and a manual single-biography migration adds an unchecked sharing flag. No database migration was executed.
+
+Team editors switch between All and Caught search sources using the authenticated collection. Seen-only species are excluded in Caught mode. Switching, collection failures and retries preserve existing members and unsaved edits; failed or empty collections never expand the results to the full catalogue. Existing six-slot and duplicate protection is preserved.
+
+Verification: 16 community tests passed, including opt-in/revocation/current text, account isolation, manual-migration fallback and additive schema composition. The complete automated suite reports 86 passed, one skipped opt-in live-MySQL test, and the existing founder-artwork checksum mismatch (the user-supplied image was preserved). The isolated Chrome suite passed 65/65 checks, including empty/failed/recovered caught searches, Seen exclusion, draft retention, save/reload, biography field count/order and public sharing, plus existing avatar/team/authentication, mobile and theme checks. Browser runs use fixture data and temporary sessions/uploads, not live MySQL or live PokeAPI.
+
+
+## Dexhaven v0.6.1 sprites and Trainer Card Studio
+
+Completed sprite integration and expanded the existing Studio using a shared safe configuration/appearance renderer. Reproduced Hexagon's missing diagonal borders and Sparkles overlapping the directory stamp before editing; saved baseline screenshots separately. The new silhouette/inset-image frame has six real edges, and SVG Sparkles stays in the banner behind interactive content. Reviewed Chromium and Firefox screenshots in dark/light themes at 375px and 1280px.
+
+- Complete upstream Git-tree inspection found all 649 standard animated, static and party sprite paths, plus 649 shiny battle paths in each supported style. Nine samples for #009/#151/#649 returned HTTP 200, decoded and had real GIF animation. The checked manifest pins the upstream revision.
+- Automated suite: 94 passed, one opt-in live-MySQL test skipped and one existing founder-image checksum mismatch. Preserved the supplied image and historical expectation.
+- Targeted sprite/card/community checks: 24 passed. New schema tests compare every added column/constraint with the fresh definition, ensure one complete decoration table and preserve old defaults/options; validation and parameterized owner persistence are covered. No real SQL was executed.
+- Full Chromium suite: **68/68 passed**, covering existing registration/login/logout, crop uploads, profile/biography privacy, team CRUD/limits/caught source, favourites, collection/achievements, filtering, Encyclopedia, public sharing/analysis and both themes/mobile. Added Studio options, custom colour validation, preview/default reset, successful/failed save/reload, shared styling, six-edge border pixels, bounded Sparkles, Mew/Blastoise GIFs, party order/empty slots, static reduced motion and finite sprite fallback. Focused checks additionally verify distinct computed appearances for every palette/background/frame/effect/border option.
+- Firefox BiDi: **12/12 layout checks passed** across the real Studio, directory and public profile in two widths/two themes. Also verified portrait-avatar object-fit/clipping, pointer-transparent decorative layers and None/Shimmer/Sparkles switching. This was a focused visual review, not a full Firefox regression run.
+
+Browser tests use temporary profiles, fixture sessions/uploads and MemoryRepository, with downloaded upstream sprite samples supplied through browser interception. GIF failure handling includes an injected image error to avoid an already-decoded image cache. Live upstream asset checks ran separately. These tests do not validate a live MySQL migration or real-account restart persistence, Safari, screen readers or low-end-device CPU usage.
+
+The [manual v0.6.1 migration](database/MIGRATION_v0.6.1.md) remains unapplied and needs explicit approval. Existing reads default new fields safely; expanded saves give migration guidance before approval/application. No tag, release, push or deployment. See [the implementation report](IMPLEMENTATION_v0.6.1.md) for all options, root causes and files.

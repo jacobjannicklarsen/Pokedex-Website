@@ -33,7 +33,7 @@
     const p = palette();
     const axis = title => ({ grid: { color: p.line }, ticks: { color: p.muted }, title: { display: true, text: title, color: p.text } });
     return { responsive: true, maintainAspectRatio: false, animation: false, indexAxis: horizontal ? 'y' : 'x',
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode: 'index', axis: horizontal ? 'y' : 'x', intersect: false },
       plugins: { legend: { display: legend, position: 'bottom', labels: { color: p.text, boxWidth: 12 } },
         tooltip: { backgroundColor: p.panel, titleColor: p.text, bodyColor: p.text, borderColor: p.line, borderWidth: 1,
           callbacks: { label: context => `${context.dataset.label}: ${Number(horizontal ? context.parsed.x : context.parsed.y).toLocaleString(undefined, { maximumFractionDigits: 2 })}` } } },

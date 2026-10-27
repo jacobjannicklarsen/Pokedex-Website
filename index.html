@@ -16,6 +16,7 @@
     <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="trainer-cards.css">
     <script src="encyclopedia-data.js" defer></script>
     <script src="script.js" defer></script>
     <script src="encyclopedia.js" defer></script>
@@ -45,6 +46,7 @@
     <a href="trainers.html" data-page="trainers">Trainer Hub</a>
     <a href="community.html" data-page="community">Community</a>
     <a href="dashboard.html" data-page="dashboard">Analytics</a>
+    <a href="about.html" data-page="about">About</a>
     <span id="session-status" class="form-help" role="status">Checking session…</span>
     <div id="guest-actions" class="guest-actions" hidden>
       <button id="account-button" class="text-button" type="button">Log in</button>
@@ -64,11 +66,11 @@
           <button id="home-login" class="text-button" type="button">Already a member</button>
         </div>
       </div>
-      <div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="art-label">THE SITE FOUNDERS</span>
+      <a class="hero-art" href="about.html" aria-label="About Dexhaven and the site founders"><div class="hero-orbit" aria-hidden="true"></div><span class="art-label">THE SITE FOUNDERS</span>
         <img src="./images/group-picture.png" alt="" width="280" height="280" fetchpriority="high">
-        <span class="hero-spark hero-spark-one"></span><span class="hero-spark hero-spark-two"></span><span class="hero-spark hero-spark-three"></span>
+        <span class="hero-spark hero-spark-one" aria-hidden="true"></span><span class="hero-spark hero-spark-two" aria-hidden="true"></span><span class="hero-spark hero-spark-three" aria-hidden="true"></span>
         <span class="art-caption">Lucas, Oscar, Jacob Jannick & Patrick. <span>IT Architecture Students.</span></span>
-      </div>
+      </a>
     </section>
     <section class="home-features" aria-label="Discover Dexhaven">
       <article><p class="eyebrow">DISCOVER</p><h2>National Pokédex</h2><p>Explore 649 Pokémon from five generations. Search by name or number, compare types and discover their stats.</p><a class="explore-link" href="pokemon.html">Browse Pokémon <span aria-hidden="true">↗</span></a></article>

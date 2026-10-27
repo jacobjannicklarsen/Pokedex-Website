@@ -21,7 +21,7 @@ GitHub Pages/static previews can display the shell and existing public Pokémon 
 ## Privacy model
 
 - Every existing account and team stays private: absence of a settings row means disabled. Nothing is published by migration, registration, team save, analysis or preview.
-- Enabling a public profile lists its username in the directory and authorizes username, joining date, separate public biography and an optional featured Pokémon. The existing private biography is never copied. Username/email editing remains unsupported; existing validated usernames are unique and stable. Duplicate registration retains the existing 409 handling. Unknown/obsolete names return unavailable; links resolve a current username rather than guessing a renamed account.
+- Enabling a public profile lists its username in the directory and authorizes username, joining date, single Biography only when Show biography publicly is enabled and an optional featured Pokémon. Biography is hidden until explicitly shared; there is no separate public editor. Username/email editing remains unsupported; existing validated usernames are unique and stable. Duplicate registration retains the existing 409 handling. Unknown/obsolete names return unavailable; links resolve a current username rather than guessing a renamed account.
 - Picture, favourites, completion totals and unlocked achievements each have a separate unchecked-by-default switch. Public statistics contain National/generation aggregates only, without recent activity, individual collection records, team/favourite counts or private filters. Public achievement entries contain definition and unlock date, without current private metrics.
 - Individual teams have separate Private/Public controls. Public means its saved name, lineup, analysis and trainer username can be read by anyone with its UUID link, even if the trainer keeps their profile private. Disabling a profile removes its page and directory entry; **it does not revoke separately shared teams**. The settings UI states this explicitly. Set each team private to revoke its link. A private or deleted team returns 404 for everyone, including its owner through the public endpoint. The owner still manages it through private APIs.
 - Featured teams must belong to the authenticated owner and appear only while independently public. Public profile queries select shared teams only. Sharing does not duplicate a team. UUID links are stable across visibility changes; republishing re-enables the same link. A UUID is an identifier, not authorization: the server always checks visibility.
@@ -30,7 +30,7 @@ GitHub Pages/static previews can display the shell and existing public Pokémon 
 
 ## Storage and authorization
 
-`trainer_public_settings` owns one optional row per user: disabled flag, separate public biography, nullable featured species/team, and four optional sharing flags. `team_sharing` owns one optional row per existing team, with a unique UUIDv4 and disabled public flag. New-install/migration definitions match; see the [migration guide](database/MIGRATION_v0.6.0.md) for constraints and backup/verification SQL.
+`trainer_public_settings` owns one optional row per user: disabled flag, explicit biography sharing flag, nullable featured species/team, and optional sharing flags. `team_sharing` owns one optional row per existing team, with a unique UUIDv4 and disabled public flag. See the [community migration guide](database/MIGRATION_v0.6.0.md) and subsequent [single-biography migration](database/MIGRATION_single-biography.md). Old `public_bio` text is archived in place and no longer edited or published.
 
 Protected endpoints continue to derive ownership exclusively from `req.user.id`. Sharing updates lock an owned team, and settings updates lock the owner plus the featured team before writing, in transactions with rollback on error. All values are bound parameters. Visitors get read-only projections, never private user/settings rows. Authentication, HTTP-only sessions, password hashing and CSRF/origin checks are retained. Public read endpoints have a per-process limit of 120 requests per minute per IP; directory pages use a bounded 24-item cursor query. API errors hide internal SQL details, and missing new tables return a migration instruction.
 
@@ -42,13 +42,17 @@ Public GETs require no login. The trainer/team JSON is already visibility-filter
 
 | Method | Endpoint | Result |
 | --- | --- | --- |
-| GET | `/api/public/trainers?after=ID` | `{trainers:[{username}],next:null\|cursor}`; only enabled profiles, 24 per page |
+| GET | `/api/public/trainers?q=name&after=ID` | `{trainers:[publicCard],next:null\|cursor,total}`; enabled profiles only, literal partial username search, 24 per page |
 | GET | `/api/public/trainers/:username` | `{profile}` with approved fields only, otherwise 404 |
 | GET | `/api/public/trainers/:username/teams` | `{teams}` containing only that enabled profile's shared teams |
 | GET | `/api/public/trainers/:username/avatar` | WebP only if profile and picture sharing are enabled |
 | GET | `/api/public/teams/:shareId` | `{team,analysis}` only while explicitly public |
 
-`profile` has username, bio, createdAt, nullable avatarUrl/featuredPokemonId/featuredTeamId, and public teams (`name,shareId,pokemonIds,featured`). Optional fields `favorites`, `statistics` and `achievements` are omitted unless approved. `team` has `name,username,profileAvailable,shareId,pokemonIds`; it never grants editing rights. Public analysis includes only the shared species' public data and derived matchup/stat totals.
+`profile` has username, bio, createdAt, nullable avatarUrl/featuredPokemonId/featuredTeamId, public teams (`name,shareId,pokemonIds,featured`), approved card `decoration` and `pinnedBadges`. Badge pins stay empty unless achievement sharing is enabled; only earned badges can appear. Optional fields `favorites`, `statistics` and `achievements` are omitted unless approved. `team` has `name,username,profileAvailable,shareId,pokemonIds`; it never grants editing rights. Public analysis includes only the shared species' public data and derived matchup/stat totals. See [TRAINER_STYLE.md](TRAINER_STYLE.md) for the 96-achievement vault and decoration studio.
+
+The refreshed directory renders large avatar/banner cards, public biographies/titles, featured partners, a public-team count and a six-slot showcase of the featured public team (otherwise one public team). `publicCard` allowlists `username,bio,createdAt,avatarUrl,featuredPokemonId,decoration,publicTeamCount,showcaseTeam`. Public avatars use the existing revocable opt-in route; the filename is never returned. Card decoration pins stay empty, and the directory never reads raw collection records, favourites, unshared biography, private teams or current achievement metrics. Counts/search include only enabled profiles. Search text is bounded to 64 characters and SQL escapes wildcard characters literally. Snapshot labels are optional; cards stay readable if species labels cannot load.
+
+Page metadata now identifies the community correctly. The directory has username search, load-more navigation, result counts, clear-search and retry/empty states. Profile/team routes hide the discovery hero and have a useful back-link; the directory has no self-link labelled Public trainers. Existing theme, header account controls, crop uploads, public visibility checks and saved-team analysis remain. This refresh needs no database migration; existing v0.6.0 sharing tables are still prerequisites. Additional decoration data is batch-read when its optional table exists, with safe default styling otherwise.
 
 Private APIs require the existing session. Every PUT requires the current `X-CSRF-Token` and same-origin request checks:
 
@@ -64,7 +68,7 @@ Private APIs require the existing session. Every PUT requires the current `X-CSR
 ```json
 {
   "enabled": false,
-  "publicBio": "",
+  "shareBio": false,
   "featuredPokemonId": null,
   "featuredTeamId": null,
   "shareAvatar": false,
@@ -74,7 +78,7 @@ Private APIs require the existing session. Every PUT requires the current `X-CSR
 }
 ```
 
-Settings reject missing/extra fields, nonboolean flags, invalid species/team IDs and biographies over 500 characters. Visibility accepts only its single explicit field. Owner identifiers cannot be submitted. Unknown/private resources return 404, missing login 401, invalid CSRF/origin 403, malformed input 400, rate limit 429, and missing schema 503. Existing team CRUD still enforces ownership, six members and no duplicates.
+Settings reject missing/extra fields, nonboolean flags, invalid species/team IDs (Biography is edited separately via PATCH /api/profile, maximum 500 characters). Visibility accepts only its single explicit field. Owner identifiers cannot be submitted. Unknown/private resources return 404, missing login 401, invalid CSRF/origin 403, malformed input 400, rate limit 429, and missing schema 503. Existing team CRUD still enforces ownership, six members and no duplicates.
 
 ## Team analysis calculations
 
@@ -93,7 +97,7 @@ The private Analyze Team action recalculates current draft slots after every add
 After reviewing/applying the migration to your development database, use two distinct accounts A/B plus a logged-out browser:
 
 1. Confirm existing profile/team URLs are unavailable publicly and the directory is empty for unshared accounts. Verify existing biography, uploads, teams, favourites, collection and awards are intact.
-2. As A, edit the separate public biography, choose a featured Pokémon/team, save and preview while private. Test harmless angle-bracket text to confirm it renders literally. Confirm email/private biography never appears.
+2. As A, edit Biography and enable Show biography publicly, choose a featured Pokémon/team, save and preview while private. Test harmless angle-bracket text to confirm it renders literally. Confirm email never appears, and turning biography sharing off hides the text.
 3. Enable A's profile. Open `/trainer/A_username` logged out. Toggle each optional section individually and refresh the public view, including avatar requests. Confirm profile disable hides the page and directory entry.
 4. Create incomplete/full teams. Open Analyze Team; add/replace/remove a draft member and confirm counts/averages change before save. Test duplicate/six-member protection. Charizard has Rock 4×, Grass 0.25× and Ground 0× under modern type-only rules. Magnemite is Poison-immune and neutral to Ghost under those rules.
 5. Publish one team, copy the UUID link and open it logged out. Inspect all six slots, member artwork/numbers/types/base stats, deep links, charts and matrix. Keep another team private. Account B must not edit A's team, change its visibility, request its private analysis or feature it on B's profile.
@@ -110,3 +114,12 @@ Run `npm.cmd test` for all calculation, API, security, schema and regression tes
 New files: `community.html`, `community.js`, `team-analysis.js`, `team-analysis-data.js`, `data/type-chart.json`, `server/community.js`, `server/community-repository.js`, `database/migrations/v0.6.0-trainer-community.sql`, `database/MIGRATION_v0.6.0.md`, `tests/community.test.cjs`, `tests/support/memory-community.cjs` and this guide.
 
 Modified: shared navigation in `index.html`/`pokemon.html`/`trainers.html`/`dashboard.html`, hub script loading, `account.js`, `styles.css`, `server/app.js`, `server/repository.js`, `database/schema.sql`, package/lock versions, browser fixtures/tests, version/schema regression assertions, opt-in MySQL integration coverage, README, Windows setup, API reference, release notes and QA report. Custom homepage artwork and the existing user-requested hero effects are preserved.
+
+
+## v0.6.1 shared card rendering and sprites
+
+TrainerCardConfig normalizes the same safe choices in the API and Studio. TrainerDecorations.appearance applies palettes, backgrounds, avatar silhouettes, custom colours, title/border treatments and banner-contained effects to Studio previews, public profiles and directory cards. The directory projection includes approved cosmetic fields, never arbitrary CSS. Old saved choices remain supported.
+
+Featured Partners use the selected species' verified Generation V battle sprites; compact teams use party icons in the stored slot order with the existing empty slots. Expanded shared teams keep statistics/analysis and use larger static battle sprites. No extra private data or shiny state is inferred. Reduced motion selects static sprites. The [sprite and Studio report](IMPLEMENTATION_v0.6.1.md) documents upstream checks, fallbacks and browser testing.
+
+Expanded persistence requires the separate [v0.6.1 manual migration](database/MIGRATION_v0.6.1.md). Old decoration reads have a legacy/default fallback; writes report the missing upgrade rather than silently discarding new fields. All existing profile, avatar, biography, achievement and team visibility gates remain.

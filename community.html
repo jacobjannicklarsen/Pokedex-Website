@@ -4,18 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#10171e">
-    <meta name="description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
+    <meta name="description" content="Meet the Dexhaven community. Discover trainer cards, featured Pokémon and shared teams, then make your own journey part of the story.">
     <meta property="og:site_name" content="Dexhaven">
-    <meta property="og:title" content="Trainer Hub — Dexhaven">
-    <meta property="og:description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
+    <meta property="og:title" content="Trainer Community — Dexhaven">
+    <meta property="og:description" content="Discover the people, Pokémon and teams that make Dexhaven yours.">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Trainer Hub — Dexhaven">
-    <meta name="twitter:description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
-    <title>Trainer Hub — Dexhaven</title>
+    <meta name="twitter:title" content="Trainer Community — Dexhaven">
+    <meta name="twitter:description" content="Discover the people, Pokémon and teams that make Dexhaven yours.">
+    <title>Trainer Community — Dexhaven</title>
     <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="trainer-cards.css">
     <script src="encyclopedia-data.js" defer></script>
     <script src="pokemon-data.js" defer></script>
     <script src="script.js" defer></script>
@@ -25,6 +26,10 @@
     <script src="vendor/chart.umd.js" defer></script>
     <script src="team-analysis-data.js" defer></script>
     <script src="team-analysis.js" defer></script>
+    <script src="trainer-card-config.js" defer></script>
+    <script src="sprite-availability.js" defer></script>
+    <script src="pokemon-sprites.js" defer></script>
+    <script src="profile-decorations.js" defer></script>
     <script src="community.js" defer></script>
     <script src="account.js" defer></script>
 </head>
@@ -51,6 +56,7 @@
     <a href="trainers.html" data-page="trainers">Trainer Hub</a>
     <a href="community.html" data-page="community" aria-current="page">Community</a>
     <a href="dashboard.html" data-page="dashboard">Analytics</a>
+    <a href="about.html" data-page="about">About</a>
     <span id="session-status" class="form-help" role="status">Checking session…</span>
     <div id="guest-actions" class="guest-actions" hidden>
       <button id="account-button" class="text-button" type="button">Log in</button>
@@ -59,7 +65,10 @@
     <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
   </nav>
   <main id="main">
-    <header class="hub-intro"><p class="eyebrow">SHARE YOUR JOURNEY</p><h1>Trainer community<span>.</span></h1><p class="hero-description">A place for your lineup, your discoveries and your next inspiration.</p><a class="text-button" href="trainers.html">My private Trainer Hub</a> ? <a class="text-button" href="community.html">Public trainers</a></header>
+    <header id="community-intro" class="community-intro">
+      <div class="community-intro-copy"><p class="eyebrow">DIFFERENT TRAINERS. SHARED ADVENTURES.</p><h1>Find your people.<br><span>Share your journey.</span></h1><p class="hero-description">The favourites. The carefully chosen six. The stories behind every trainer. Find your next inspiration in the Dexhaven community.</p><a class="action-button" href="trainers.html#view=profile">Make your trainer card <span aria-hidden="true">↗</span></a></div>
+      <div class="community-hero-art" aria-hidden="true"><div class="community-hero-orbit"></div><span class="community-art-caption">EVERY JOURNEY STARTS SOMEWHERE</span><img class="community-starter community-starter-grass" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png" alt="" width="130" height="130"><img class="community-starter community-starter-fire" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png" alt="" width="150" height="150"><img class="community-starter community-starter-water" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png" alt="" width="130" height="130"><span class="community-art-label">YOUR PATH. YOUR POKÉMON.</span></div>
+    </header>
     <p id="account-message" class="account-message" role="status" aria-live="polite" hidden></p>
     <section id="community-content" aria-live="polite" aria-label="Shared trainer content"></section>
     <noscript><p class="notice">Enable JavaScript to view shared trainers and teams. Public community content requires the Express backend.</p></noscript>

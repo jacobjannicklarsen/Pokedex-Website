@@ -4,8 +4,8 @@
   const root = new URL('.',document.currentScript.src);
   const link = (label,path,className='text-button') => { const a=element('a',className,label);a.href=new URL(path,root).href;return a; };
   const button = (label,fn) => { const b=element('button','action-button',label);b.type='button';b.onclick=fn;return b; };
-  async function publicRequest(path) {
-    const response=await fetch(new URL(`api/public/${path}`,root),{credentials:'same-origin',cache:'no-store'});
+  async function publicRequest(path,{signal}={}) {
+    const response=await fetch(new URL(`api/public/${path}`,root),{credentials:'same-origin',cache:'no-store',signal});
     const data=await response.json().catch(()=>({error:'Community sharing needs the Express backend. Static previews cannot load trainer data.'}));
     if(!response.ok)throw Error(data.error||'This shared content is unavailable.');return data;
   }
@@ -16,49 +16,50 @@
     const copy=button('Copy link',async()=>{try{await navigator.clipboard.writeText(url);status.textContent='Link copied.';}catch{input.focus();input.select();status.textContent='Select and copy this link.';}});
     row.append(label,copy,status);container.append(row);
   }
-  function pokemonTile(p) {
+  function pokemonTile(p,kind='party') {
     const tile=element('a','shared-pokemon');tile.href=new URL(`pokemon.html?pokemon=${p.id}`,root).href;
-    tile.append(artwork({...p,artwork:`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png`}),element('strong','',`${number(p.id)} ${prettyName(p.name)}`),badges(p.types));return tile;
+    tile.append(PokemonSprites.create(p.id,{kind,name:prettyName(p.name),pokemon:p}),element('strong','',`${number(p.id)} ${prettyName(p.name)}`),badges(p.types));return tile;
   }
-  function roster(container,ids,records,full=false) {
+  function roster(container,ids,records,full=false,kind='party',six=false) {
     const grid=element('div','shared-roster');
     const byId=new Map(records.map(p=>[p.id,p]));
-    for(let i=0;i<(full?6:ids.length);i++) {
+    for(let i=0;i<(full||six?6:ids.length);i++) {
       const p=byId.get(ids[i]);
       if(!p){const empty=element('div','shared-pokemon empty-public-slot',`Slot ${i+1} · Empty`);grid.append(empty);continue;}
-      const card=pokemonTile(p);
+      const card=pokemonTile(p,kind);
       if(full)card.append(element('p','form-help',p.stats.map((s,j)=>`${PokemonData.labels[j]} ${s.value}`).join(' · ')));
       grid.append(card);
     }container.append(grid);
   }
   async function renderProfile(target,p,{preview=false}={}) {
-    const {records}=await DexhavenTeamAnalysis.load();if(!target.isConnected)return;
+    const records=(await PokemonData.load()).pokemon;if(!target.isConnected)return;
     target.replaceChildren();
-    const header=element('div','trainer-panel public-identity');
+    const header=element('div','trainer-panel public-identity public-profile-hero');
     if(p.avatarUrl){const img=element('img','trainer-avatar');img.src=p.avatarUrl;img.alt=`${p.username}'s public profile picture`;header.append(img);}
     else header.append(element('span','trainer-avatar avatar-initial',p.username[0].toUpperCase()));
-    const info=element('div');info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),element('h2','',p.username),element('p','form-help',`Trainer since ${new Date(p.createdAt).toLocaleDateString()}`));
+    const info=element('div','trainer-identity-copy');info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),element(preview?'h3':'h1','public-profile-name',p.username),element('p','form-help',`Trainer since ${new Date(p.createdAt).toLocaleDateString()}`));
     if(p.bio)info.append(element('p','profile-biography',p.bio));header.append(info);target.append(header);
+    globalThis.TrainerDecorations?.apply(header,p.decoration,p.pinnedBadges||[]);
     if(!preview)copyLink(target,`trainer/${encodeURIComponent(p.username)}`);
-    if(p.featuredPokemonId){target.append(element('h3','','Featured Pokémon'));roster(target,[p.featuredPokemonId],records);}
+    if(p.featuredPokemonId){target.append(element('h3','','Featured Pokémon'));roster(target,[p.featuredPokemonId],records,false,'battle');}
     target.append(element('h3','','Shared teams'));
     if(!p.teams.length)target.append(element('p','form-help','This trainer has not shared any teams.'));
     const ordered=[...p.teams].sort((a,b)=>Number(b.featured)-Number(a.featured));
-    for(const t of ordered){const card=element('article','trainer-panel');card.append(element('h4','',`${t.featured?'★ Featured · ':''}${t.name}`));roster(card,t.pokemonIds,records);card.append(link('View team & analysis',`team/${t.shareId}`,'explore-link'));target.append(card);}
+    for(const t of ordered){const card=element('article','trainer-panel');card.append(element('h4','',`${t.featured?'★ Featured · ':''}${t.name}`));roster(card,t.pokemonIds,records,false,'party',true);card.append(link('View team & analysis',`team/${t.shareId}`,'explore-link'));target.append(card);}
     if(p.favorites){target.append(element('h3','','Shared favourites'));if(p.favorites.length)roster(target,p.favorites,records);else target.append(element('p','form-help','No shared favourites yet.'));}
     if(p.statistics){target.append(element('h3','','Shared Pokédex completion'));const stats=element('div','overview-grid');for(const g of [{name:'National',...p.statistics.national},...p.statistics.generations]){const card=element('article','overview-card');card.append(element('p','',g.name),element('strong','',`${g.caught}/${g.total}`),element('span','',`${g.caughtPercentage.toFixed(2)}% caught · ${g.seen} seen`));stats.append(card);}target.append(stats);}
-    if(p.achievements){target.append(element('h3','','Shared achievements'));const list=element('div','achievement-grid');for(const a of p.achievements){const card=element('article','trainer-panel');card.append(element('h4','',a.name),element('p','',a.description),element('p','form-help',`Unlocked ${new Date(a.unlockedAt).toLocaleDateString()}`));list.append(card);}target.append(list);if(!p.achievements.length)target.append(element('p','form-help','No unlocked achievements shared yet.'));}
+    if(p.achievements){target.append(element('h3','','Shared achievements'));const list=element('div','achievement-grid');for(const a of p.achievements){const card=element('article','trainer-panel achievement-card unlocked');card.dataset.rarity=a.rarity||'bronze';card.append(element('span','achievement-icon',a.icon||'✦'),element('h4','',a.name),element('p','',a.description),element('p','form-help',`Unlocked ${new Date(a.unlockedAt).toLocaleDateString()}`));list.append(card);}target.append(list);if(!p.achievements.length)target.append(element('p','form-help','No unlocked achievements shared yet.'));}
   }
   async function settings(target,ctx) {
-    const panel=element('section','trainer-panel community-settings');panel.append(element('h3','','Your public profile'),element('p','form-help','Your account starts private. Publishing your profile shares your username, joining date, public biography and featured Pokémon. Every optional item below needs your approval. Individual teams have separate visibility controls.'));target.append(panel);
+    const panel=element('section','trainer-panel community-settings');panel.append(element('h3','','Your public profile'),element('p','form-help','Your account starts private. Publishing your profile shares your username, joining date and featured Pokémon. Every optional item below needs your approval. Individual teams have separate visibility controls.'));target.append(panel);
     try {
       const {settings:s}=await ctx.request('/community/settings');if(!panel.isConnected||ctx.currentUserId()!==ctx.user.id)return;
       const form=element('form','account-form');
       const checks={};
-      for(const [key,label] of [['enabled','Enable my public profile (also lists me in the trainer directory)'],['shareAvatar','Show my current profile picture publicly'],['shareFavorites','Share my current favourites'],['shareProgress','Share my National and generation completion totals'],['shareAchievements','Share my unlocked achievements']]){
+      for(const [key,label] of [['enabled','Enable my public profile (also lists me in the trainer directory)'],['shareBio','Show biography publicly'],['shareAvatar','Show my current profile picture publicly'],['shareFavorites','Share my current favourites'],['shareProgress','Share my National and generation completion totals'],['shareAchievements','Share my unlocked achievements']]){
         const l=element('label','privacy-option');const input=element('input');input.type='checkbox';input.name=key;input.checked=s[key];checks[key]=input;l.append(input,document.createTextNode(label));form.append(l);
       }
-      const bioLabel=element('label','','Public biography'),bio=element('textarea');bio.name='publicBio';bio.maxLength=500;bio.rows=4;bio.value=s.publicBio;bioLabel.append(bio);form.append(bioLabel);
+      form.append(element('p','form-help','Show biography publicly shares the Biography you edit above. It appears only while your public profile is enabled.'));
       let featuredPokemonId=s.featuredPokemonId;
       if(globalThis.PokemonSelector){const selector=PokemonSelector.create({slot:'featured',label:'Featured Pokémon (optional)',selectedId:s.featuredPokemonId,total:649,getPokemon:id=>state.pokemon.get(id),excludedIds:()=>new Set(),formatName:prettyName,makeArtwork:artwork,onChange:id=>{featuredPokemonId=id;}});ctx.trackSelector(selector);form.append(selector.element);}
       else form.append(element('p','form-help','Pokémon selector unavailable; your saved featured Pokémon will be preserved.'));
@@ -67,7 +68,7 @@
       const publicLink=element('div'),preview=element('div','public-preview');panel.append(publicLink,preview);
       const links=enabled=>{publicLink.replaceChildren();publicLink.append(element('p','form-help',enabled?'Your profile is public. Turning it off removes it from the directory and profile URL. Separately shared teams remain public until you switch each team to private.':'Your profile is private. Preview is visible only to you. Separately shared teams keep their own visibility.'));if(enabled)publicLink.append(link('Open my public profile',`trainer/${encodeURIComponent(ctx.user.username)}`));};links(s.enabled);
       const previewButton=button('Preview saved public profile',async()=>{previewButton.disabled=true;try{const {profile}=await ctx.request('/community/preview');if(ctx.currentUserId()===ctx.user.id&&preview.isConnected)await renderProfile(preview,profile,{preview:true});}catch(e){ctx.notice(e.message,true);}finally{previewButton.disabled=false;}});panel.append(previewButton,element('p','form-help','Save changes before previewing. Preview uses exactly the same approved fields as the public profile.'));
-      form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{const body={publicBio:bio.value,featuredPokemonId,featuredTeamId:teamSelect.value?Number(teamSelect.value):null};for(const [key,input]of Object.entries(checks))body[key]=input.checked;const data=await ctx.request('/community/settings',{method:'PUT',body});if(ctx.currentUserId()===ctx.user.id&&panel.isConnected){preview.replaceChildren();links(data.settings.enabled);ctx.notice('Public profile settings saved.');}}catch(e){ctx.notice(e.message,true);}finally{save.disabled=false;}};
+      form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{const body={featuredPokemonId,featuredTeamId:teamSelect.value?Number(teamSelect.value):null};for(const [key,input]of Object.entries(checks))body[key]=input.checked;const data=await ctx.request('/community/settings',{method:'PUT',body});if(ctx.currentUserId()===ctx.user.id&&panel.isConnected){preview.replaceChildren();links(data.settings.enabled);ctx.notice('Public profile settings saved.');}}catch(e){ctx.notice(e.message,true);}finally{save.disabled=false;}};
     }catch(e){if(panel.isConnected)panel.append(element('p','form-error',e.message),button('Retry sharing settings',()=>{panel.remove();settings(target,ctx);}));}
   }
   async function teamSettings(target,team,ctx) {
@@ -75,13 +76,68 @@
     try{
       let value=await ctx.request(`/teams/${team.id}/visibility`);if(!panel.isConnected)return;
       const label=element('label','','Team visibility'),select=element('select');select.setAttribute('aria-label',`Visibility of ${team.name}`);
-      for(const [v,t]of [['private','Private · only you'],['public','Public · anyone with the link']]){const o=element('option','',t);o.value=v;select.append(o);}select.value=value.visibility;label.append(select);
+      for(const [v,t]of [['private','Private'],['public','Public']]){const o=element('option','',t);o.value=v;select.append(o);}select.value=value.visibility;label.append(select);
       const links=element('div'),status=element('p','form-help');status.setAttribute('role','status');
       const render=()=>{links.replaceChildren();status.textContent=value.visibility==='public'?'This team is public, including its name, lineup and trainer username.':'This team is private.';if(value.visibility==='public'){links.append(link('Open shared team',`team/${value.shareId}`));copyLink(links,`team/${value.shareId}`);}};
       const save=button('Save visibility',async()=>{save.disabled=true;select.disabled=true;try{value=await ctx.request(`/teams/${team.id}/visibility`,{method:'PUT',body:{visibility:select.value}});render();ctx.notice('Team visibility saved.');}catch(e){select.value=value.visibility;ctx.notice(e.message,true);}finally{save.disabled=false;select.disabled=false;}});
       panel.replaceChildren(label,save,status,links);render();
     }catch(e){if(panel.isConnected)panel.replaceChildren(element('p','form-error',e.message));}
   }
+  const directoryPokemon=new Map();
+  function directoryPokemonLabel(id){const p=directoryPokemon.get(id);return `${number(id)} ${p?prettyName(p.name):'Pokémon'}`;}
+  function directoryPokemonArt(id,kind='battle'){
+    const p=directoryPokemon.get(id)||{id,name:`Pokémon ${id}`,artwork:`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`};
+    return PokemonSprites.create(id,{kind,name:directoryPokemonLabel(id),pokemon:p});
+  }
+  function directoryCard(t){
+    const card=element('article','trainer-panel trainer-card-surface trainer-directory-card');card.dataset.trainer=t.username;
+    const style=TrainerCardConfig.normalize(t.decoration);
+    const top=element('div','directory-card-top'),avatar=element('span','trainer-avatar avatar-initial directory-avatar');avatar.append(element('span','',t.username[0].toUpperCase()));
+    if(t.avatarUrl){const image=element('img');image.src=t.avatarUrl;image.alt=`${t.username}'s public profile picture`;image.loading='lazy';image.addEventListener('error',()=>image.remove(),{once:true});avatar.append(image);}
+    top.append(avatar,element('span','directory-card-stamp','TRAINER CARD'));card.append(top);
+    const body=element('div','directory-card-body'),identity=element('div','directory-card-identity');identity.append(element('h3','',t.username));
+    if(style.title)identity.append(element('span','trainer-title-ribbon',style.title));body.append(identity);
+    body.append(element('p','directory-card-bio',t.bio||style.motto||'A new chapter is waiting. This trainer has not added a public biography yet.'));
+    if(t.featuredPokemonId){const partner=element('div','directory-partner');const text=element('div'),name=element('strong','',directoryPokemonLabel(t.featuredPokemonId));name.dataset.publicPokemonName=t.featuredPokemonId;text.append(element('span','eyebrow','FEATURED PARTNER'),name);partner.append(directoryPokemonArt(t.featuredPokemonId),text);body.append(partner);}
+    if(t.showcaseTeam){const showcase=element('div','directory-showcase');showcase.append(element('p','',t.showcaseTeam.name));const row=element('div','directory-mini-roster');for(let slot=0;slot<6;slot++){const id=t.showcaseTeam.pokemonIds[slot];if(id){const img=directoryPokemonArt(id,'party');img.title=directoryPokemonLabel(id);row.append(img);}else row.append(element('span','directory-empty-slot','·'));}showcase.append(row);body.append(showcase);}
+    const meta=element('div','directory-card-meta');meta.append(element('span','',`${t.publicTeamCount} shared ${t.publicTeamCount===1?'team':'teams'}`));
+    if(Number.isFinite(Date.parse(t.createdAt)))meta.append(element('span','',`Joined ${new Intl.DateTimeFormat(undefined,{month:'short',year:'numeric'}).format(new Date(t.createdAt))}`));body.append(meta);
+    const actions=element('div','directory-card-actions'),profileLink=link('Meet the trainer',`trainer/${encodeURIComponent(t.username)}`,'action-button directory-profile-link');profileLink.setAttribute('aria-label',`View ${t.username}'s public profile`);actions.append(profileLink);if(t.showcaseTeam)actions.append(link('View team ↗',`team/${t.showcaseTeam.shareId}`));body.append(actions);card.append(body);TrainerDecorations.appearance(card,style);return card;
+  }
+  function communityMessage(title,copy,{clear,action}={}){
+    const box=element('div','community-message');const mark=element('span','community-message-mark','◒');mark.setAttribute('aria-hidden','true');box.append(mark,element('h3','',title),element('p','form-help',copy));if(clear)box.append(button('Clear search',clear));if(action)box.append(link(action.label,action.path,'action-button'));return box;
+  }
+  async function renderDirectory(target){
+    target.replaceChildren();target.removeAttribute('aria-live');document.title='Trainer Community — Dexhaven';
+    const heading=element('div','community-directory-heading'),copy=element('div');copy.append(element('p','eyebrow','THE TRAINER DIRECTORY'),element('h2','','A face behind every journey.'));heading.append(copy);
+    const form=element('form','community-search'),label=element('label','sr-only','Search trainers by username'),input=element('input');input.id='community-search';input.type='search';input.maxLength=64;input.placeholder='Find a trainer by username…';input.autocomplete='off';label.htmlFor=input.id;
+    const submit=element('button','community-search-submit','Search');submit.type='submit';form.append(label,input,submit);heading.append(form);target.append(heading);
+    const info=element('div','community-directory-info'),count=element('p','form-help','Loading trainers…');count.setAttribute('role','status');info.append(count,element('span','community-public-note','Shared by choice. Discover at your pace.'));target.append(info);
+    const list=element('div','community-directory');list.setAttribute('aria-label','Public trainer cards');target.append(list);
+    const feedback=element('div','community-directory-feedback'),more=button('Discover more trainers',()=>load(false));more.classList.add('community-load-more');more.hidden=true;target.append(feedback,more);
+    let query=new URLSearchParams(location.search).get('q')?.slice(0,64)||'',cursor=null,version=0,controller,timer,total=0;const loaded=new Map();input.value=query;
+    const updateCount=()=>{count.textContent=`${loaded.size} of ${total} ${total===1?'trainer':'trainers'}${query?` matching “${query}”`:''}`;};
+    async function load(reset){
+      const request=++version;controller?.abort();controller=new AbortController();more.disabled=true;list.setAttribute('aria-busy','true');feedback.replaceChildren();count.textContent=query?'Finding your trainer…':'Discovering trainers…';
+      const nextCursor=reset?null:cursor;
+      try{
+        const params=new URLSearchParams();if(query)params.set('q',query);if(nextCursor!==null)params.set('after',nextCursor);
+        const data=await publicRequest(`trainers${params.size?'?'+params:''}`,{signal:controller.signal});if(request!==version||!target.isConnected)return;
+        if(!Array.isArray(data.trainers)||!Number.isInteger(data.total)||data.total<0)throw Error('Trainer cards could not be loaded. Please try again.');
+        if(reset){loaded.clear();list.replaceChildren();}
+        total=data.total;cursor=data.next;
+        for(const trainer of data.trainers)if(!loaded.has(trainer.username.toLowerCase())){loaded.set(trainer.username.toLowerCase(),trainer);list.append(directoryCard(trainer));}
+        more.hidden=cursor===null;updateCount();
+        if(!loaded.size){list.append(query?communityMessage('No trainer found. Yet.',`We couldn't find a public trainer matching “${query}”. Try another name.`,{clear:()=>{input.value='';search();}}):communityMessage('Every community starts with a first hello.','Make your trainer card, choose what to share, and give the next visitor someone to meet.',{action:{label:'Create your public profile',path:'trainers.html#view=profile'}}));}
+      }catch(error){if(request!==version||error.name==='AbortError'||!target.isConnected)return;count.textContent=loaded.size?`${loaded.size} trainers ready to explore`:'Trainers are taking a little longer to arrive.';const message=communityMessage('A little pause in the journey.',error.message);message.classList.add('community-error');message.append(button('Try again',()=>load(reset)));feedback.append(message);more.hidden=true;}
+      finally{if(request===version){list.setAttribute('aria-busy','false');more.disabled=false;}}
+    }
+    function search(){clearTimeout(timer);query=input.value.trim();const url=new URL(location.href);if(query)url.searchParams.set('q',query);else url.searchParams.delete('q');history.replaceState({},'',url);load(true);}
+    input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(search,250);});form.addEventListener('submit',event=>{event.preventDefault();search();});
+    PokemonData.load().then(snapshot=>{for(const p of snapshot.pokemon)directoryPokemon.set(p.id,p);if(target.isConnected)target.querySelectorAll('[data-public-pokemon-name]').forEach(node=>{node.textContent=directoryPokemonLabel(Number(node.dataset.publicPokemonName));});target.querySelectorAll('img[data-sprite-id]').forEach(img=>{img.alt=`${directoryPokemonLabel(Number(img.dataset.spriteId))} ${img.classList.contains('sprite-party')?'party icon':'battle sprite'}`;});}).catch(()=>{/* Trainer cards stay usable when optional species labels cannot load. */});
+    await load(true);
+  }
+  document.querySelectorAll('.community-starter').forEach(img=>img.addEventListener('error',()=>{img.src=new URL('artwork-fallback.svg',root).href;},{once:true}));
   const target=document.querySelector('#community-content');
   async function publicPage(){
     if(!target)return;
@@ -90,10 +146,11 @@
       const route=location.pathname.match(/\/(trainer|team)\/([^/]+)\/?$/),params=new URLSearchParams(location.search);
       const trainer=route?.[1]==='trainer'?decodeURIComponent(route[2]):params.get('trainer');
       const teamId=route?.[1]==='team'?decodeURIComponent(route[2]):params.get('team');
-      if(trainer){const {profile}=await publicRequest(`trainers/${encodeURIComponent(trainer)}`);await renderProfile(target,profile);document.title=`${profile.username} · Dexhaven`;}
-      else if(teamId){const {team}=await publicRequest(`teams/${encodeURIComponent(teamId)}`),{records}=await DexhavenTeamAnalysis.load();target.replaceChildren(element('p','eyebrow','SHARED LINEUP'),element('h2','',team.name),element('p','form-help',`A team by ${team.username}`));document.title=`${team.name} · Dexhaven`;if(team.profileAvailable)target.append(link(`Visit ${team.username}’s profile`,`trainer/${encodeURIComponent(team.username)}`));copyLink(target,`team/${team.shareId}`);roster(target,team.pokemonIds,records,true);const analysis=element('section');target.append(analysis);await DexhavenTeamAnalysis.render(analysis,team.pokemonIds);}
-      else{target.replaceChildren(element('h2','','Meet the trainers'),element('p','form-help','Discover trainers who chose to share their profiles. Public teams and profiles require the Express backend. Your private Trainer Hub stays yours.'));const list=element('div','community-directory');target.append(list);let cursor=null;const more=button('Load more trainers',async()=>{more.disabled=true;try{await page();}catch(e){target.append(element('p','form-error',e.message));}finally{more.disabled=false;}});const page=async()=>{const data=await publicRequest(`trainers${cursor===null?'':`?after=${cursor}`}`);for(const t of data.trainers)list.append(link(t.username,`trainer/${encodeURIComponent(t.username)}`,'trainer-panel directory-trainer'));cursor=data.next;more.hidden=cursor===null;if(!list.children.length)list.append(element('p','form-help','No public trainers yet. Your profile stays private until you choose to publish it.'));};await page();target.append(more);}
-    }catch(e){target.replaceChildren(element('h2','','Shared content unavailable'),element('p','form-error',e.message),element('p','form-help','This profile or team may be private, removed, or temporarily unavailable. Public trainer content needs the Express backend; it is unavailable in a static preview.'),button('Try again',publicPage),link('Browse public trainers','community.html'));}
+      const intro=document.querySelector('#community-intro');if(intro)intro.hidden=Boolean(trainer||teamId);document.body.classList.toggle('community-detail',Boolean(trainer||teamId));
+      if(trainer){const {profile}=await publicRequest(`trainers/${encodeURIComponent(trainer)}`);await renderProfile(target,profile);target.prepend(link('← Back to the community','community.html','community-back-link'));document.title=`${profile.username} · Dexhaven`;}
+      else if(teamId){const {team}=await publicRequest(`teams/${encodeURIComponent(teamId)}`),records=(await PokemonData.load()).pokemon;target.replaceChildren(link('← Back to the community','community.html','community-back-link'),element('p','eyebrow','SHARED LINEUP'),element('h1','community-team-title',team.name),element('p','form-help',`A team by ${team.username}`));document.title=`${team.name} · Dexhaven`;if(team.profileAvailable)target.append(link(`Visit ${team.username}’s profile`,`trainer/${encodeURIComponent(team.username)}`));copyLink(target,`team/${team.shareId}`);roster(target,team.pokemonIds,records,true,'static');const analysis=element('section');target.append(analysis);await DexhavenTeamAnalysis.render(analysis,team.pokemonIds);}
+      else await renderDirectory(target);
+    }catch(e){target.replaceChildren(element('h2','','Shared content unavailable'),element('p','form-error',e.message),element('p','form-help','This profile or team may be private, removed, or temporarily unavailable. Public trainer content needs the Express backend; it is unavailable in a static preview.'),button('Try again',publicPage));if(location.pathname!==new URL('community.html',root).pathname||location.search)target.append(link('Back to the community','community.html','community-back-link'));}
   }
   globalThis.DexhavenCommunity={settings,teamSettings,renderProfile};publicPage();
 })();

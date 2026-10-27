@@ -1,9 +1,26 @@
 # Dexhaven release notes
 
+## v0.6.1 — Pokémon Sprites & Trainer Card Studio Expansion
+
+- Added authentic Gen V battle animations for Featured Partners, party/menu icons for compact shared/private team previews, and larger static battle sprites in expanded teams. Official artwork remains the National Pokédex default.
+- Added a reusable validated sprite utility, complete upstream availability manifest, pinned asset revision, finite fallback chains, lazy loading, pixel-art scaling and live reduced-motion handling. No trainer-specific species or additional Pokémon API requests.
+- Expanded the existing Studio to 12 palettes, 11 banners, 11 frames, eight finishing touches, four border treatments, three title styles, six presets and optional validated accent/border/frame hex colours.
+- Fixed Hexagon by sharing an outer silhouette/inset-image component; fixed Sparkles with a contained, noninteractive SVG banner layer below card content. Preview, directory and public profile use one appearance renderer.
+- Preserved old preferences, earned pins and privacy. Added live preview, default reset confirmation and backend-confirmed persistence/error feedback. Existing avatar upload/storage is unchanged.
+- Updated package/lock versions to 0.6.1. Prepared the [manual Studio migration](database/MIGRATION_v0.6.1.md), without applying it. No tag, push, release or deployment.
+
+See [IMPLEMENTATION_v0.6.1.md](IMPLEMENTATION_v0.6.1.md) for options, rendering root causes, files and verification scope. Automated tests: 94 passed, one live-MySQL test skipped, existing founder-image checksum failure retained. Browser results are recorded in QA_REPORT.md.
+
+## Earlier v0.6.0 follow-ups
+
+Biography now has one editor and an explicit **Show biography publicly** setting. Existing databases require the [manual single-biography migration](database/MIGRATION_single-biography.md); old public text is archived and sharing starts off. Trainer Hub puts picture editing above Biography and offers All/Caught search sources in each team editor.
+
+Local v0.6.0 follow-up: expanded the original eight achievements to **96**, added bronze/silver/gold/legendary medal styles, Hall of Fame filters and dismissible unlock celebrations. Added a trainer-card studio with eight palettes, six banners, six frames, effects, titles, mottos and up to three validated earned badge pins. Public pins respect achievement-sharing privacy. Decoration persistence uses a separate additive migration, prepared but **not executed**; see [TRAINER_STYLE.md](TRAINER_STYLE.md) and the [Workbench guide](database/MIGRATION_profile-decorations.md). Existing uncommitted chart, toggle and ability-tooltip changes were retained. No version bump, implementation commit, push, deployment or release was performed.
+
 ## v0.6.0 — Trainer Community & Advanced Team Analysis
 
 - Added the opt-in Community directory, clean `/trainer/username` and `/team/UUIDv4` public views and a shared read-only shell. Existing usernames stay unique and immutable; unavailable/private profiles and teams fail gracefully. Static previews explain the backend requirement.
-- Added owner-only settings and saved preview for a separate public biography, featured Pokémon/team, optional avatar/favourites/completion/achievement sharing. Existing accounts stay private. Public APIs allowlist approved fields and omit email, private biography, individual collection records, recent activity, secrets and settings.
+- Added owner-only settings and saved preview for explicit sharing of the account Biography, featured Pokémon/team, optional avatar/favourites/completion/achievement sharing. Existing accounts stay private. Public APIs allowlist approved fields and omit email, unshared biography, individual collection records, recent activity, secrets and settings.
 - Added independent per-team visibility with stable UUID links, immediate server-side revocation, row-locked ownership checks, existing CSRF protection, rate-limited public reads and no-store responses. Sharing reuses existing teams; no analysis records are stored. Original avatars are now owner-only; public images require a revocable opt-in profile route.
 - Added private draft and public saved-team analysis using the Encyclopedia's modern type calculation and 18 bundled official PokéAPI type resources: dual-type defensive multipliers/counts, six-slot matrix, type-based offensive potential, actual averages/totals/type diversity, narrative counts, interactive theme-aware Chart.js views and accessible exact tables/fallbacks.
 - Fixed a trainer-hub restore race exposed by browser QA: profile/team/favourite views wait for owned data, stale identity responses are ignored, and initial failures offer a retry. Fixed narrow-screen chart overflow while preserving horizontal matrix scrolling.

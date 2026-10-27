@@ -1,5 +1,7 @@
 # Dexhaven v0.5.0 — Trainer Progression
 
+The later [achievement vault enhancement](TRAINER_STYLE.md) expands the catalogue to **96 achievements** while preserving the original eight below, their keys, thresholds and unlock dates. It also adds rarity/category styling, filters, unlock celebrations and earned profile pins. New criteria use existing stored collection/team/favourite data; no new tracking schema is needed for awards.
+
 The website remains **Dexhaven**, the development project remains **Pokédex Website**, and MySQL remains **pokedex_app**. This update carries the existing v0.4.0 work onto `dev/v0.5.0` without discarding or committing it.
 
 ## Enable and test locally
@@ -20,7 +22,7 @@ Guests can browse every public Pokémon page. Collection controls stay hidden fo
 4. In Progress, verify totals, percentages, generation bars, team/favourite counts, recent registrations and type memberships. Generations use **introduction intervals**, not individual games' regional Pokédex lists. Dual-type species contribute to both type totals.
 5. Unlock First Encounter and First Catch, then remove the registration. The awards remain unlocked with their original dates; current collection counts return to zero. Catch 25 species for Pokémon Collector, or save a six-member team for Team Builder, then verify permanence after reducing the collection/deleting the team.
 6. Refresh, log out/log back in and navigate all four pages. Open a second tab, change a status and confirm it updates. Switching accounts must replace the private collection, not merge it with the previous trainer's records.
-7. Test mobile layouts, both themes, keyboard selects and detail controls. With the backend or new tables unavailable, tracking must show a meaningful error/retry state while ordinary public filters and existing trainer features remain available.
+7. Test mobile layouts, both themes, keyboard toggles and detail controls. Each card/detail uses three exclusive icons: minus-circle (Not registered), eye (Seen), and Poké Ball (Caught). Buttons have accessible names, hover labels and an `aria-pressed` selection; Not registered clears tracking. The main collection-filter dropdown remains available. With the backend or new tables unavailable, tracking must show a meaningful error/retry state while ordinary public filters and existing trainer features remain available.
 
 ## Records, API and consistency
 

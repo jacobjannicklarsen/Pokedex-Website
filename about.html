@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10171e">
+    <meta name="description" content="Meet Lucas, Oscar, Jacob Jannick and Patrick, the IT Architecture students at Erhvervsakademi K&oslash;benhavn behind Dexhaven.">
+    <meta property="og:site_name" content="Dexhaven">
+    <meta property="og:title" content="About Dexhaven">
+    <meta property="og:description" content="Meet Lucas, Oscar, Jacob Jannick and Patrick, the IT Architecture students at Erhvervsakademi K&oslash;benhavn behind Dexhaven.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="About Dexhaven">
+    <meta name="twitter:description" content="Meet Lucas, Oscar, Jacob Jannick and Patrick, the IT Architecture students at Erhvervsakademi K&oslash;benhavn behind Dexhaven.">
+    <title>About Dexhaven</title>
+    <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="trainer-cards.css">
+    <script src="encyclopedia-data.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="encyclopedia.js" defer></script>
+    <script src="trainer-progress.js" defer></script>
+    <script src="account.js" defer></script>
+</head>
+<body data-page="about">
+
+  <header class="site-header">
+    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a>
+    <span class="header-label">FIVE GENERATIONS. YOUR CHOICES.</span>
+    <div class="header-actions">
+      <span class="region"><i></i>Change theme</span>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" hidden>
+        <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
+      </button>
+      <a id="header-profile" class="header-profile" href="trainers.html#view=profile" aria-label="Open trainer profile" data-requires-auth hidden>
+        <img id="header-avatar" alt="" width="36" height="36" hidden>
+        <span id="header-avatar-initial" aria-hidden="true"></span>
+      </a>
+    </div>
+  </header>
+  <nav class="trainer-nav" aria-label="Main navigation">
+    <a href="./" data-page="home">Home</a>
+    <a href="pokemon.html" data-page="pokemon">National Pokédex</a>
+    <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="community.html" data-page="community">Community</a>
+    <a href="dashboard.html" data-page="dashboard">Analytics</a>
+    <a href="about.html" data-page="about" aria-current="page">About</a>
+    <span id="session-status" class="form-help" role="status">Checking session…</span>
+    <div id="guest-actions" class="guest-actions" hidden>
+      <button id="account-button" class="text-button" type="button">Log in</button>
+      <button id="register-button" class="text-button" type="button">Register</button>
+    </div>
+    <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
+  </nav>
+  <main id="main">
+    <p id="account-message" class="account-message" role="status" aria-live="polite" hidden></p>
+    <section class="hero about-intro" aria-labelledby="about-title">
+      <div>
+        <p class="eyebrow">THE PEOPLE BEHIND DEXHAVEN</p>
+        <h1 id="about-title">Built by four students.<br><span>Made for your journey.</span></h1>
+        <p class="hero-description">A shared interest in Pok&eacute;mon, a curiosity for software, and a place to bring them together. That's Dexhaven.</p>
+        <p class="form-help">Meet Lucas, Oscar, Jacob Jannick and Patrick.</p>
+        <div class="team-actions"><a class="action-button" href="#about-team-title">Meet the team</a><a class="text-button" href="pokemon.html">Explore the National Pok&eacute;dex &rarr;</a></div>
+      </div>
+      <figure class="about-founders-art">
+        <img src="images/group-picture.png" alt="Illustration of the four Dexhaven founders" width="1536" height="1024" fetchpriority="high">
+        <figcaption>Lucas, Oscar, Jacob Jannick &amp; Patrick.<br><span>IT Architecture students.</span></figcaption>
+      </figure>
+    </section>
+
+    <section class="about-team-section" aria-labelledby="about-team-title">
+      <div class="section-heading"><div><p class="eyebrow">MEET THE TEAM</p><h2 id="about-team-title">Four students. One shared curiosity.</h2></div></div>
+      <p class="about-section-copy">Lucas, Oscar, Jacob Jannick and Patrick are IT Architecture students at <strong>Erhvervsakademi K&oslash;benhavn</strong>.<br>Together, we build Dexhaven as a place to explore Pok&eacute;mon, create teams and share discoveries.</p>
+      <ul class="about-team-list" aria-label="Dexhaven team members">
+        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">01</span><h3>Lucas</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">02</span><h3>Oscar</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">03</span><h3>Jacob Jannick</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">04</span><h3>Patrick</h3><p class="form-help">IT Architecture student</p></li>
+      </ul>
+    </section>
+
+    <section class="about-story-section" aria-labelledby="about-story-title">
+      <div><p class="eyebrow">WHY WE BUILD</p><h2 id="about-story-title">A home for your next discovery.</h2></div>
+      <div class="about-section-copy"><p>Dexhaven brings Pok&eacute;mon information and trainer tools together. Look up a species, explore its evolution, compare stats, or find the missing piece of your next team.</p><p>We focus on useful details, clear design and giving trainers control over what they share. Your own journey stays at the centre of the experience.</p></div>
+    </section>
+
+    <section class="home-features" aria-label="Explore Dexhaven">
+      <article><p class="eyebrow">DISCOVER</p><h2>649 Pok&eacute;mon to explore</h2><p>Five generations of Pok&eacute;mon, with searchable details, evolution families, moves and type matchups.</p><a class="explore-link" href="pokemon.html">Browse Pok&eacute;mon <span aria-hidden="true">&nearr;</span></a></article>
+      <article><p class="eyebrow">MAKE IT YOURS</p><h2>Your trainer journey</h2><p>Build teams, collect favourites, track your Pok&eacute;dex and showcase the achievements you earn along the way.</p><a class="explore-link" href="trainers.html">Open Trainer Hub <span aria-hidden="true">&nearr;</span></a></article>
+      <article><p class="eyebrow">SHARE &amp; CONNECT</p><h2>A community of trainers</h2><p>Discover public profiles and shared teams, with privacy controls that keep you in charge of your own information.</p><a class="explore-link" href="community.html">Meet the community <span aria-hidden="true">&nearr;</span></a></article>
+    </section>
+  </main>
+  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
+  <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <button id="close-auth" class="close-button" type="button" aria-label="Close account form">×</button>
+    <form id="auth-form" class="account-form">
+      <p class="eyebrow">WELCOME TO DEXHAVEN</p><h2 id="auth-title">Log in</h2>
+      <label id="username-label" hidden>Username<input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+"></label>
+      <label id="email-label" hidden>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254"></label>
+      <label id="identifier-label">Username or email<input id="auth-identifier" name="identifier" autocomplete="username" maxlength="254" required></label>
+      <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <p id="password-help" class="form-help" hidden>Use 12–128 characters. Usernames use letters, numbers and underscores.</p>
+      <p id="auth-error" class="form-error" role="alert" hidden></p>
+      <button id="auth-submit" class="action-button" type="submit">Log in</button>
+      <button id="auth-switch" class="text-button" type="button">New here? Create an account</button>
+    </form>
+  </dialog>
+    
+</body>
+</html>

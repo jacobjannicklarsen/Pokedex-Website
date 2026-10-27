@@ -15,6 +15,7 @@ const community = require('./community');
 const speciesData = require('../data/pokemon-summary.json').pokemon;
 const typeChart = require('../data/type-chart.json');
 const teamAnalysis = require('../team-analysis-data');
+const decorations = require('./decorations');
 
 const publicUser = user => ({
   id: user.id, username: user.username, email: user.email, bio: user.bio,
@@ -103,7 +104,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   };
   const communityLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many community requests. Please wait a minute.' } });
   app.use('/api/public', communityLimiter);
-  app.get('/api/public/trainers', communityOperation(req => repo.community.directory(req.query.after === undefined ? 0 : v.id(req.query.after))));
+  app.get('/api/public/trainers', communityOperation(req => repo.community.directory(req.query.after === undefined ? 0 : v.id(req.query.after),v.text(req.query.q??'','Trainer search',0,64))));
   async function publicTrainer(req) {
     const user = await repo.community.findTrainer(community.username(req.params.username));
     if (!user) throw new v.HttpError(404, 'Trainer profile unavailable.');
@@ -135,6 +136,11 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     next();
   });
   app.get('/api/profile', (req, res) => res.json({ user: publicUser(req.user) }));
+  app.get('/api/profile/decorations', communityOperation(async req => {
+    await repo.progression.snapshot(req.user.id);
+    return { decoration:await repo.community.decoration(req.user.id), choices:decorations.choices, badges:await repo.community.earnedBadges(req.user.id) };
+  }));
+  app.put('/api/profile/decorations', communityOperation(async req => ({ decoration:await repo.community.saveDecoration(req.user.id,decorations.validate(req.body)) })));
   app.get('/api/community/settings', communityOperation(async req => ({ settings: await repo.community.settings(req.user.id) })));
   app.put('/api/community/settings', communityOperation(async req => ({ settings: await repo.community.saveSettings(req.user.id, community.settings(req.body)) })));
   app.get('/api/community/preview', communityOperation(async req => ({ profile: await community.profile(repo, req.user, await repo.community.settings(req.user.id), true) })));
@@ -147,24 +153,30 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   });
   app.patch('/api/profile', async (req, res) => {
     v.object(req.body);
-    const user = await repo.updateBio(req.user.id, v.text(req.body.bio, 'Trainer bio', 0, 500));
+    const user = await repo.updateBio(req.user.id, v.text(req.body.bio, 'Biography', 0, 500));
     res.json({ user: publicUser(user) });
   });
   const upload = multer({
-    storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1, fields: 0, parts: 1 },
+    storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1, fields: 1, parts: 2, fieldSize: 1024 },
     fileFilter(req, file, callback) {
       callback(['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype) ? null : new v.HttpError(400, 'Upload a JPEG, PNG or WebP image.'), true);
     }
   });
   app.post('/api/profile/avatar', uploadLimiter, upload.single('avatar'), async (req, res) => {
     if (!req.file) throw new v.HttpError(400, 'Select a profile picture.');
+    if(Object.keys(req.body||{}).some(key=>key!=='crop'))throw new v.HttpError(400,'Only the picture and crop coordinates may be uploaded.');
     let bytes;
     try {
       const image = sharp(req.file.buffer, { limitInputPixels: 16_000_000, animated: false });
       const metadata = await image.metadata();
       if (!['jpeg', 'png', 'webp'].includes(metadata.format) || (metadata.pages || 1) > 1) throw Error('Unsupported image');
-      bytes = await image.rotate().resize(256, 256, { fit: 'cover' }).webp({ quality: 85 }).toBuffer();
-    } catch { throw new v.HttpError(400, 'Invalid image. Use a nonanimated JPEG, PNG or WebP under 2 MB and 16 megapixels.'); }
+      // Crop coordinates refer to the upright image, after EXIF orientation is applied.
+      const {data,info}=await image.rotate().toColourspace('srgb').raw().toBuffer({resolveWithObject:true});
+      const crop=v.avatarCrop(req.body?.crop,info.width,info.height);
+      let output=sharp(data,{raw:{width:info.width,height:info.height,channels:info.channels}});
+      if(crop)output=output.extract(crop);
+      bytes=await output.resize(256,256,{fit:'cover'}).webp({quality:85}).toBuffer();
+    } catch(error) { if(error instanceof v.HttpError)throw error;throw new v.HttpError(400, 'Invalid image. Use a nonanimated JPEG, PNG or WebP under 2 MB and 16 megapixels.'); }
     const filename = `${crypto.randomUUID()}.webp`;
     const target = path.join(config.uploadDir, filename);
     await fs.writeFile(target, bytes, { flag: 'wx' });
@@ -207,7 +219,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'artwork-fallback.svg']) {
+  for (const asset of ['styles.css', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
@@ -226,6 +238,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(root, 'vendor/chart.umd.js')));
   app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
   app.get('/community.html', (req, res) => res.sendFile(path.join(root, 'community.html')));
+  app.get('/about.html', (req, res) => res.sendFile(path.join(root, 'about.html')));
   for (const route of ['/trainer/:username', '/team/:shareId']) app.get(route, async (req, res) => {
     // Relative assets still work in a static subpath; clean backend URLs use the root.
     const html = await fs.readFile(path.join(root, 'community.html'), 'utf8');

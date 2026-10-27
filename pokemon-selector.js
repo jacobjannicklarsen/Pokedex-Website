@@ -11,7 +11,7 @@
     const matches = pokemon.filter(p => !trimmed || (numeric ? p.id === id : name && (normalize(p.name).includes(name) || normalize(formatName(p.name)).includes(name))));
     return { count: matches.length, items: matches.slice(0, limit) };
   }
-  function create({ slot, label: customLabel, selectedId = null, total = 649, getPokemon, excludedIds, formatName, makeArtwork, onChange }) {
+  function create({ slot, label: customLabel, selectedId = null, total = 649, getPokemon, eligibleIds = () => null, excludedIds, formatName, makeArtwork, onChange }) {
     const node = (tag, className, text) => {
       const el = document.createElement(tag);
       if (className) el.className = className;
@@ -61,12 +61,14 @@
       } else input.removeAttribute('aria-activedescendant');
     }
     function select(id) {
+      if (eligibleIds() !== null && !eligibleIds().has(id)) { render(); return; }
       if (excludedIds().has(id)) { status.textContent = 'That Pokémon is already in another slot.'; return; }
       value = id; close(); onChange(value);
       input.focus();
     }
     function render(activateFirst = false) {
-      const candidates = Array.from({ length: total }, (_, i) => record(i + 1));
+      const eligible = eligibleIds();
+      const candidates = Array.from({ length: total }, (_, i) => record(i + 1)).filter(p => eligible === null || eligible.has(p.id));
       const found = search(candidates, query, formatName);
       const excluded = excludedIds();
       results = found.items.map(p => ({ ...p, disabled: excluded.has(p.id) }));

@@ -4,9 +4,34 @@
   const SIGNAL = 'dexhaven-progress-change';
   let userId = null, authReady = false, ready = false, loading = false, mutating = false, error = '', bundle = null, config = {}, ticket = 0, again = false, lastSignal = '';
   let records = new Map(), channel;
+  let toastTimer;
+  function celebrate(awards) {
+    document.querySelector('.achievement-toast')?.remove(); clearTimeout(toastTimer);
+    const toast=element('aside','achievement-toast');toast.setAttribute('role','status');
+    const close=element('button','text-button','×');close.type='button';close.setAttribute('aria-label','Dismiss achievement celebration');close.onclick=()=>toast.remove();
+    toast.append(element('span','achievement-icon',awards[0].icon),element('p','eyebrow',`${awards.length===1?'ACHIEVEMENT UNLOCKED':`${awards.length} ACHIEVEMENTS UNLOCKED`}`),element('strong','',awards.slice(0,3).map(a=>a.name).join(' · ')),close);document.body.append(toast);toastTimer=setTimeout(()=>toast.remove(),8000);
+  }
   try { channel = new BroadcastChannel('dexhaven-trainer-progress'); } catch { /* Storage events still synchronize supported browsers. */ }
   const statusOf = id => records.get(id)?.status || 'not-registered';
-  const option = (value, label) => { const node = element('option', '', label); node.value = value; return node; };
+  function statusIcon(status) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+    const shapes = status === 'seen' ? [['path',{d:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z'}],['circle',{cx:12,cy:12,r:3}]] : [['circle',{cx:12,cy:12,r:9}],['path',{d:status === 'caught' ? 'M3 12h6m6 0h6' : 'M8 12h8'}],...(status === 'caught' ? [['circle',{cx:12,cy:12,r:3}]] : [])];
+    shapes.forEach(([tag,attrs]) => { const shape = document.createElementNS('http://www.w3.org/2000/svg',tag); Object.entries(attrs).forEach(([key,value])=>shape.setAttribute(key,value)); svg.append(shape); });
+    return svg;
+  }
+  function statusControl(group) {
+    group.hidden = !userId;
+    group.setAttribute('aria-busy', String(loading || mutating));
+    const tile = group.closest('.pokemon-tile'); tile?.classList.toggle('has-collection', Boolean(userId));
+    const current = ready ? statusOf(Number(group.dataset.collectionId)) : 'loading';
+    group.dataset.status = current;
+    group.querySelectorAll('[data-collection-status]').forEach(button => {
+      button.disabled = !ready || loading || mutating;
+      button.setAttribute('aria-pressed', String(button.dataset.collectionStatus === current));
+    });
+    group.querySelector('.collection-control-state').textContent = error ? 'Tracking unavailable' : loading || !ready ? 'Loading collection…' : mutating ? 'Saving collection…' : current === 'caught' ? 'Caught' : current === 'seen' ? 'Seen' : 'Not registered';
+  }
   function announce() {
     const id = `${Date.now()}-${Math.random()}`; lastSignal = id;
     try { localStorage.setItem(SIGNAL, id); } catch { /* Keep private state in memory. */ }
@@ -20,16 +45,7 @@
   if (channel) channel.onmessage = event => external(event.data);
   window.addEventListener('storage', event => { if (event.key === SIGNAL) external(event.newValue); });
   function controls() {
-    document.querySelectorAll('[data-collection-id]').forEach(group => {
-      group.hidden = !userId;
-      group.setAttribute('aria-busy', String(loading || mutating));
-      const tile = group.closest('.pokemon-tile'); tile?.classList.toggle('has-collection', Boolean(userId));
-      const select = group.querySelector('select');
-      select.disabled = !ready || loading || mutating;
-      select.querySelector('option[value=""]').textContent = error ? 'Tracking unavailable' : 'Loading collection…';
-      select.value = ready ? statusOf(Number(group.dataset.collectionId)) : '';
-      group.dataset.status = ready ? statusOf(Number(group.dataset.collectionId)) : 'loading';
-    });
+    document.querySelectorAll('[data-collection-id]').forEach(statusControl);
     const filter = $('#collection-filter');
     if (filter) {
       filter.disabled = !ready || loading || mutating;
@@ -42,7 +58,9 @@
   function changed() { controls(); config.onChange?.(); }
   function accept(value) {
     if (!Array.isArray(value?.collection) || !Array.isArray(value.achievements) || value.statistics?.national?.total !== TOTAL || new Set(value.collection.map(row => row.pokemonId)).size !== value.collection.length || value.collection.some(row => !Number.isInteger(row.pokemonId) || row.pokemonId < 1 || row.pokemonId > TOTAL || !['seen', 'caught'].includes(row.status))) throw Error('The collection response was incomplete. Please retry.');
+    const previous=bundle?new Set(bundle.achievements.filter(a=>a.unlockedAt).map(a=>a.key)):null;
     bundle = value; records = new Map(value.collection.map(row => [row.pokemonId, row])); ready = true; error = '';
+    const fresh=previous?value.achievements.filter(a=>a.unlockedAt&&!previous.has(a.key)):[];if(fresh.length)celebrate(fresh);
   }
   async function refresh() {
     if (!userId || !config.request) return false;
@@ -64,6 +82,7 @@
     const next = user?.id || null;
     if (next === userId) { controls(); return; }
     userId = next; ticket++; loading = false; mutating = false; again = false; ready = false; error = ''; bundle = null; records = new Map();
+    document.querySelector('.achievement-toast')?.remove();clearTimeout(toastTimer);
     changed(); announce(); if (userId) refresh();
   }
   async function update(id, status) {
@@ -79,14 +98,18 @@
   }
   function decorate(container, pokemon) {
     if (container.querySelector('[data-collection-id]')) return;
-    const label = element('label', 'collection-control'); label.dataset.collectionId = pokemon.id;
-    label.append(element('span', '', 'Your Pokédex'));
-    const select = element('select'); select.setAttribute('aria-label', `Collection status for ${prettyName(pokemon.name)}, ${number(pokemon.id)}`);
-    const pending = option('', 'Loading collection…'); pending.disabled = true;
-    select.append(pending, option('not-registered', 'Not registered'), option('seen', 'Seen'), option('caught', 'Caught'));
-    select.addEventListener('change', () => update(pokemon.id, select.value)); label.append(select); container.append(label);
-    label.hidden = !userId; select.disabled = !ready || loading || mutating; select.value = ready ? statusOf(pokemon.id) : '';
-    label.dataset.status = ready ? statusOf(pokemon.id) : 'loading';
+    const group = element('div', 'collection-control'); group.dataset.collectionId = pokemon.id;
+    group.setAttribute('role', 'group'); group.setAttribute('aria-label', `Collection status for ${prettyName(pokemon.name)}, ${number(pokemon.id)}`);
+    group.append(element('span', '', 'Your Pokédex'));
+    const toggles = element('div', 'collection-toggles');
+    for (const [status, name] of [['not-registered','Not registered'],['seen','Seen'],['caught','Caught']]) {
+      const button = element('button', 'collection-toggle'); button.type = 'button'; button.dataset.collectionStatus = status;
+      button.title = name; button.setAttribute('aria-label', `${name} · ${prettyName(pokemon.name)}`);
+      button.append(statusIcon(status));
+      button.addEventListener('click', () => { if (statusOf(pokemon.id) !== status) update(pokemon.id, status); }); toggles.append(button);
+    }
+    const feedback = element('span', 'collection-control-state sr-only');
+    group.append(toggles, feedback); container.append(group); statusControl(group);
     container.classList.toggle('has-collection', Boolean(userId) && container.classList.contains('pokemon-tile'));
   }
   function matches(id, filter = 'all') {
@@ -138,18 +161,28 @@
   function renderAchievements(target) {
     if (pendingView(target)) return;
     target.append(element('p', 'form-help', 'Achievements are awarded by the server and stay unlocked after collection changes or team deletion. Unlock dates record when Dexhaven first verified the condition; progress bars describe your current collection or teams.'));
+    const awards=bundle.achievements,unlocked=awards.filter(a=>a.unlockedAt);
+    const hero=element('div','achievement-vault');hero.append(element('p','eyebrow','YOUR HALL OF FAME'),element('h3','',`${unlocked.length} / ${awards.length} earned`),element('p','',`${awards.filter(a=>!a.unlockedAt&&a.current/a.goal>=.5).length} achievements are at least halfway within reach. Keep exploring, catching and building.`));target.append(hero);
+    const toolbar=element('div','achievement-filters');toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Filter achievements');
+    let selected='all';
+    const options=[['all','All badges'],['unlocked','Earned'],['locked','Locked'],['near','Nearly there'],...['collection','exploration','regions','types','teams','favourites'].map(key=>[key,prettyName(key)])];
+    options.forEach(([key,label])=>{const button=element('button','achievement-filter',label);button.type='button';button.dataset.achievementFilter=key;button.setAttribute('aria-pressed',String(key==='all'));button.onclick=()=>{selected=key;toolbar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();};toolbar.append(button);});target.append(toolbar);
+    const count=element('p','form-help');count.setAttribute('role','status');target.append(count);
     const grid = element('div', 'achievement-grid');
-    bundle.achievements.forEach(award => {
+    function draw(){grid.replaceChildren();const visible=awards.filter(a=>selected==='all'||selected==='unlocked'&&a.unlockedAt||selected==='locked'&&!a.unlockedAt||selected==='near'&&!a.unlockedAt&&a.current/a.goal>=.5||a.category===selected);count.textContent=`${visible.length} ${visible.length===1?'achievement':'achievements'} shown`;
+    visible.forEach(award => {
       const card = element('article', `trainer-panel achievement-card${award.unlockedAt ? ' unlocked' : ''}`); card.dataset.achievement = award.key;
+      card.dataset.rarity=award.rarity||'bronze';
       const icon = element('span', 'achievement-icon', award.icon); icon.setAttribute('aria-hidden', 'true');
-      card.append(icon, element('h3', '', award.name), element('p', 'form-help', award.description), element('strong', '', award.unlockedAt ? 'Unlocked' : 'Locked'));
+      const meta=element('div','achievement-meta');meta.append(element('span','rarity-label',prettyName(award.rarity||'bronze')),element('span','',prettyName(award.category||'collection')));
+      card.append(meta,icon, element('h3', '', award.name), element('p', 'form-help', award.description), element('strong', 'achievement-state', award.unlockedAt ? '✦ Unlocked' : '◇ Locked'));
       if (award.unlockedAt) { const date = element('time', 'form-help', new Date(award.unlockedAt).toLocaleString()); date.dateTime = award.unlockedAt; card.append(date); }
       const label = element('label', 'personal-progress', `Current: ${award.unit === '%' ? award.current.toFixed(2) : award.current}${award.unit || ''} / ${award.goal}${award.unit || ''}`);
       const bar = element('progress'); bar.max = award.goal; bar.value = Math.min(award.current, award.goal); label.append(bar); card.append(label); grid.append(card);
-    }); target.append(grid);
+    });if(!visible.length)grid.append(element('p','form-help','No achievements match this view yet.'));}target.append(grid);draw();
   }
   $('#collection-filter')?.addEventListener('change', event => { state.collectionFilter = event.target.value; render(); });
   $('#collection-login')?.addEventListener('click', () => config.login?.());
   $('#collection-retry')?.addEventListener('click', refresh);
-  globalThis.TrainerProgress = { setUser, refresh, update, decorate, matches, renderProgress, renderAchievements };
+  globalThis.TrainerProgress = { caughtState: () => ({ ready: Boolean(userId && ready), loading, error, ids: new Set([...records].filter(([, row]) => row.status === 'caught').map(([id]) => id)) }), setUser, refresh, update, decorate, matches, renderProgress, renderAchievements };
 })();

@@ -46,7 +46,7 @@ test('real MySQL: constraints, ownership, atomic updates, sharing revocation and
     assert.deepEqual(await repo.community.teamSettings(alice.id,team.id), {visibility:'private',shareId:null});
     await assert.rejects(repo.community.share(bob.id,team.id,'public'),/not found/);
     await assert.rejects(repo.community.saveSettings(bob.id,{...community.defaults(),featuredTeamId:team.id}),/not found/);
-    await repo.community.saveSettings(alice.id,{...community.defaults(),enabled:true,shareProgress:true,publicBio:'Public integration biography',featuredTeamId:team.id});
+    await repo.community.saveSettings(alice.id,{...community.defaults(),enabled:true,shareProgress:true,shareBio:true,featuredTeamId:team.id});
     const sharing = await repo.community.share(alice.id,team.id,'public');
     const reopenedRepo = new Repository(pool);
     assert.equal((await reopenedRepo.community.settings(alice.id)).enabled,true);

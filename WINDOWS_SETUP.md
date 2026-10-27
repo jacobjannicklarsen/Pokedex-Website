@@ -1,5 +1,9 @@
 # Windows / VS Code setup
 
+**v0.6.1:** review the separate [Trainer Card Studio migration](database/MIGRATION_v0.6.1.md) for existing decoration tables. It is prepared only and must be approved before application. Fresh installs use the updated schema. Sprite images require access to the public PokéAPI sprite host and fall back to a local placeholder.
+
+Biography now has one editor and an explicit **Show biography publicly** setting. Existing databases require the [manual single-biography migration](database/MIGRATION_single-biography.md); old public text is archived and sharing starts off. Trainer Hub puts picture editing above Biography and offers All/Caught search sources in each team editor.
+
 The project is **Pokédex Website**; the public website is **Dexhaven v0.6.0**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
 
 **Upgrading from v0.5.0:** review [database/MIGRATION_v0.6.0.md](database/MIGRATION_v0.6.0.md) and manually apply its two additive community settings tables when approved. Existing accounts/teams remain private; no migration, settings backfill or publication occurs automatically. Older upgrades must first follow their earlier migration guides, then this v0.6.0 guide. Open `/community.html` for opt-in trainers and use Profile/My Teams in the private hub for sharing controls. See [COMMUNITY.md](COMMUNITY.md) for APIs, privacy, calculations and two-account manual verification.
@@ -24,7 +28,7 @@ Recommended with Workbench:
 1. Connect to your local MySQL server using an administrator account you control.
 2. Run `SHOW DATABASES LIKE 'pokedex_app';`. If that name is already used for unrelated data, inspect it and resolve the conflict before proceeding. Never drop an existing database for this setup.
 3. Choose **File → Open SQL Script** and open `E:\EK - IT-Arkitektur\Pokedex Website\database\schema.sql`.
-4. Execute the whole script. It selects only `pokedex_app` and creates its missing tables: `users`, `teams`, `team_pokemon`, `favorites`, `sessions`, `user_pokedex`, `user_achievements`, `trainer_public_settings`, `team_sharing`. It contains no DROP statements or data replacement. Existing tables are not migrated automatically.
+4. Execute the whole script. It selects only `pokedex_app` and creates its missing tables: `users`, `teams`, `team_pokemon`, `favorites`, `sessions`, `user_pokedex`, `user_achievements`, `trainer_public_settings`, `team_sharing`, `trainer_decorations`. It contains no DROP statements or data replacement. Existing tables are not migrated automatically. Existing v0.6.0 installations can enable saved trainer-card cosmetics with the separate reviewed [manual decoration migration](database/MIGRATION_profile-decorations.md).
 5. Verify:
 
 ```sql
