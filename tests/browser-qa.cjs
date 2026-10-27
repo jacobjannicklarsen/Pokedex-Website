@@ -32,7 +32,7 @@ async function main() {
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['index.html','pokemon.html','trainers.html','dashboard.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -81,6 +81,7 @@ async function main() {
     catch (error) {
       results.push({ name, passed: false }); console.log(`FAIL ${name}: ${error.message}`);
       console.log(await evaluate(`JSON.stringify({path:location.pathname,hash:location.hash,mode:window.qaMode,requests:window.qaRequests,message:document.querySelector('#account-message')?.textContent,retryHidden:document.querySelector('#trainer-catalog-retry')?.hidden,status:document.querySelector('#trainer-catalog-status')?.textContent})`).catch(()=> 'Diagnostic page state unavailable'));
+      console.log(await evaluate(`JSON.stringify([...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth+1).slice(0,12).map(n=>({tag:n.tagName,class:n.className,width:n.getBoundingClientRect().width})))`).catch(()=> 'Geometry unavailable'));
     }
   }
   async function waitFor(expression) {
@@ -1001,6 +1002,113 @@ async function main() {
       await command('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
     }
     await key('Escape','Escape');assert.equal(await evaluate('dialog.open'),false);assert.deepEqual(exceptions,[]);
+  });
+  let communityTeamId,communityShareId;
+  await check('private analysis handles unsaved changes, six slots, exact dual-type coverage and interactive charts',async()=>{
+    await command('Page.navigate',{url:origin+'/trainers.html#view=teams'});
+    await waitFor(`document.querySelector('#logout-button')?.hidden===false`);
+    const created=await evaluate(`(async()=>{const s=await(await fetch('/api/auth/session')).json();const headers={'Content-Type':'application/json','X-CSRF-Token':s.csrfToken};const team=(await(await fetch('/api/teams',{method:'POST',headers,body:JSON.stringify({name:'Community QA Team'})})).json()).team;await fetch('/api/teams/'+team.id,{method:'PUT',headers,body:JSON.stringify({name:team.name,pokemonIds:[6,81]})});return team.id;})()`);communityTeamId=created;
+    await command('Page.reload');await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .team-slot [role="combobox"]')`);
+    await evaluate(`[...document.querySelector('.team-editor[data-team-id="${communityTeamId}"]').querySelectorAll('button')].find(b=>b.textContent==='Analyze Team').click()`);
+    await waitFor(`document.querySelector('#team-analysis-${communityTeamId} .analytics-table')`);
+    assert.equal(await evaluate(`document.querySelector('#team-analysis-${communityTeamId}').dataset.memberCount`),'2');
+    assert.match(await evaluate(`document.querySelector('#team-analysis-${communityTeamId}').textContent`),/4×/);
+    assert.equal(await evaluate(`document.querySelectorAll('#team-analysis-${communityTeamId} table').length`),4);
+    assert.equal(await evaluate(`Chart.getChart(document.querySelector('#team-analysis-${communityTeamId} canvas')).data.labels.length`),18);
+    await evaluate(`(()=>{const s=document.querySelector('#team-analysis-${communityTeamId} select');s.value='immune';s.dispatchEvent(new Event('change'));})()`);
+    assert.match(await evaluate(`Chart.getChart(document.querySelector('#team-analysis-${communityTeamId} canvas')).data.datasets[0].label`),/Immunities/);
+    await evaluate(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .selector-clear').click()`);
+    await waitFor(`document.querySelector('#team-analysis-${communityTeamId}').dataset.memberCount==='1'`);
+    assert.equal(await evaluate(`(async()=>{const teams=(await(await fetch('/api/teams')).json()).teams;return teams.find(t=>t.id===${communityTeamId}).pokemonIds.length;})()`),2,'analysis must not save the draft');
+    await evaluate(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"]').requestSubmit()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Team saved.'`);
+    await command('Page.reload');await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"]')`);
+  });
+  await check('public profile settings start private; saved preview safely renders approved fields and featured Pokémon',async()=>{
+    await evaluate(`document.querySelector('[data-view="/profile"]').click()`);
+    await waitFor(`document.querySelector('.community-settings form')`);
+    assert.equal(await evaluate(`document.querySelector('.community-settings [name="enabled"]').checked`),false);
+    await evaluate(`(()=>{const input=document.querySelector('.community-settings [role="combobox"]');input.focus();input.value='#6';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await key('Enter','Enter');
+    await evaluate(`(()=>{const f=document.querySelector('.community-settings form');f.querySelector('[name="publicBio"]').value='<img src=x onerror=alert(1)> Trainer story';f.querySelector('[name="enabled"]').checked=true;f.querySelector('[name="shareFavorites"]').checked=true;f.querySelector('[name="shareProgress"]').checked=true;f.querySelector('[name="shareAchievements"]').checked=true;f.querySelector('[name="shareAvatar"]').checked=true;f.requestSubmit();})()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Public profile settings saved.'`);
+    await evaluate(`[...document.querySelectorAll('.community-settings button')].find(b=>b.textContent==='Preview saved public profile').click()`);
+    await waitFor(`document.querySelector('.public-preview .public-identity')`);
+    assert.match(await evaluate(`document.querySelector('.public-preview .profile-biography').textContent`),/<img/);
+    assert.equal(await evaluate(`document.querySelector('.public-preview .profile-biography img')`),null);
+    assert.equal(await evaluate(`document.querySelector('.public-preview').textContent.includes('browser@example.test')`),false);
+    const profile=await evaluate(`(async()=>await(await fetch('/api/public/trainers/browser_trainer',{credentials:'omit'})).json())()`);
+    assert.equal(profile.profile.username,'browser_trainer');assert.ok(profile.profile.statistics);assert.ok(Array.isArray(profile.profile.achievements));assert.ok(!('email'in profile.profile));
+    assert.equal(profile.profile.featuredPokemonId,6);
+    assert.match(await evaluate(`document.querySelector('.public-preview .shared-roster').textContent`),/Charizard/);
+    assert.ok(!profile.profile.teams.some(t=>t.name==='Community QA Team'));
+  });
+  await check('team visibility publishes a stable link; logged-out public team shows six slots and read-only analysis',async()=>{
+    await evaluate(`document.querySelector('[data-view="/teams"]').click()`);
+    await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .team-sharing select')`);
+    await evaluate(`(()=>{const f=document.querySelector('.team-editor[data-team-id="${communityTeamId}"]');f.querySelector('.team-sharing select').value='public';[...f.querySelectorAll('button')].find(b=>b.textContent==='Save visibility').click();})()`);
+    await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .share-link-row input')`);
+    communityShareId=(await evaluate(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .share-link-row input').value`)).split('/').pop();
+    await evaluate(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .share-link-row button').click()`);
+    await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .share-link-row [role="status"]').textContent.length>0`);
+    await evaluate(`document.querySelector('#logout-button').click()`);await waitFor(`document.querySelector('#guest-actions').hidden===false`);
+    await command('Page.navigate',{url:origin+'/team/'+communityShareId});
+    await waitFor(`document.querySelector('#community-content .team-analysis .analytics-table')`);
+    assert.equal(await evaluate(`document.querySelectorAll('.shared-roster>.shared-pokemon').length`),6);
+    assert.equal(await evaluate(`document.querySelectorAll('.shared-roster>.empty-public-slot').length`),5);
+    assert.equal(await evaluate(`document.querySelector('.team-analysis').dataset.memberCount`),'1');
+    assert.equal(await evaluate(`document.querySelector('.team-editor')`),null);
+    assert.equal(await evaluate(`document.querySelector('#header-profile').hidden`),true);
+    await evaluate(`document.querySelector('.shared-roster a').click()`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Magnemite'`);
+    await command('Page.navigate',{url:origin+'/trainer/browser_trainer'});
+    await waitFor(`document.querySelector('.public-identity')`);
+    assert.match(await evaluate(`document.querySelector('#community-content').textContent`),/Community QA Team/);
+    assert.equal(await evaluate(`document.querySelector('.public-identity img').getAttribute('src')`),'/api/public/trainers/browser_trainer/avatar');
+  });
+  await check('public profiles, team charts and exact-value matrix fit both themes and keyboard access on mobile',async()=>{
+    await command('Page.navigate',{url:origin+'/team/'+communityShareId});await waitFor(`document.querySelector('.team-analysis .analytics-table')`);
+    for(const theme of ['dark','light']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){
+        await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+        assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${theme} ${width}px`);
+        assert.equal(await evaluate(`document.querySelectorAll('.team-analysis table tbody tr').length`),60);
+      }
+      assert.equal(await evaluate(`Chart.getChart(document.querySelector('.team-analysis canvas')).options.scales.x.ticks.color`),await evaluate(`getComputedStyle(document.documentElement).getPropertyValue('--text').trim()`));
+    }
+    await evaluate(`document.querySelector('.analysis-table-wrap').focus()`);assert.equal(await evaluate(`document.activeElement.getAttribute('role')`),'region');
+    await key('ArrowRight','ArrowRight');
+    if(process.env.QA_SCREENSHOT_DIR){fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});const shot=await command('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'community-team.png'),Buffer.from(shot.data,'base64'));}
+    await command('Page.navigate',{url:origin+'/trainer/browser_trainer'});await waitFor(`document.querySelector('.public-identity')`);
+    for(const width of [320,375,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}
+  });
+  await check('chart-library failure preserves team tables; revoking profile and team immediately closes public links',async()=>{
+    await command('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*raw.githubusercontent.com*','*vendor/chart.umd.js*']});
+    await command('Page.navigate',{url:origin+'/team/'+communityShareId});await waitFor(`document.querySelector('.team-analysis .analytics-table')`);
+    assert.match(await evaluate(`document.querySelector('.team-analysis').textContent`),/Charts are unavailable/);
+    assert.equal(await evaluate(`document.querySelectorAll('.team-analysis table').length`),4);
+    await command('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*raw.githubusercontent.com*']});
+    await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='browser@example.test';document.querySelector('#auth-password').value='browser test password 123';document.querySelector('#auth-form').requestSubmit()`);
+    await waitFor(`document.querySelector('#logout-button').hidden===false`);
+    await command('Page.navigate',{url:origin+'/trainers.html#view=profile'});await waitFor(`document.querySelector('.community-settings form')`);
+    await evaluate(`(()=>{const f=document.querySelector('.community-settings form');f.querySelector('[name="enabled"]').checked=false;f.requestSubmit();})()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Public profile settings saved.'`);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click()`);await waitFor(`document.querySelector('.team-editor[data-team-id="${communityTeamId}"] .team-sharing select')`);
+    await evaluate(`(()=>{const f=document.querySelector('.team-editor[data-team-id="${communityTeamId}"]');f.querySelector('.team-sharing select').value='private';[...f.querySelectorAll('button')].find(b=>b.textContent==='Save visibility').click();})()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Team visibility saved.'`);
+    await command('Page.navigate',{url:origin+'/team/'+communityShareId});await waitFor(`document.querySelector('#community-content h2')?.textContent==='Shared content unavailable'`);
+    await command('Page.navigate',{url:origin+'/trainer/browser_trainer'});await waitFor(`document.querySelector('#community-content h2')?.textContent==='Shared content unavailable'`);
+    await command('Page.navigate',{url:origin+'/community.html'});await waitFor(`document.querySelector('.community-directory')`);
+    assert.equal(await evaluate(`document.querySelector('.community-directory').textContent.includes('browser_trainer')`),false);
+    assert.deepEqual(exceptions,[]);
+  });
+  await check('static community preview gives a clear backend-required state without exposing private data',async()=>{
+    await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/community.html'});
+    await waitFor(`document.querySelector('#community-content h2')?.textContent==='Shared content unavailable'`);
+    assert.match(await evaluate(`document.querySelector('#community-content').textContent`),/Express backend|Static preview/);
+    assert.equal(await evaluate(`document.querySelector('#header-profile').hidden`),true);
+    assert.deepEqual(exceptions,[]);
   });
   await check('GitHub Pages project-path preview: no backend, correct brand/hero, generations, details and hash navigation',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/'});

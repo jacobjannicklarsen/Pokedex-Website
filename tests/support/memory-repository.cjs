@@ -3,6 +3,7 @@ const { HttpError } = require('../../server/validation');
 const logic = require('../../server/progression');
 class MemoryRepository {
   constructor() {
+    this.community = new (require('./memory-community.cjs').MemoryCommunity)(this);
     this.users = []; this.savedTeams = []; this.savedFavorites = new Map(); this.sequence = 0;
     this.collections = new Map(); this.awards = new Map();
     this.progression = {

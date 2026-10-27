@@ -89,6 +89,9 @@ test('migration is additive, scoped, repeatable and identical to new-install tab
   assert.ok(!/(?:^|;)\s*(?:DROP|TRUNCATE|ALTER|DELETE|UPDATE|INSERT)\b/i.test(sql.replace(/^--.*$/gm,'')));
   assert.match(sql,/PRIMARY KEY \(user_id, pokemon_id\)/);assert.match(sql,/PRIMARY KEY \(user_id, achievement_key\)/);
   assert.match(sql,/seen_at DATETIME\(3\) NOT NULL/);assert.match(sql,/caught_at IS NULL OR caught_at >= seen_at/);assert.match(sql,/BETWEEN 1 AND 649/);
-  assert.equal(schema.slice(schema.indexOf('CREATE TABLE IF NOT EXISTS user_pokedex')).trim(),sql.slice(sql.indexOf('CREATE TABLE')).trim());
+  for (const name of ['user_pokedex', 'user_achievements']) {
+    const definition = text => text.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${name} \\([\\s\\S]*?\\) ENGINE=InnoDB;`))[0];
+    assert.equal(definition(schema), definition(sql));
+  }
   for(const file of ['server/index.js','server/setup-db.js'])assert.ok(!read(file).includes('v0.5.0-trainer-progression.sql'));
 });

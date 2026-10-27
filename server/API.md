@@ -1,5 +1,29 @@
 # Express API
 
+## Trainer community (v0.6.0)
+
+Requires the reviewed [manual community migration](../database/MIGRATION_v0.6.0.md) after v0.5.0. Missing rows mean private; every sharing flag defaults to false. Nothing is published automatically. See [COMMUNITY.md](../COMMUNITY.md) for complete JSON projections, settings validation, privacy rules and calculations.
+
+| Method | Endpoint | Access / result |
+| --- | --- | --- |
+| GET | `/api/public/trainers?after=ID` | Public, bounded 24-profile opt-in directory; `{trainers:[{username}],next}` |
+| GET | `/api/public/trainers/:username` | Public, enabled profile's approved projection only; `{profile}` |
+| GET | `/api/public/trainers/:username/teams` | Public, enabled profile's shared teams only; `{teams}` |
+| GET | `/api/public/trainers/:username/avatar` | Public WebP only while both profile/picture sharing are enabled |
+| GET | `/api/public/teams/:shareId` | Public UUIDv4 team, only while explicitly public; `{team,analysis}` |
+| GET | `/api/community/settings` | Authenticated owner's `{settings}` |
+| PUT | `/api/community/settings` | Owner's complete validated settings → `{settings}` |
+| GET | `/api/community/preview` | Owner-only saved public-profile projection; never publishes |
+| GET | `/api/teams/:id/visibility` | Owned team → `{visibility,shareId}` |
+| PUT | `/api/teams/:id/visibility` | Owned team, `{visibility:"private"\|"public"}` → authoritative visibility/link |
+| GET | `/api/teams/:id/analysis` | Owned saved lineup → `{analysis}`; no publication required |
+
+Public API reads precede private-auth middleware, use explicit field allowlists and visibility predicates, and are limited to 120 requests/minute/IP/process. Profile disable removes the profile/directory entry; independent public teams must be revoked separately. Disabling/deleting a team makes its old UUID URL return 404. UUIDs never confer editing rights. Settings/sharing writes use session-derived ownership, bound values, row locks/transactions and existing CSRF/origin checks. Unknown/private resources return 404, malformed inputs 400, missing auth 401, bad CSRF 403, throttling 429 and absent schema 503. Public and private responses remain `no-store`. Public statistics expose approved aggregates only, never raw collection records/recent activity or private settings.
+
+Settings require exactly `{enabled,publicBio,featuredPokemonId,featuredTeamId,shareAvatar,shareFavorites,shareProgress,shareAchievements}` with actual boolean flags, 0–500 character public biography, nullable species ID 1–649 and nullable owned featured-team ID. Only independently public featured teams appear publicly. The existing private biography/email are never copied into public JSON. Existing usernames remain unique and immutable in the UI; invalid or obsolete profile names fail gracefully.
+
+Pages `/community.html`, `/trainer/:username` and `/team/:shareId` serve the community shell; clean routes require Express. Static previews show a backend-required explanation. Analysis shares the existing Encyclopedia's modern multiplier logic and the bundled official type chart; draft analysis also works privately in the browser. See [COMMUNITY.md](../COMMUNITY.md#team-analysis-calculations).
+
 ## Trainer progression (v0.5.0)
 
 Requires the reviewed, manually applied [v0.5.0 migration](../database/MIGRATION_v0.5.0.md). Existing trainer endpoints remain unchanged. All progression endpoints run after the normal authentication middleware and infer ownership exclusively from `req.user.id`; no owner ID is accepted from the client. API responses remain `Cache-Control: no-store`.
@@ -50,4 +74,4 @@ All profile/team/favourite endpoints require authentication. Team member IDs are
 
 Statuses: 400 invalid data; 401 unauthenticated/invalid login; 403 missing or invalid CSRF/disallowed origin; 404 absent or unowned team; 409 conflicting username/email; 413 upload/request too large; 429 rate limited; 503 unavailable database; 500 unexpected server error. Password hashes, SQL errors and secrets are never returned.
 
-Sessions persist in the `sessions` MySQL table with a seven-day rolling TTL. Expired sessions are ignored and pruned at startup/hourly. Passwords use Argon2id through node-argon2. Uploads are decoded with a pixel limit, rotated, stripped of input metadata, resized to 256×256 and re-encoded as WebP with a random server-generated filename. Old avatar files are removed after the database update succeeds. Avatar image URLs are publicly readable, unguessable resource URLs, not private profile-data endpoints; do not upload sensitive pictures.
+Sessions persist in the `sessions` MySQL table with a seven-day rolling TTL. Expired sessions are ignored and pruned at startup/hourly. Passwords use Argon2id through node-argon2. Uploads are decoded with a pixel limit, rotated, stripped of input metadata, resized to 256×256 and re-encoded as WebP with a random server-generated filename. Old avatar files are removed after the database update succeeds. Since v0.6.0, original `/media/avatars/:filename` URLs require the matching authenticated owner and use `no-store`; optional public pictures use a separate revocable `/api/public/trainers/:username/avatar` route. No avatar files are replaced by the upgrade.

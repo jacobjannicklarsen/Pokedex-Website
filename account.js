@@ -1,7 +1,7 @@
 // Account features are isolated from the existing PokéAPI cache and theme code.
 (() => {
   'use strict';
-  const session = { user: null, csrf: '', favorites: new Set(), teams: [], ready: false };
+  const session = { user: null, csrf: '', favorites: new Set(), teams: [], ready: false, privateReady: false, privateError: '' };
   const siteRoot = new URL('.', document.currentScript?.src || location.href);
   const isTrainerHub = document.body.dataset.page === 'trainers';
   const viewTarget = view => `${new URL('trainers.html', siteRoot).pathname}#view=${view.slice(1) || 'profile'}`;
@@ -53,7 +53,7 @@
     const data = response.status === 204 ? {} : await response.json().catch(() => ({ error: 'The account server is unavailable. Start the Express server and try again.' }));
     if (!response.ok) {
       if (response.status === 401 && session.user) {
-        session.user = null; session.favorites.clear(); session.teams = []; updateAccountUI();
+        session.user = null; session.favorites.clear(); session.teams = []; session.privateReady = false; updateAccountUI();
         if (activeView !== '/') renderPage();
       }
       throw new Error(data.error || 'The request failed. Please try again.');
@@ -64,7 +64,7 @@
     const data = await request('/auth/session');
     const identityChanged = session.user?.id !== data.user?.id;
     session.user = data.user; session.csrf = data.csrfToken;
-    if (identityChanged) { session.teams = []; session.favorites.clear(); }
+    if (identityChanged) { session.teams = []; session.favorites.clear(); session.privateReady = false; session.privateError = ''; }
     session.ready = true; updateAccountUI();
     if (identityChanged && isTrainerHub) renderPage();
     if (session.user) await loadPrivateData();
@@ -72,8 +72,12 @@
     session.ready = true; updateAccountUI();
   }
   async function loadPrivateData() {
-    const [teams, favorites] = await Promise.all([request('/teams'), request('/favorites')]);
-    session.teams = teams.teams; session.favorites = new Set(favorites.pokemonIds);
+    const userId = session.user?.id;
+    try {
+      const [teams, favorites] = await Promise.all([request('/teams'), request('/favorites')]);
+      if (session.user?.id !== userId) return;
+      session.teams = teams.teams; session.favorites = new Set(favorites.pokemonIds); session.privateReady = true; session.privateError = '';
+    } catch (error) { if (session.user?.id === userId) session.privateError = error.message; throw error; }
   }
   function updateAccountUI() {
     const authenticated = session.ready && Boolean(session.user);
@@ -227,9 +231,15 @@
     if (!isTrainerHub) return;
     teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
     content.replaceChildren();
+    globalThis.DexhavenTeamAnalysis?.cleanup();
     $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile', '/progress': 'Pokédex Progress', '/achievements': 'Achievements' })[activeView] || 'Trainer';
     if (!session.ready) { content.append(element('p', 'form-help', 'Loading your trainer account…')); return; }
     if (!session.user) return;
+    if (!session.privateReady) {
+      content.append(element('p', session.privateError ? 'form-error' : 'form-help', session.privateError || 'Loading your teams and favourites…'));
+      if (session.privateError) content.append(action('Retry trainer data', async () => { try { await loadPrivateData(); renderPage(); } catch (error) { notice(error.message, true); } }));
+      return;
+    }
     if (!trainerCatalogueStarted) loadTrainerCatalogue();
     if (activeView === '/teams') renderTeams();
     if (activeView === '/favorites') {
@@ -294,7 +304,9 @@
       try { const result = await request('/profile/avatar', { method: 'POST', form: data }); session.user = result.user; updateAccountUI(); notice('Profile picture updated.'); if (activeView === '/profile') renderPage(); }
       catch (error) { notice(error.message, true); } finally { upload.disabled = false; }
     });
-    content.append(form, avatarForm, element('h2', 'account-subheading', `Teams · ${session.teams.length}`));
+    content.append(form, avatarForm);
+    globalThis.DexhavenCommunity?.settings(content, { user, teams: session.teams, request, notice, currentUserId: () => session.user?.id, trackSelector: selector => teamSelectors.add(selector) });
+    content.append(element('h2', 'account-subheading', `Teams · ${session.teams.length}`));
     session.teams.forEach(team => {
       const summary = element('div', 'trainer-panel'); summary.append(element('h3', '', team.name));
       const members = element('div', 'mini-roster'); team.pokemonIds.forEach(id => members.append(miniPokemon(id))); summary.append(members); content.append(summary);
@@ -337,6 +349,9 @@
       const nameLabel = element('label', '', 'Team name'); const title = element('input'); title.value = team.name; title.required = true; title.maxLength = 60; nameLabel.append(title);
       form.append(nameLabel); const slots = element('div', 'team-slots');
       const selectors = [];
+      let analysisOpen = false;
+      const analysisPanel = element('section'); analysisPanel.hidden = true;
+      const updateAnalysis = () => { if (analysisOpen) globalThis.DexhavenTeamAnalysis?.render(analysisPanel, selectors.map(s => s.value).filter(Boolean)); };
       for (let slot = 0; slot < 6; slot++) {
         const box = element('div', 'team-slot'); const preview = element('div');
         const update = value => { preview.replaceChildren(); if (value) preview.append(miniPokemon(value)); else preview.append(element('span', 'empty-slot-art', '+')); };
@@ -350,7 +365,7 @@
           slot: slot + 1, selectedId: team.pokemonIds[slot], total: TOTAL,
           getPokemon: id => state.pokemon.get(id), formatName: prettyName, makeArtwork: artwork,
           excludedIds: () => new Set(selectors.filter(other => other !== selector).map(other => other.value).filter(Boolean)),
-          onChange(value) { update(value); selectors.forEach(other => other.refresh()); }
+          onChange(value) { update(value); selectors.forEach(other => other.refresh()); updateAnalysis(); }
         });
         selectors.push(selector); teamSelectors.add(selector);
         update(selector.value); box.append(preview, selector.element); slots.append(box);
@@ -369,7 +384,12 @@
         finally { remove.disabled = false; save.disabled = false; }
       }, 'text-button delete-team');
       remove.setAttribute('aria-label', `Delete team ${team.name}`);
-      const actions = element('div', 'team-actions'); actions.append(save, remove); form.append(slots, actions); content.append(form);
+      const analyze = action('Analyze Team', () => { analysisOpen = !analysisOpen; analysisPanel.hidden = !analysisOpen; analyze.setAttribute('aria-expanded', String(analysisOpen)); updateAnalysis(); });
+      analyze.setAttribute('aria-expanded', 'false'); analysisPanel.id = `team-analysis-${team.id}`; analyze.setAttribute('aria-controls', analysisPanel.id);
+      const actions = element('div', 'team-actions'); actions.append(save, analyze, remove); form.append(slots, actions, element('p','form-help','Analysis follows your current slot selections, including unsaved changes. Public visitors see the last saved lineup.'));
+      content.append(form);
+      globalThis.DexhavenCommunity?.teamSettings(form, team, {request, notice});
+      form.append(analysisPanel);
       form.addEventListener('submit', async event => {
         event.preventDefault();
         const pokemonIds = selectors.map(selector => selector.value).filter(Boolean);
@@ -383,6 +403,7 @@
           globalThis.TrainerProgress?.refresh();
           remove.setAttribute('aria-label', `Delete team ${saved.name}`);
           notice('Team saved.');
+          updateAnalysis();
         }
         catch (error) { notice(error.message, true); } finally { save.disabled = false; remove.disabled = false; }
       });
@@ -423,7 +444,7 @@
       await refreshSession();
       const body = authMode === 'register' ? { username: $('#auth-username').value, email: $('#auth-email').value, password: $('#auth-password').value } : { identifier: $('#auth-identifier').value, password: $('#auth-password').value };
       const data = await request(`/auth/${authMode}`, { method: 'POST', body });
-      session.user = data.user; session.csrf = data.csrfToken; session.ready = true;
+      session.user = data.user; session.csrf = data.csrfToken; session.ready = true; session.privateReady = false; session.privateError = '';
       updateAccountUI(); authDialog.close(); $('#auth-form').reset();
       notice(`Welcome, ${session.user.username}!`);
       try { await loadPrivateData(); } catch (error) { notice(`Logged in, but trainer data could not be loaded: ${error.message}`, true); }
@@ -433,7 +454,7 @@
   });
   $('#logout-button').addEventListener('click', async () => {
     $('#logout-button').disabled = true;
-    try { await request('/auth/logout', { method: 'POST' }); session.user = null; session.csrf = ''; session.favorites.clear(); session.teams = []; updateAccountUI(); navigate('/'); notice('Logged out.'); await refreshSession(); }
+    try { await request('/auth/logout', { method: 'POST' }); session.user = null; session.csrf = ''; session.favorites.clear(); session.teams = []; session.privateReady = false; updateAccountUI(); navigate('/'); notice('Logged out.'); await refreshSession(); }
     catch (error) { notice(error.message, true); } finally { $('#logout-button').disabled = false; }
   });
   globalThis.PokedexAccounts = { decorateCard, decorateDetails, onPokemonUpdate };

@@ -11,6 +11,10 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const v = require('./validation');
 const { TTL } = require('./session-store');
+const community = require('./community');
+const speciesData = require('../data/pokemon-summary.json').pokemon;
+const typeChart = require('../data/type-chart.json');
+const teamAnalysis = require('../team-analysis-data');
 
 const publicUser = user => ({
   id: user.id, username: user.username, email: user.email, bio: user.bio,
@@ -38,7 +42,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   }));
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.use('/api', express.json({ limit: '16kb', strict: true }));
-  app.use('/api', session({
+  app.use(['/api', '/media/avatars'], session({
     name: 'pokedex.sid', store, secret: config.secret,
     resave: false, saveUninitialized: false, rolling: true,
     cookie: { httpOnly: true, secure: config.production, sameSite: 'lax', maxAge: TTL, path: '/' }
@@ -90,6 +94,40 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     res.clearCookie('pokedex.sid', { httpOnly: true, secure: config.production, sameSite: 'lax', path: '/' });
     res.status(204).end();
   });
+  const communityOperation = operation => async (req, res) => {
+    try { res.json(await operation(req)); }
+    catch (error) {
+      if (error.code === 'ER_NO_SUCH_TABLE') throw new v.HttpError(503, 'Community sharing is unavailable. Review the manual v0.6.0 migration in MySQL Workbench.');
+      throw error;
+    }
+  };
+  const communityLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many community requests. Please wait a minute.' } });
+  app.use('/api/public', communityLimiter);
+  app.get('/api/public/trainers', communityOperation(req => repo.community.directory(req.query.after === undefined ? 0 : v.id(req.query.after))));
+  async function publicTrainer(req) {
+    const user = await repo.community.findTrainer(community.username(req.params.username));
+    if (!user) throw new v.HttpError(404, 'Trainer profile unavailable.');
+    const settings = await repo.community.settings(user.id);
+    if (!settings.enabled) throw new v.HttpError(404, 'Trainer profile unavailable.');
+    return { user, settings };
+  }
+  app.get('/api/public/trainers/:username', communityOperation(async req => {
+    const { user, settings } = await publicTrainer(req);
+    return { profile: await community.profile(repo, user, settings) };
+  }));
+  app.get('/api/public/trainers/:username/teams', communityOperation(async req => {
+    const { user, settings } = await publicTrainer(req);
+    return { teams: (await community.profile(repo, user, { ...settings, shareProgress: false, shareAchievements: false, shareFavorites: false })).teams };
+  }));
+  app.get('/api/public/trainers/:username/avatar', async (req, res) => {
+    const { user, settings } = await publicTrainer(req);
+    if (!settings.shareAvatar || !avatarPattern.test(user.avatar_filename || '')) throw new v.HttpError(404, 'Image not found.');
+    res.sendFile(path.join(config.uploadDir, user.avatar_filename));
+  });
+  app.get('/api/public/teams/:shareId', communityOperation(async req => {
+    const team = await repo.community.publicTeam(community.shareId(req.params.shareId));
+    return { team, analysis: teamAnalysis.analyze(team.pokemonIds, speciesData, typeChart.resources) };
+  }));
   app.use('/api', async (req, res, next) => {
     const user = req.session.userId ? await repo.user(req.session.userId) : null;
     if (!user) return next(new v.HttpError(401, 'Please log in to continue.'));
@@ -97,6 +135,16 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     next();
   });
   app.get('/api/profile', (req, res) => res.json({ user: publicUser(req.user) }));
+  app.get('/api/community/settings', communityOperation(async req => ({ settings: await repo.community.settings(req.user.id) })));
+  app.put('/api/community/settings', communityOperation(async req => ({ settings: await repo.community.saveSettings(req.user.id, community.settings(req.body)) })));
+  app.get('/api/community/preview', communityOperation(async req => ({ profile: await community.profile(repo, req.user, await repo.community.settings(req.user.id), true) })));
+  app.get('/api/teams/:id/visibility', communityOperation(req => repo.community.teamSettings(req.user.id, v.id(req.params.id))));
+  app.put('/api/teams/:id/visibility', communityOperation(req => repo.community.share(req.user.id, v.id(req.params.id), community.visibility(req.body))));
+  app.get('/api/teams/:id/analysis', async (req, res) => {
+    const team = (await repo.teams(req.user.id)).find(t => t.id === v.id(req.params.id));
+    if (!team) throw new v.HttpError(404, 'Team not found.');
+    res.json({ analysis: teamAnalysis.analyze(team.pokemonIds, speciesData, typeChart.resources) });
+  });
   app.patch('/api/profile', async (req, res) => {
     v.object(req.body);
     const user = await repo.updateBio(req.user.id, v.text(req.body.bio, 'Trainer bio', 0, 500));
@@ -159,20 +207,30 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'artwork-fallback.svg']) {
+  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
-  app.get('/media/avatars/:filename', (req, res, next) => {
+  app.get('/media/avatars/:filename', async (req, res, next) => {
     if (!avatarPattern.test(req.params.filename)) return next(new v.HttpError(404, 'Image not found.'));
-    res.set('Cache-Control', 'public, max-age=86400');
+    // Existing avatar URLs are owner-only. Public pictures use a revocable profile route.
+    const owner = req.session.userId ? await repo.user(req.session.userId) : null;
+    if (!owner || owner.avatar_filename !== req.params.filename) throw new v.HttpError(404, 'Image not found.');
+    res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(config.uploadDir, req.params.filename));
   });
   app.get('/pokemon.html', (req, res) => res.sendFile(path.join(root, 'pokemon.html')));
   app.get('/dashboard.html', (req, res) => res.sendFile(path.join(root, 'dashboard.html')));
   app.get('/data/pokemon-summary.json', (req, res) => res.sendFile(path.join(root, 'data/pokemon-summary.json')));
+  app.get('/data/type-chart.json', (req, res) => res.sendFile(path.join(root, 'data/type-chart.json')));
   app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(root, 'vendor/chart.umd.js')));
   app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
+  app.get('/community.html', (req, res) => res.sendFile(path.join(root, 'community.html')));
+  for (const route of ['/trainer/:username', '/team/:shareId']) app.get(route, async (req, res) => {
+    // Relative assets still work in a static subpath; clean backend URLs use the root.
+    const html = await fs.readFile(path.join(root, 'community.html'), 'utf8');
+    res.set('Cache-Control', 'no-store').type('html').send(html.replace('<head>', '<head>\n    <base href="/">'));
+  });
   for (const view of ['profile', 'teams', 'favorites']) app.get(`/${view}`, (req, res) => res.redirect(302, `trainers.html#view=${view}`));
   for (const page of ['/', '/index.html']) app.get(page, (req, res) => res.sendFile(path.join(root, 'index.html')));
   app.use((req, res) => res.status(404).json({ error: 'Page not found.' }));

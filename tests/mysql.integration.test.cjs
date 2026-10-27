@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-test('real MySQL: constraints, ownership, atomic updates, favorites and session persistence', { skip: process.env.RUN_MYSQL_TESTS !== '1' }, async () => {
+test('real MySQL: constraints, ownership, atomic updates, sharing revocation and session persistence', { skip: process.env.RUN_MYSQL_TESTS !== '1' }, async () => {
   const mysql = require('mysql2/promise');
   const argon2 = require('argon2');
   const { configFromEnv } = require('../server/config');
@@ -39,6 +39,29 @@ test('real MySQL: constraints, ownership, atomic updates, favorites and session 
     assert.deepEqual(await repo.favorites(alice.id),[25]);assert.deepEqual(await repo.favorites(bob.id),[]);
     await repo.favorite(alice.id,649,true);assert.deepEqual(await repo.favorites(alice.id),[25,649]);
     await assert.rejects(repo.favorite(alice.id,650,true));
+    // Requires the manually reviewed v0.6.0 schema. Never creates/migrates tables.
+    const community = require('../server/community');
+    assert.deepEqual(await repo.community.settings(alice.id), community.defaults());
+    assert.equal(await repo.community.findTrainer(alice.username), null);
+    assert.deepEqual(await repo.community.teamSettings(alice.id,team.id), {visibility:'private',shareId:null});
+    await assert.rejects(repo.community.share(bob.id,team.id,'public'),/not found/);
+    await assert.rejects(repo.community.saveSettings(bob.id,{...community.defaults(),featuredTeamId:team.id}),/not found/);
+    await repo.community.saveSettings(alice.id,{...community.defaults(),enabled:true,shareProgress:true,publicBio:'Public integration biography',featuredTeamId:team.id});
+    const sharing = await repo.community.share(alice.id,team.id,'public');
+    const reopenedRepo = new Repository(pool);
+    assert.equal((await reopenedRepo.community.settings(alice.id)).enabled,true);
+    assert.equal((await reopenedRepo.community.publicTeam(sharing.shareId)).username,alice.username);
+    assert.deepEqual((await reopenedRepo.community.publicTeam(sharing.shareId)).pokemonIds,final.pokemonIds);
+    await repo.progression.set(alice.id,6,'caught');
+    assert.equal((await repo.community.publicProgress(alice.id)).statistics.national.caught,1);
+    const projection=await community.profile(repo,alice,await repo.community.settings(alice.id));
+    assert.equal(projection.statistics.national.caught,1);assert.ok(!('collection'in projection));assert.ok(!('email'in projection));
+    await assert.rejects(pool.execute('UPDATE trainer_public_settings SET enabled = 2 WHERE user_id = ?',[alice.id]));
+    await repo.community.share(alice.id,team.id,'private');
+    await assert.rejects(repo.community.publicTeam(sharing.shareId),/unavailable/);
+    assert.equal((await community.profile(repo,alice,await repo.community.settings(alice.id))).featuredTeamId,null);
+    await repo.community.saveSettings(alice.id,community.defaults());
+    assert.equal(await repo.community.findTrainer(alice.username),null);
     await new Promise((resolve,reject)=>store.set(sid,{userId:alice.id,cookie:{expires:new Date(Date.now()+60000)}},e=>e?reject(e):resolve()));
     const reopened = new MySQLSessionStore(pool);
     const data = await new Promise((resolve,reject)=>reopened.get(sid,(e,data)=>e?reject(e):resolve(data)));
@@ -47,6 +70,7 @@ test('real MySQL: constraints, ownership, atomic updates, favorites and session 
     assert.deepEqual(await repo.teams(alice.id),[]);
     const [remainingMembers]=await pool.execute('SELECT pokemon_id FROM team_pokemon WHERE team_id = ?',[team.id]);
     assert.deepEqual(remainingMembers,[]);
+    const [remainingSharing]=await pool.execute('SELECT team_id FROM team_sharing WHERE team_id = ?',[team.id]);assert.deepEqual(remainingSharing,[]);
     await assert.rejects(repo.deleteTeam(alice.id,team.id),/not found/);
   } finally {
     try {

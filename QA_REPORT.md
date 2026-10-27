@@ -1,6 +1,6 @@
 # Pokédex QA review
 
-This report records successive project stages. The **Dexhaven v0.5.0 trainer progression** section at the end describes the current version and latest verification; earlier sections document previous reviews.
+This report records successive project stages. The **Dexhaven v0.6.0 trainer community** section at the end describes the current version and latest verification; earlier sections document previous reviews.
 
 Reviewed search, filtering, sorting, details, loading, API failures, cache behavior, accessibility, keyboard interaction, and responsive geometry. The design and existing features are preserved; each development stage below records its dependency and verification scope.
 
@@ -246,3 +246,16 @@ Verified on 27 October 2026 on `dev/v0.5.0`. Existing uncommitted v0.4.0 work wa
 - No implementation commit, push, deployment or release was created.
 
 Before release: back up and review/apply the migration manually when approved, verify its constraints and unchanged existing records in MySQL, restart Express, then test a real existing account at `/pokemon.html`, `/trainers.html#progress` and `/trainers.html#achievements`. Check status changes across refresh/login, profile/avatar, team/favourite operations and navigation. Real touch, screen-reader, Safari and Firefox checks remain manual.
+
+
+## Dexhaven v0.6.0 trainer community
+
+Verified on 27 October 2026 on branch dev/v0.6.0, preserving the existing uncommitted homepage styling. Package and root lockfile versions are 0.6.0. No migration, live MySQL writes, implementation commit, push, deployment or release was performed.
+
+- Implemented opt-in public profiles/directory, separate public biography, featured species/team, four optional sharing flags, saved owner-only preview, independent team visibility and stable UUID links. Missing settings stay private; public responses explicitly project approved fields. Public pictures check profile/avatar opt-in per request, while original upload URLs are owner-only. Public aggregate statistics exclude collection records/recent activity. Shared teams remain separately public when a profile is disabled, as stated in the UI.
+- Protected sharing/settings endpoints reuse session-derived ownership and CSRF/origin checks. Production SQL uses bound values, owned-team row locks, transactions/rollback, foreign keys/unique/check constraints and disabled defaults. Public reads are bounded/rate limited and no-store. Clean public routes serve local assets correctly; static previews show a backend requirement.
+- Team analysis reuses the Encyclopedia modern type calculation with 18 official Pok?API resources retrieved read-only. Tests validate reciprocity, all multiplier categories including dual-type/immunity cases, exact incomplete-team averages, totals, type diversity and offensive type potential. Public saved and private draft analysis share the calculation; empty slots never count. Charts have interactive measures, tooltips, theme updates and exact keyboard-accessible tables/matrix, including missing-library fallback.
+- npm.cmd test: **73 passed, one opt-in live-MySQL test skipped, zero failed**. New tests exercise two-account authorization, default-private projections, optional fields/avatar revocation, guessed links, forged settings/CSRF, featured-team ownership, revocation/deletion, clean routes/allowlists, rate limiting, missing-schema errors and transaction rollback/schema consistency. The opt-in MySQL suite is extended for real settings persistence, flags, public progress, revocation and sharing cascades, but was not executed.
+- npm.cmd run test:browser: **58/58 passed** in isolated real headless Chrome. Retains all prior checks and adds draft analysis/update-without-saving, charts/matrix, public settings/preview/literal biography rendering, sharing/copyable link and logged-out deep links, visibility revocation, optional public picture/sections, public mobile layouts/both themes/keyboard scrolling, chart-library failure and static backend-required handling. Two-account browser session switching and existing auth/profile/upload/team/favourite/progression/catalogue/Encyclopedia/dashboard checks remain. No uncaught script exceptions were observed.
+- Browser QA exposed an initial hub-data readiness race and narrow-screen canvas overflow; both were fixed and the complete suite then passed. Visually inspected community-team.png from the isolated QA screenshot directory; external artwork/fonts are intentionally blocked by the harness and existing image fallbacks render.
+- Reviewed additive migration SQL without executing it. Schema matching and SQL mocks do not validate an installed MySQL server. Follow database/MIGRATION_v0.6.0.md and COMMUNITY.md for backup, manual execution, original-record counts, constraints and real-account persistence checks. Real touch/screen-reader and Safari/Firefox checks remain manual.

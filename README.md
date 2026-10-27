@@ -1,10 +1,14 @@
-# Dexhaven v0.5.0 — Trainer Progression & Pokédex Completion
+# Dexhaven v0.6.0 — Trainer Community & Advanced Team Analysis
 
 The public website is **Dexhaven**; the development project remains **Pokédex Website** and its MySQL database remains **pokedex_app**. Explore all **649 species from Generations I–V** with the existing vanilla HTML/CSS/JavaScript frontend and Node.js/Express/MySQL backend. Trainer accounts, profiles, uploads, multiple six-member teams, favourites and both themes are preserved. No frontend framework or build step.
 
 Version **0.2.0** introduced the National Pokédex expansion. Version **0.2.1** separated the homepage from the catalogue. Version **0.2.2** centralized the existing profile, teams and favourites in the dedicated Trainer Hub at `trainers.html`. Version **0.3.0** added a public statistics dashboard, advanced stat filters/sorts and two-Pokémon comparisons. Version **0.4.0** expanded the shared detail dialog with evolution families, game-specific moves, modern type matchups and English Pokédex/species information. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) for rules, cache behavior, shareable links and verification steps. See [ANALYTICS.md](ANALYTICS.md) for data provenance, formulas, refresh instructions and feature testing. See [RELEASE_NOTES.md](RELEASE_NOTES.md). Version **0.5.0** adds personal Seen/Caught tracking, completion statistics and permanent server-verified achievements. It requires the additive [manual v0.5.0 migration](database/MIGRATION_v0.5.0.md); it is never applied automatically. See [PROGRESSION.md](PROGRESSION.md) for storage, APIs, achievement policy and testing.
 
 ## Run locally
+
+Version **0.6.0** adds optional public profiles, independently shareable teams, private visibility controls and modern type-based team analysis. Read [COMMUNITY.md](COMMUNITY.md) for the public/private API, privacy model, exact calculations, file list and manual verification. Existing accounts and teams remain private. Custom homepage artwork, hero effects and previous trainer/Pokédex features are preserved.
+
+**Existing v0.5.0 installation:** review [database/MIGRATION_v0.6.0.md](database/MIGRATION_v0.6.0.md) and manually apply its two additive settings tables when approved. No migrations are run automatically. Older upgrades must follow their earlier migration guides first, then this v0.6.0 guide. Public content requires Express; the static preview explains that requirement. Private analysis needs no new analysis records.
 
 **Existing v0.2.0–v0.4.0 installation:** preserve your database, `.env` and uploads. Review [database/MIGRATION_v0.5.0.md](database/MIGRATION_v0.5.0.md) and manually apply the two new tables in Workbench when approved. Until then, tracking reports an actionable unavailable state; existing public/account features remain usable.
 
@@ -19,11 +23,16 @@ npm.cmd ci
 npm.cmd start
 ```
 
-Open **http://localhost:3000/** for the homepage and **http://localhost:3000/pokemon.html** for the National Pokédex, and **http://localhost:3000/trainers.html** for the Trainer Hub. Open **http://localhost:3000/dashboard.html** for public analytics and comparisons. Stop with Ctrl+C. Use `npm.cmd run dev` for automatic server restarts during development. Use Express for the full application; Live Server and Python do not provide the account API.
+Open **http://localhost:3000/** for the homepage and **http://localhost:3000/pokemon.html** for the National Pokédex, and **http://localhost:3000/trainers.html** for the Trainer Hub. Open **http://localhost:3000/dashboard.html** for public analytics and comparisons. Open **http://localhost:3000/community.html** for opt-in trainers; shared links use `/trainer/username` and `/team/UUIDv4` through Express. Stop with Ctrl+C. Use `npm.cmd run dev` for automatic server restarts during development. Use Express for the full application; Live Server and Python do not provide the account API.
 
 The existing catalogue needs internet on its first uncached index load. Dashboard charts, rankings and comparisons use a complete local PokéAPI snapshot. Artwork remains external with existing fallbacks. Optional Google Fonts fall back to system fonts.
 
 ## Project structure
+
+- `community.html`, `community.js`: opt-in trainer directory, public profiles/teams, owner-only sharing settings and saved-profile preview.
+- `team-analysis-data.js`, `team-analysis.js`, `data/type-chart.json`: shared exact modern matchup calculations, interactive Chart.js views, accessible matrices/tables and official 18-type data.
+- `server/community.js`, `server/community-repository.js`: strict public projections/validation and transactional settings/sharing queries.
+- `database/migrations/v0.6.0-trainer-community.sql`, `database/MIGRATION_v0.6.0.md`: additive manual-only settings migration and Workbench instructions.
 
 - `index.html`: dedicated homepage with the original hero, founder artwork and caption, plus introductions to the catalogue, trainer tools and analytics.
 - `pokemon.html`: the complete National Pokédex collection, generation/search/type/sort controls, advanced stat ranges and loading/error states.
@@ -99,7 +108,7 @@ To test: toggle both ways, reload, emulate the opposite system preference in bro
 
 ### Static/GitHub Pages preview
 
-The public catalogue and analytics work without Express, including generation/search/type/stat/sort controls, comparisons, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `dashboard.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg`, `images/group-picture.png`, `pokemon-data.js`, `advanced-filters.js`, `dashboard.js`, `encyclopedia-data.js`, `encyclopedia.js`, `trainer-progress.js`, `data/pokemon-summary.json` and `vendor/chart.umd.js` at the same relative paths. The custom hero artwork and founder caption are preserved.
+The public catalogue and analytics work without Express, including generation/search/type/stat/sort controls, comparisons, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `dashboard.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg`, `images/group-picture.png`, `pokemon-data.js`, `advanced-filters.js`, `dashboard.js`, `encyclopedia-data.js`, `encyclopedia.js`, `trainer-progress.js`, `community.html`, `community.js`, `team-analysis.js`, `team-analysis-data.js`, `data/type-chart.json`, `data/pokemon-summary.json` and `vendor/chart.umd.js` at the same relative paths. The custom hero artwork and founder caption are preserved.
 
 For a local static preview:
 
@@ -138,5 +147,7 @@ The optional `mysql.integration.test.cjs` is skipped unless `RUN_MYSQL_TESTS=1` 
 12. Open `/pokemon.html?pokemon=133`, inspect the full evolution family and the reference-only #700 branch; test Moves with a specific game group, Type Matchups and the English game-entry selector. Confirm favourite/team actions and previous/next navigation remain usable. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) for representative checks across all five generations.
 
 13. After the approved migration, mark Seen/Caught from cards and details; combine personal filters with public filters; inspect `trainers.html#view=progress` and `#view=achievements`; verify permanent unlock dates after removing records and cross-tab/account isolation. [PROGRESSION.md](PROGRESSION.md) has the full manual flow.
+
+14. After the approved v0.6.0 migration, use two trainer accounts and a logged-out browser to test opt-in profiles, each sharing flag, saved preview, team links and revocation, ownership isolation, draft/public analysis, responsive charts/matrix and real MySQL persistence. See [COMMUNITY.md](COMMUNITY.md#manual-verification).
 
 Data and artwork: https://pokeapi.co/. Unofficial fan project; Pokémon belongs to Nintendo / Game Freak.

@@ -1,5 +1,18 @@
 # Dexhaven release notes
 
+## v0.6.0 — Trainer Community & Advanced Team Analysis
+
+- Added the opt-in Community directory, clean `/trainer/username` and `/team/UUIDv4` public views and a shared read-only shell. Existing usernames stay unique and immutable; unavailable/private profiles and teams fail gracefully. Static previews explain the backend requirement.
+- Added owner-only settings and saved preview for a separate public biography, featured Pokémon/team, optional avatar/favourites/completion/achievement sharing. Existing accounts stay private. Public APIs allowlist approved fields and omit email, private biography, individual collection records, recent activity, secrets and settings.
+- Added independent per-team visibility with stable UUID links, immediate server-side revocation, row-locked ownership checks, existing CSRF protection, rate-limited public reads and no-store responses. Sharing reuses existing teams; no analysis records are stored. Original avatars are now owner-only; public images require a revocable opt-in profile route.
+- Added private draft and public saved-team analysis using the Encyclopedia's modern type calculation and 18 bundled official PokéAPI type resources: dual-type defensive multipliers/counts, six-slot matrix, type-based offensive potential, actual averages/totals/type diversity, narrative counts, interactive theme-aware Chart.js views and accessible exact tables/fallbacks.
+- Fixed a trainer-hub restore race exposed by browser QA: profile/team/favourite views wait for owned data, stale identity responses are ignored, and initial failures offer a retry. Fixed narrow-screen chart overflow while preserving horizontal matrix scrolling.
+- Prepared additive, disabled-by-default settings tables in the fresh schema and a separate [manual migration](database/MIGRATION_v0.6.0.md). No migration or live MySQL write was executed. Updated package/lock versions to **0.6.0**, navigation and [community/API documentation](COMMUNITY.md); carried existing uncommitted homepage changes onto `dev/v0.6.0`.
+
+Validation: **73 automated tests passed, one opt-in live-MySQL test skipped**, and **58/58 Chrome browser checks passed**. Tests include two-account privacy/ownership, avatar/section opt-in, profile/team revocation, schema consistency/transaction rollback, exact calculations, draft updates, shared navigation, no-chart fallback and both themes/mobile. Visually inspected the public-team layout. Fixtures/static SQL checks do not prove live MySQL execution. Follow [COMMUNITY.md](COMMUNITY.md#manual-verification) after the reviewed migration; real existing-account persistence, MySQL constraints, touch/screen-reader and Safari/Firefox checks remain manual.
+
+No implementation commit, push, deployment or release was created. Existing public pages, catalogue/Encyclopedia/analytics, accounts/uploads/teams/favourites/progression/awards and custom founder artwork are preserved.
+
 ## v0.5.0 — Trainer Progression & Pokédex Completion
 
 - Added personal Not registered/Seen/Caught controls on shared Pokémon cards and detail dialogs. Caught automatically counts as Seen, repeated status writes are idempotent and removing a registration clears only current collection progress.

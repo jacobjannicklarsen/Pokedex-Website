@@ -11,7 +11,7 @@ test('Dexhaven branding and custom hero are preserved',()=>{
   assert.match(html,/src="\.\/images\/group-picture\.png"/);
   const hash=crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'../images/group-picture.png'))).digest('hex');
   assert.equal(hash,'2d2aa845789f32e5b7188dcf0ef7b71b74eef671f0ffb9987cfe1869db14138f');
-  assert.equal(JSON.parse(read('package.json')).version,'0.5.0');
+  assert.equal(JSON.parse(read('package.json')).version,'0.6.0');
 });
 test('manual migration widens two checks without recreating or deleting data',()=>{
   const sql=read('database/migrations/v0.2.0-national-pokedex.sql');
@@ -50,5 +50,5 @@ test('v0.5.0 preserves shared layout, trainer isolation and four-page navigation
   assert.ok(hub.includes('id="trainer-invitation"'));
   assert.match(hub,/<title>Trainer Hub — Dexhaven<\/title>/);
   const lock=JSON.parse(read('package-lock.json'));
-  assert.equal(lock.version,'0.5.0');assert.equal(lock.packages[''].version,'0.5.0');
+  assert.equal(lock.version,'0.6.0');assert.equal(lock.packages[''].version,'0.6.0');
 });

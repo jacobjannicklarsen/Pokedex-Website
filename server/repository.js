@@ -2,8 +2,9 @@
 const { HttpError } = require('./validation');
 const { ProgressionRepository } = require('./progression-repository');
 const { awardTeamBuilder } = require('./progression');
+const { CommunityRepository } = require('./community-repository');
 class Repository {
-  constructor(pool) { this.pool = pool; this.progression = new ProgressionRepository(pool); }
+  constructor(pool) { this.pool = pool; this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); }
   async user(id) {
     const [rows] = await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?', [id]);
     return rows[0] || null;

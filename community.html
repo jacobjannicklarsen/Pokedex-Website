@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10171e">
+    <meta name="description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
+    <meta property="og:site_name" content="Dexhaven">
+    <meta property="og:title" content="Trainer Hub — Dexhaven">
+    <meta property="og:description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Trainer Hub — Dexhaven">
+    <meta name="twitter:description" content="Manage your Dexhaven trainer profile, six-Pokémon teams and favourite Pokémon.">
+    <title>Trainer Hub — Dexhaven</title>
+    <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <script src="encyclopedia-data.js" defer></script>
+    <script src="pokemon-data.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="encyclopedia.js" defer></script>
+    <script src="pokemon-selector.js" defer></script>
+    <script src="trainer-progress.js" defer></script>
+    <script src="vendor/chart.umd.js" defer></script>
+    <script src="team-analysis-data.js" defer></script>
+    <script src="team-analysis.js" defer></script>
+    <script src="community.js" defer></script>
+    <script src="account.js" defer></script>
+</head>
+<body data-page="community">
+
+  <header class="site-header">
+    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a>
+    <span class="header-label">FIVE GENERATIONS. YOUR CHOICES.</span>
+    <div class="header-actions">
+      <span class="region"><i></i>Change theme</span>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" hidden>
+        <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
+      </button>
+      <a id="header-profile" class="header-profile" href="trainers.html#view=profile" aria-label="Open trainer profile" data-requires-auth hidden>
+        <img id="header-avatar" alt="" width="36" height="36" hidden>
+        <span id="header-avatar-initial" aria-hidden="true"></span>
+      </a>
+    </div>
+  </header>
+  <nav class="trainer-nav" aria-label="Main navigation">
+    <a href="./" data-page="home">Home</a>
+    <a href="pokemon.html" data-page="pokemon">National Pokédex</a>
+    <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="community.html" data-page="community" aria-current="page">Community</a>
+    <a href="dashboard.html" data-page="dashboard">Analytics</a>
+    <span id="session-status" class="form-help" role="status">Checking session…</span>
+    <div id="guest-actions" class="guest-actions" hidden>
+      <button id="account-button" class="text-button" type="button">Log in</button>
+      <button id="register-button" class="text-button" type="button">Register</button>
+    </div>
+    <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
+  </nav>
+  <main id="main">
+    <header class="hub-intro"><p class="eyebrow">SHARE YOUR JOURNEY</p><h1>Trainer community<span>.</span></h1><p class="hero-description">A place for your lineup, your discoveries and your next inspiration.</p><a class="text-button" href="trainers.html">My private Trainer Hub</a> ? <a class="text-button" href="community.html">Public trainers</a></header>
+    <p id="account-message" class="account-message" role="status" aria-live="polite" hidden></p>
+    <section id="community-content" aria-live="polite" aria-label="Shared trainer content"></section>
+    <noscript><p class="notice">Enable JavaScript to view shared trainers and teams. Public community content requires the Express backend.</p></noscript>
+  </main>
+  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
+  <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <button id="close-auth" class="close-button" type="button" aria-label="Close account form">×</button>
+    <form id="auth-form" class="account-form">
+      <p class="eyebrow">WELCOME TO DEXHAVEN</p><h2 id="auth-title">Log in</h2>
+      <label id="username-label" hidden>Username<input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+"></label>
+      <label id="email-label" hidden>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254"></label>
+      <label id="identifier-label">Username or email<input id="auth-identifier" name="identifier" autocomplete="username" maxlength="254" required></label>
+      <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <p id="password-help" class="form-help" hidden>Use 12–128 characters. Usernames use letters, numbers and underscores.</p>
+      <p id="auth-error" class="form-error" role="alert" hidden></p>
+      <button id="auth-submit" class="action-button" type="submit">Log in</button>
+      <button id="auth-switch" class="text-button" type="button">New here? Create an account</button>
+    </form>
+  </dialog>
+    
+</body>
+</html>
