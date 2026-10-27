@@ -1,12 +1,14 @@
-# Dexhaven v0.3.0 — Pokémon Analytics & Advanced Filtering
+# Dexhaven v0.5.0 — Trainer Progression & Pokédex Completion
 
 The public website is **Dexhaven**; the development project remains **Pokédex Website** and its MySQL database remains **pokedex_app**. Explore all **649 species from Generations I–V** with the existing vanilla HTML/CSS/JavaScript frontend and Node.js/Express/MySQL backend. Trainer accounts, profiles, uploads, multiple six-member teams, favourites and both themes are preserved. No frontend framework or build step.
 
-Version **0.2.0** introduced the National Pokédex expansion. Version **0.2.1** separated the homepage from the catalogue. Version **0.2.2** centralized the existing profile, teams and favourites in the dedicated Trainer Hub at `trainers.html`. Version **0.3.0** adds a public statistics dashboard, advanced stat filters/sorts and two-Pokémon comparisons. See [ANALYTICS.md](ANALYTICS.md) for data provenance, formulas, refresh instructions and feature testing. See [RELEASE_NOTES.md](RELEASE_NOTES.md). No MySQL schema change is required when upgrading from v0.2.0, v0.2.1 or v0.2.2.
+Version **0.2.0** introduced the National Pokédex expansion. Version **0.2.1** separated the homepage from the catalogue. Version **0.2.2** centralized the existing profile, teams and favourites in the dedicated Trainer Hub at `trainers.html`. Version **0.3.0** added a public statistics dashboard, advanced stat filters/sorts and two-Pokémon comparisons. Version **0.4.0** expanded the shared detail dialog with evolution families, game-specific moves, modern type matchups and English Pokédex/species information. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) for rules, cache behavior, shareable links and verification steps. See [ANALYTICS.md](ANALYTICS.md) for data provenance, formulas, refresh instructions and feature testing. See [RELEASE_NOTES.md](RELEASE_NOTES.md). Version **0.5.0** adds personal Seen/Caught tracking, completion statistics and permanent server-verified achievements. It requires the additive [manual v0.5.0 migration](database/MIGRATION_v0.5.0.md); it is never applied automatically. See [PROGRESSION.md](PROGRESSION.md) for storage, APIs, achievement policy and testing.
 
 ## Run locally
 
-**Existing v0.1.0 installation:** preserve your `.env`, database and uploads. Follow the [manual migration instructions](database/MIGRATION_v0.2.0.md) to widen the two existing ID CHECKs. The migration is never executed automatically. Re-importing `schema.sql` does not update existing CHECKs.
+**Existing v0.2.0–v0.4.0 installation:** preserve your database, `.env` and uploads. Review [database/MIGRATION_v0.5.0.md](database/MIGRATION_v0.5.0.md) and manually apply the two new tables in Workbench when approved. Until then, tracking reports an actionable unavailable state; existing public/account features remain usable.
+
+**Existing v0.1.0 installation:** preserve your `.env`, database and uploads. Follow the [manual migration instructions](database/MIGRATION_v0.2.0.md) to widen the two existing ID CHECKs, then follow the manual v0.5.0 migration. The migration is never executed automatically. Re-importing `schema.sql` does not update existing CHECKs.
 
 **New installation:** follow [WINDOWS_SETUP.md](WINDOWS_SETUP.md), configure `.env` with your actual credentials, and import [database/schema.sql](database/schema.sql), which already supports #001–649.
 
@@ -28,6 +30,10 @@ The existing catalogue needs internet on its first uncached index load. Dashboar
 - `trainers.html`: Trainer Hub with a guest sign-in invitation and authenticated Profile, My Teams and My Favourites sections; the existing account forms and six-slot selector are reused.
 - `dashboard.html`, `dashboard.js`: public generation/type/stat charts, numeric top-ten rankings and searchable comparisons with accessible tables.
 - `pokemon-data.js`, `data/pokemon-summary.json`: validated complete PokéAPI data, deterministic calculations, shared loader and inclusive filter predicates.
+- `trainer-progress.js`: authenticated in-memory collection state, card/detail controls, personal filters, private progress/achievement views and cross-tab session-aware synchronization. No private progress is stored in localStorage.
+- `server/progression.js`, `server/progression-repository.js`: server-derived completion/achievement rules and transactional MySQL collection/award persistence.
+- `database/migrations/v0.5.0-trainer-progression.sql`: additive, manual-only collection/achievement table creation.
+- `encyclopedia.js`, `encyclopedia-data.js`: six-section shared detail UI and on-demand PokéAPI species/evolution/move/type resources, validated seven-day caches and a four-request scheduler. Shareable entries use `pokemon.html?pokemon=25`.
 - `advanced-filters.js`: collapsible seven-stat min/max controls, validation, retry and sorting readiness.
 - `scripts/update-pokemon-data.cjs`: explicit maintenance updater; four concurrent read-only PokéAPI requests, complete validation and atomic snapshot replacement.
 - `vendor/chart.umd.js`, `vendor/Chart.js.LICENSE.md`, `scripts/vendor-chart.cjs`: locally served pinned Chart.js bundle, MIT license and vendor refresh helper.
@@ -49,7 +55,7 @@ Accounts use Argon2id passwords, HTTP-only SameSite session cookies, login sessi
 
 ### Team selection and account navigation
 
-All four pages share Home, National Pokédex, Trainer Hub and Analytics links, optional Log in/Register, the theme toggle and the logged-in trainer's header avatar. The current page and hub section are indicated with `aria-current`. Profile, My Teams and My Favourites links live inside the hub and stay hidden until authentication is confirmed. The hub is publicly accessible, with a sign-in/create-account invitation for guests; private account data and forms require login. The Dashboard is public and uses only species data; trainer account data remains private.
+All four pages share Home, National Pokédex, Trainer Hub and Analytics links, optional Log in/Register, the theme toggle and the logged-in trainer's header avatar. The current page and hub section are indicated with `aria-current`. Profile, My Teams, My Favourites, Pokédex Progress and Achievements links live inside the hub and stay hidden until authentication is confirmed. The hub is publicly accessible, with a sign-in/create-account invitation for guests; private account data and forms require login. The Dashboard is public and uses only species data; trainer account data remains private.
 
 Navigation and avatar links use relative HTML paths, including on repository-subpath previews. The top-right avatar opens the hub's Profile section, uses an initial when no image is available and updates after uploads. Profile shows the existing username/email, editable biography, avatar upload and team/favourite summaries. Editing uses the existing `{bio}` API; username and email remain display fields. Obsolete trainer-management containers and selector-script loading were removed from the homepage and National Pokédex.
 
@@ -87,13 +93,13 @@ To test: toggle both ways, reload, emulate the opposite system preference in bro
 - Live detail endpoint requests occur **only when opening details**, with duplicate requests coalesced and results cached. Advanced filters and the dashboard also load the committed complete local summary snapshot; dashboard details/comparisons reuse that data. Legacy `kanto-pokedex-v1-*` detail caches remain compatible; existing theme/account/session keys are unchanged.
 - Search by partial name or exact number (`25`, `025`, `#025`), combined with generation, type and sorting. Generation ranges: Kanto 1–151, Johto 152–251, Hoenn 252–386, Sinnoh 387–493, Unova 494–649. Counts, headings and range labels update together.
 - Index/detail requests time out after 12 seconds. A failed species-list request stops immediately; sustained type errors stop the remaining queue. Retry loads only missing index resources. Partial type failures retain name/number/generation search and clearly identify incomplete type results.
-- Detail modals have loading, error and retry states; closed/stale responses cannot replace a newer selection. Height and weight are converted to meters and kilograms.
+- Detail modals have six keyboard-accessible sections with on-demand loading, error and retry states; closed/stale responses cannot replace a newer selection. Height and weight are converted to meters and kilograms.
 - Artwork falls back to a sprite, then a local SVG placeholder.
 - Native dialog supports keyboard navigation, Escape, and focus restoration.
 
 ### Static/GitHub Pages preview
 
-The public catalogue and analytics work without Express, including generation/search/type/stat/sort controls, comparisons, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `dashboard.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg`, `images/group-picture.png`, `pokemon-data.js`, `advanced-filters.js`, `dashboard.js`, `data/pokemon-summary.json` and `vendor/chart.umd.js` at the same relative paths. The custom hero artwork and founder caption are preserved.
+The public catalogue and analytics work without Express, including generation/search/type/stat/sort controls, comparisons, details and themes. Keep `index.html`, `pokemon.html`, `trainers.html`, `dashboard.html`, `script.js`, `pokemon-selector.js`, `account.js`, `theme.js`, `styles.css`, `artwork-fallback.svg`, `images/group-picture.png`, `pokemon-data.js`, `advanced-filters.js`, `dashboard.js`, `encyclopedia-data.js`, `encyclopedia.js`, `trainer-progress.js`, `data/pokemon-summary.json` and `vendor/chart.umd.js` at the same relative paths. The custom hero artwork and founder caption are preserved.
 
 For a local static preview:
 
@@ -120,7 +126,7 @@ The optional `mysql.integration.test.cjs` is skipped unless `RUN_MYSQL_TESTS=1` 
 1. Open the homepage and confirm the original hero and founder caption. As a guest, choose **Create an account** or **Already a member** to open registration or login; both hero buttons stay hidden when signed in. Choose **National Pokédex** in navigation or **Browse Pokémon** below the hero to open `pokemon.html`; confirm navigation highlights the current page. Wait for 649 cards; verify Bulbasaur (#001) and Genesect (#649). Developer tools should show no full `/pokemon/{id}/` requests until details open.
 2. Search `pika`, `25`, and `#025` to find Pikachu. Search `not-a-pokemon` for the empty state.
 3. Select each generation and verify counts 151, 100, 135, 107, 156. Combine Sinnoh with Dragon, then search `gible`. Reset and check all sort modes.
-4. Open Bulbasaur: height 0.7 m, weight 6.9 kg; stats 45, 49, 49, 65, 65, 45 (total 318). Check Grass/Poison and hidden ability label.
+4. Open Bulbasaur and choose Base Stats: height 0.7 m, weight 6.9 kg; stats 45, 49, 49, 65, 65, 45 (total 318). Check Grass/Poison and hidden ability label.
 5. Use Tab and Enter, close details with Escape, and confirm focus returns to the card. Press `/` to focus search.
 6. Check all four pages at desktop and 375px mobile widths, including dialog scrolling. Toggle the theme, switch pages and verify it persists. Register/log in on any page and verify the session, teams and favourites survive navigation between all four pages and refreshes. In the hub, test the guest invitation, direct section links and Back/Forward navigation. Confirm logout hides private forms and the header avatar immediately.
 7. Reload to check caching. To test a first-load failure, clear site storage in developer tools, enable Offline, and reload. Disable Offline and select Try again.
@@ -128,5 +134,9 @@ The optional `mysql.integration.test.cjs` is skipped unless `RUN_MYSQL_TESTS=1` 
 9. On an actual phone, check touch interactions, opening the keyboard, zoom, orientation changes, and scrolling the modal. Check Safari and Firefox separately.
 10. With a screen reader, verify announcements, type names, modal navigation, and focus restoration.
 11. After manually migrating, log in with an existing account and verify its avatar, teams and favourites. Add #649 to a team/favourites and confirm #650 is rejected. Six-member and duplicate protections remain unchanged.
+
+12. Open `/pokemon.html?pokemon=133`, inspect the full evolution family and the reference-only #700 branch; test Moves with a specific game group, Type Matchups and the English game-entry selector. Confirm favourite/team actions and previous/next navigation remain usable. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) for representative checks across all five generations.
+
+13. After the approved migration, mark Seen/Caught from cards and details; combine personal filters with public filters; inspect `trainers.html#view=progress` and `#view=achievements`; verify permanent unlock dates after removing records and cross-tab/account isolation. [PROGRESSION.md](PROGRESSION.md) has the full manual flow.
 
 Data and artwork: https://pokeapi.co/. Unofficial fan project; Pokémon belongs to Nintendo / Game Freak.

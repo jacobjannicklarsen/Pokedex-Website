@@ -12,6 +12,8 @@ const { MemoryRepository } = require('./support/memory-repository.cjs');
 const { createPokeFixture } = require('./support/pokeapi-fixture.cjs');
 const analytics = require('../pokemon-data');
 const snapshot = require('../data/pokemon-summary.json');
+const encyclopedia = require('../encyclopedia-data');
+const encyclopediaFixture = require('./fixtures/encyclopedia.json');
 const root = path.resolve(__dirname, '..');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const browserPath = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -30,7 +32,7 @@ async function main() {
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['index.html','pokemon.html','trainers.html','dashboard.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','pokemon-data.js','advanced-filters.js','dashboard.js','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['index.html','pokemon.html','trainers.html','dashboard.html','styles.css','script.js','theme.js','pokemon-selector.js','account.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -61,12 +63,12 @@ async function main() {
     pending.delete(message.id);
     message.error ? request.reject(Error(JSON.stringify(message.error))) : request.resolve(message.result);
   });
-  function command(method, params = {}) {
+  function command(method, params = {}, sessionId) {
     const id = ++nextId;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => { pending.delete(id); reject(Error(`CDP timeout: ${method}`)); }, 15000);
       pending.set(id, { resolve: (value) => { clearTimeout(timeout); resolve(value); }, reject: (error) => { clearTimeout(timeout); reject(error); } });
-      socket.send(JSON.stringify({ id, method, params }));
+      socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
     });
   }
   async function evaluate(expression) {
@@ -86,7 +88,7 @@ async function main() {
     throw Error(`Timed out: ${expression}`);
   }
   async function key(key, code, extra = {}) {
-    const windowsVirtualKeyCode = {Enter:13,Tab:9,Escape:27,ArrowDown:40,ArrowUp:38,'/':191}[key];
+    const windowsVirtualKeyCode = {Enter:13,Tab:9,Escape:27,ArrowDown:40,ArrowUp:38,ArrowLeft:37,ArrowRight:39,Home:36,End:35,'/':191}[key];
     await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, ...(key === 'Enter' ? { text: '\r' } : {}), ...extra });
     await command('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode, ...extra });
   }
@@ -99,10 +101,14 @@ async function main() {
   await command('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*raw.githubusercontent.com*'] });
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.qaRequests = 0; window.qaDetailRequests = 0; window.qaMode = 'ok'; window.qaSummaryRequests=0;window.qaSummaryMode='ok';
-    const fixture = (${createPokeFixture.toString()})();
+    window.qaResourceRequests={};window.qaResourceFailures=[];window.qaResourceDelay={};
+    window.qaProgressReads=0;window.qaFailCollectionRead=false;window.qaFailCollectionWrite=false;
+    const fixture = (${createPokeFixture.toString()})(${JSON.stringify(encyclopediaFixture.resources)});
     const originalFetch = window.fetch;
     window.fetch = async (url, options) => {
       const requestPath = new URL(String(url),location.href).pathname;
+      if(requestPath==='/api/pokedex'&&(!options?.method||options.method==='GET')){window.qaProgressReads++;if(window.qaFailCollectionRead)return {ok:false,status:503,json:async()=>({error:'Trainer progression is unavailable. Apply the manual v0.5.0 migration.'})};}
+      if(requestPath.startsWith('/api/pokedex/')&&['PUT','DELETE'].includes(options?.method)&&window.qaFailCollectionWrite)return {ok:false,status:503,json:async()=>({error:'Fixture collection save failure'})};
       if(requestPath.endsWith('/data/pokemon-summary.json')) {
         window.qaSummaryRequests++;
         await new Promise(resolve=>setTimeout(resolve,100));
@@ -116,6 +122,10 @@ async function main() {
         try{return await originalFetch(url,options)}finally{window.qaSessionPending=false}
       }
       if (!String(url).startsWith('https://pokeapi.co/api/v2/')) return originalFetch(url, options);
+      const resource=requestPath.split('/').filter(Boolean).slice(2).join('/');
+      window.qaResourceRequests[resource]=(window.qaResourceRequests[resource]||0)+1;
+      if(window.qaResourceDelay[resource])await new Promise(resolve=>setTimeout(resolve,window.qaResourceDelay[resource]));
+      if(window.qaResourceFailures.includes(resource))throw new TypeError('Fixture encyclopedia resource failure');
       window.qaRequests++;
       if (fixture.key(url).startsWith('pokemon-')) window.qaDetailRequests++;
       await new Promise(resolve => setTimeout(resolve, 5));
@@ -159,6 +169,9 @@ async function main() {
   await check('649 real DOM cards; 19 index requests and no eager full details', async () => {
     assert.equal(await evaluate(`document.querySelectorAll('.pokemon-card').length`), 649); assert.deepEqual(exceptions, []);
     assert.equal(await evaluate('window.qaRequests'),19);assert.equal(await evaluate('window.qaDetailRequests'),0);
+    assert.equal(await evaluate('window.qaProgressReads'),0);
+    assert.equal(await evaluate(`document.querySelector('#collection-filter').disabled`),true);
+    assert.equal(await evaluate(`[...document.querySelectorAll('[data-collection-id]')].every(n=>n.hidden)`),true);
   });
   await check('logged-out direct protected route shows a login prompt and Register opens registration',async()=>{
     await command('Page.navigate',{url:origin+'/teams'});
@@ -594,6 +607,149 @@ async function main() {
     await evaluate('dialog.close()');
     assert.deepEqual(exceptions,[]);
   });
+  await check('personal card/detail status controls and collection filters combine with every public filter',async()=>{
+    await command('Page.navigate',{url:origin+'/pokemon.html?qa=collection'});
+    await waitFor(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.disabled===false && !state.loading && state.statData?.size===649`);
+    assert.equal(await evaluate('window.qaProgressReads'),1);
+    const set=async(id,status,where='#pokemon-grid')=>{
+      await evaluate(`(()=>{const select=document.querySelector('${where} [data-collection-id="${id}"] select');select.value='${status}';select.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+      await waitFor(`document.querySelector('${where} [data-collection-id="${id}"] select')?.disabled===false && document.querySelector('${where} [data-collection-id="${id}"] select').value==='${status}'`);
+    };
+    const filter=async value=>evaluate(`document.querySelector('#collection-filter').value='${value}';document.querySelector('#collection-filter').dispatchEvent(new Event('change'))`);
+    await set(25,'seen');await filter('seen');assert.deepEqual(await evaluate('[...grid.children].map(n=>Number(n.dataset.id))'),[25]);
+    await filter('caught');assert.equal(await evaluate('grid.children.length'),0);assert.equal(await evaluate(`document.querySelector('#empty-state').hidden`),false);
+    await evaluate('showDetails(state.pokemon.get(25))');await set(25,'caught','#detail-content');
+    assert.deepEqual(await evaluate('[...grid.children].map(n=>Number(n.dataset.id))'),[25]);
+    const first=await evaluate(`fetch('/api/pokedex').then(r=>r.json())`);assert.equal(first.statistics.national.seen,1);assert.equal(first.statistics.national.caught,1);
+    await set(25,'caught','#detail-content');
+    assert.equal(await evaluate(`fetch('/api/pokedex').then(r=>r.json()).then(d=>d.collection.length)`),1);
+    await evaluate('dialog.close();resetFilters()');
+    await set(443,'seen');await set(445,'caught');
+    await filter('seen');
+    await evaluate(`document.querySelector('#generation').value='4';document.querySelector('#generation').dispatchEvent(new Event('change'));document.querySelector('[data-type="dragon"]').click();document.querySelector('#stat-attack-min').value='100';document.querySelector('#stat-speed-min').value='90';document.querySelector('#stat-speed-min').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#search').value='garch';document.querySelector('#search').dispatchEvent(new Event('input'));document.querySelector('#sort').value='stat:total:desc';document.querySelector('#sort').dispatchEvent(new Event('change'))`);
+    assert.deepEqual(await evaluate('[...grid.children].map(n=>Number(n.dataset.id))'),[445]);
+    await evaluate('resetFilters()');await filter('not-seen');assert.equal(await evaluate('grid.children.length'),646);
+    await filter('not-caught');assert.equal(await evaluate('grid.children.length'),647);
+    await evaluate('resetFilters()');assert.equal(await evaluate('grid.children.length'),649);
+    await evaluate(`window.qaFailCollectionWrite=true;const select=document.querySelector('#pokemon-grid [data-collection-id="445"] select');select.value='seen';select.dispatchEvent(new Event('change'))`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Fixture collection save failure'`);
+    assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="445"] select').value`),'caught');
+    await evaluate('window.qaFailCollectionWrite=false');
+    assert.deepEqual(exceptions,[]);
+  });
+  await check('private progress shows correct national/generation/type counts and server-earned achievements',async()=>{
+    await command('Page.navigate',{url:origin+'/trainers.html#view=progress'});
+    await waitFor(`document.querySelectorAll('#account-content .overview-card').length===8`);
+    const metrics=await evaluate(`Object.fromEntries([...document.querySelectorAll('#account-content .overview-card')].map(n=>[n.querySelector('p').textContent,n.querySelector('strong').textContent]))`);
+    assert.equal(metrics['Pokémon Seen'],'3');assert.equal(metrics['Pokémon Caught'],'2');assert.equal(metrics['Not Seen'],'646');assert.equal(metrics['Not Caught'],'647');
+    assert.equal(metrics['Caught completion'],(200/649).toFixed(2)+'%');
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-progress-generation="4"] progress')].map(n=>[n.value,n.max])`),[[2,107],[1,107]]);
+    assert.match(await evaluate(`document.querySelector('#account-content').textContent`),/not the different regional Pokédex lists/);
+    const dragon=await evaluate(`[...document.querySelectorAll('#account-content tbody tr')].find(n=>n.children[0].textContent==='Dragon')?.textContent`);assert.match(dragon,/Dragon21/);
+    assert.equal(await evaluate(`document.querySelectorAll('.recent-registration').length`),3);
+    await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),8);
+    assert.match(await evaluate(`document.querySelector('[data-achievement="first-catch"]').textContent`),/Unlocked/);
+    assert.match(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"]').textContent`),/Locked/);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('.team-create input').value='Progression Six';document.querySelector('.team-create').requestSubmit()`);
+    await waitFor(`document.querySelectorAll('.team-editor').length===1`);
+    for(const [slot,id] of [1,25,152,252,387,649].entries())await selectSlot(slot,'#'+id);
+    await evaluate(`document.querySelector('.team-editor').requestSubmit()`);
+    await waitFor(`document.querySelector('#account-message').textContent==='Team saved.'`);
+    await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
+    await waitFor(`document.querySelector('[data-achievement="team-builder"]')?.classList.contains('unlocked')`);
+    const unlocked=await evaluate(`document.querySelector('[data-achievement="team-builder"] time').dateTime`);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('.delete-team').click()`);
+    await waitFor(`document.querySelectorAll('.team-editor').length===0`);
+    await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
+    await waitFor(`document.querySelector('[data-achievement="team-builder"] progress')?.value===0`);
+    assert.equal(await evaluate(`document.querySelector('[data-achievement="team-builder"] time').dateTime`),unlocked);
+    assert.deepEqual(exceptions,[]);
+  });
+  await check('historical collector awards persist after removal, refresh and logout/login; private records never enter localStorage',async()=>{
+    await evaluate(`(async()=>{const auth=await(await fetch('/api/auth/session')).json();for(let id=1;id<=25;id++)await fetch('/api/pokedex/'+id,{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrfToken},body:JSON.stringify({status:'caught'})});await TrainerProgress.refresh()})()`);
+    await waitFor(`document.querySelector('[data-achievement="pokemon-collector"]')?.classList.contains('unlocked')`);
+    const date=await evaluate(`document.querySelector('[data-achievement="pokemon-collector"] time').dateTime`);
+    await evaluate(`(async()=>{const auth=await(await fetch('/api/auth/session')).json();const data=await(await fetch('/api/pokedex')).json();for(const row of data.collection)await fetch('/api/pokedex/'+row.pokemonId,{method:'DELETE',headers:{'X-CSRF-Token':auth.csrfToken}});await TrainerProgress.refresh()})()`);
+    assert.equal(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"] progress').value`),0);
+    assert.equal(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"] time').dateTime`),date);
+    await command('Page.reload');
+    await waitFor(`document.querySelector('[data-achievement="pokemon-collector"]')?.classList.contains('unlocked')`);
+    assert.equal(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"] time').dateTime`),date);
+    await evaluate(`document.querySelector('#logout-button').click()`);
+    await waitFor(`document.querySelector('#trainer-invitation').hidden===false`);
+    assert.equal(await evaluate(`document.querySelector('#account-content').children.length`),0);
+    await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='browser@example.test';document.querySelector('#auth-password').value='browser test password 123';document.querySelector('#auth-form').requestSubmit()`);
+    await waitFor(`document.querySelector('#logout-button').hidden===false`);
+    await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
+    await waitFor(`document.querySelector('[data-achievement="pokemon-collector"]')?.classList.contains('unlocked')`);
+    assert.equal(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"] time').dateTime`),date);
+    assert.equal(await evaluate(`Object.keys(localStorage).filter(k=>k==='dexhaven-progress-change').every(k=>!/(?:pokemonId|caught|seen|userId)/.test(localStorage.getItem(k)))`),true);
+  });
+  await check('progression failures preserve public browsing and recover with an explicit migration/retry state',async()=>{
+    const failure=await command('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaFailCollectionRead=true`});
+    try{
+      await command('Page.navigate',{url:origin+'/pokemon.html?qa=progress-offline'});
+      await waitFor(`document.querySelector('#collection-retry')?.hidden===false && !state.loading`);
+      assert.equal(await evaluate('grid.children.length'),649);assert.equal(await evaluate(`document.querySelector('#collection-filter').disabled`),true);
+      assert.match(await evaluate(`document.querySelector('#collection-filter-help').textContent`),/manual v0.5.0 migration/);
+      await evaluate(`window.qaFailCollectionRead=false;document.querySelector('#collection-retry').click()`);
+      await waitFor(`document.querySelector('#collection-filter').disabled===false`);
+      await evaluate(`TrainerProgress.update(25,'caught')`);
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'caught');
+    }finally{await command('Page.removeScriptToEvaluateOnNewDocument',{identifier:failure.identifier});}
+  });
+  await check('collection status synchronizes in a second tab without sharing private records in browser storage',async()=>{
+    const other=await command('Target.createTarget',{url:'about:blank'});const attached=await command('Target.attachToTarget',{targetId:other.targetId,flatten:true});
+    const otherEvaluate=async expression=>{
+      const result=await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},attached.sessionId);
+      if(result.exceptionDetails)throw Error(result.exceptionDetails.text);return result.result.value;
+    };
+    const otherWait=async expression=>{for(let i=0;i<100;i++){if(await otherEvaluate(expression))return;await sleep(50);}throw Error('Other tab timed out: '+expression);};
+    try{
+      await command('Network.enable',{},attached.sessionId);
+      await command('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*raw.githubusercontent.com*','*pokeapi.co*']},attached.sessionId);
+      await command('Page.navigate',{url:origin+'/pokemon.html'},attached.sessionId);
+      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.disabled===false`);
+      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'caught');
+      await evaluate(`TrainerProgress.update(25,'seen')`);
+      await otherWait(`document.querySelector('#pokemon-grid [data-collection-id="25"] select')?.value==='seen'`);
+      await evaluate(`document.querySelector('#logout-button').click()`);
+      await waitFor(`document.querySelector('#guest-actions').hidden===false`);
+      await otherWait(`document.querySelector('#collection-filter')?.disabled===true && document.querySelector('#guest-actions').hidden===false`);
+      assert.equal(await otherEvaluate(`[...document.querySelectorAll('[data-collection-id]')].every(n=>n.hidden)`),true);
+      await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='browser@example.test';document.querySelector('#auth-password').value='browser test password 123';document.querySelector('#auth-form').requestSubmit()`);
+      await waitFor(`document.querySelector('#collection-filter').disabled===false`);
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'seen');
+      await evaluate(`(async()=>{const session=await(await fetch('/api/auth/session')).json();const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrfToken},body:JSON.stringify({username:'progress_other',email:'progress.other@example.test',password:'other trainer password 123'})});if(!response.ok)throw Error('Other trainer registration failed');localStorage.setItem('dexhaven-progress-change','qa-other-trainer-'+Date.now())})()`);
+      await otherWait(`document.querySelector('#header-profile')?.title==='progress_other' && document.querySelector('#collection-filter').disabled===false`);
+      assert.equal(await otherEvaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'not-registered');
+      await waitFor(`document.querySelector('#header-profile').title==='progress_other' && document.querySelector('#collection-filter').disabled===false`);
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'not-registered');
+      await evaluate(`(async()=>{const session=await(await fetch('/api/auth/session')).json();const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrfToken},body:JSON.stringify({identifier:'browser@example.test',password:'browser test password 123'})});if(!response.ok)throw Error('Original trainer login failed');localStorage.setItem('dexhaven-progress-change','qa-original-trainer-'+Date.now())})()`);
+      await otherWait(`document.querySelector('#header-profile')?.title==='browser_trainer' && document.querySelector('#collection-filter').disabled===false`);
+      await waitFor(`document.querySelector('#header-profile').title==='browser_trainer' && document.querySelector('#collection-filter').disabled===false`);
+      assert.equal(await evaluate(`document.querySelector('#pokemon-grid [data-collection-id="25"] select').value`),'seen');
+    }finally{await command('Target.closeTarget',{targetId:other.targetId});await command('Page.bringToFront');}
+    assert.deepEqual(exceptions,[]);
+  });
+  await check('personal progression and achievements remain responsive in both themes',async()=>{
+    await command('Page.navigate',{url:origin+'/trainers.html#view=progress'});
+    await waitFor(`document.querySelectorAll('#account-content .overview-card').length===8`);
+    for(const theme of ['light','dark']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){
+        await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+        for(const view of ['/progress','/achievements']){await evaluate(`document.querySelector('[data-view="${view}"]').click()`);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${theme} ${width} ${view}`);}
+      }
+    }
+    if(process.env.QA_SCREENSHOT_DIR){
+      fs.mkdirSync(process.env.QA_SCREENSHOT_DIR,{recursive:true});
+      await evaluate(`document.querySelector('[data-view="/progress"]').click();window.scrollTo(0,0)`);await sleep(100);
+      fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'trainer-progress.png'),Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    }
+    assert.deepEqual(exceptions,[]);
+  });
   await check('public dashboard loads complete real-data metrics, three charts, accessible tables and numeric rankings',async()=>{
     await command('Page.navigate',{url:origin+'/dashboard.html'});
     await waitFor(`document.querySelector('#dashboard-content')?.hidden===false`);
@@ -717,6 +873,134 @@ async function main() {
       assert.equal(await evaluate(`document.querySelector('#metric-average').textContent`),analytics.summarize(snapshot.pokemon).averageTotal.toFixed(2));
     } finally { await command('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*','*raw.githubusercontent.com*']}); }
     assert.deepEqual(exceptions,[]);
+  });
+  await check('encyclopedia deep links, keyboard sections, English entries and shared evolution caches work',async()=>{
+    await evaluate(`Object.keys(localStorage).filter(k=>k.startsWith('dexhaven-encyclopedia-v1-')).forEach(k=>localStorage.removeItem(k))`);
+    await command('Page.navigate',{url:origin+'/pokemon.html?pokemon=1'});
+    await waitFor(`document.querySelectorAll('.detail-tab').length===6 && document.querySelector('#detail-name')?.textContent==='Bulbasaur'`);
+    await waitFor(`document.activeElement.id==='detail-name'`);
+    assert.equal(await evaluate(`document.activeElement.id`),'detail-name');
+    assert.equal(await evaluate(`window.qaResourceRequests['pokemon-species/1']||0`),0);
+    await evaluate(`document.querySelector('#detail-tab-overview').focus()`);await key('ArrowRight','ArrowRight');
+    assert.equal(await evaluate(`document.activeElement.id`),'detail-tab-stats');
+    assert.equal(await evaluate(`document.querySelector('#detail-panel-stats').hidden`),false);
+    await evaluate(`document.querySelector('#detail-tab-evolutions').click()`);
+    await waitFor(`document.querySelectorAll('.evolution-card').length===3`);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-evolutions').textContent`),/Level 16/);
+    assert.equal(await evaluate(`window.qaResourceRequests['evolution-chain/1']`),1);
+    await evaluate(`document.querySelector('#detail-tab-species').click()`);
+    await waitFor(`!!document.querySelector('#entry-version')`);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-species').textContent`),/Seed Pokémon/);
+    assert.equal(await evaluate(`window.qaResourceRequests['pokemon-species/1']`),1);
+    const entries=encyclopedia.descriptions(encyclopediaFixture.resources['pokemon-species/1']);
+    await evaluate(`document.querySelector('#entry-version').value='1';document.querySelector('#entry-version').dispatchEvent(new Event('change'))`);
+    assert.equal(await evaluate(`document.querySelector('#pokedex-description').textContent`),entries[1].text);
+    await evaluate(`document.querySelector('#detail-tab-evolutions').click();document.querySelector('[data-species-id="2"]').click()`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Ivysaur'`);
+    await waitFor(`document.activeElement.id==='detail-name'`);
+    assert.equal(await evaluate(`document.activeElement.id`),'detail-name');
+    await evaluate(`document.querySelector('#detail-tab-evolutions').click()`);
+    await waitFor(`document.querySelectorAll('.evolution-card').length===3`);
+    assert.equal(await evaluate(`window.qaResourceRequests['evolution-chain/1']`),1);
+    assert.match(await evaluate(`document.querySelector('.detail-navigation a').href`),/pokemon\.html\?pokemon=2$/);
+    await evaluate('dialog.close()');
+  });
+  await check('branching evolutions include labelled unsupported species and standalone species have clear states',async()=>{
+    await evaluate(`showDetails(state.pokemon.get(133))`);
+    await evaluate(`document.querySelector('#detail-tab-evolutions').click()`);
+    await waitFor(`document.querySelectorAll('.evolution-card').length===9`);
+    assert.equal(await evaluate(`document.querySelector('[data-species-id="700"]').tagName`),'DIV');
+    assert.match(await evaluate(`document.querySelector('[data-species-id="700"]').textContent`),/Beyond #649/);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-evolutions').textContent`),/Use Water Stone/);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-evolutions').textContent`),/Friendship/);
+    await evaluate(`document.querySelector('[data-species-id="134"]').click()`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Vaporeon'`);
+    await evaluate(`showDetails(state.pokemon.get(649))`);
+    await evaluate(`document.querySelector('#detail-tab-evolutions').click()`);
+    await waitFor(`document.querySelector('#detail-panel-evolutions').textContent.includes('no recorded evolutions')`);
+    assert.equal(await evaluate(`document.querySelectorAll('.evolution-card').length`),1);
+    await evaluate(`document.querySelector('#detail-tab-species').click()`);
+    await waitFor(`!!document.querySelector('#entry-version')`);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-species').textContent`),/Mythical/);
+    assert.match(await evaluate(`document.querySelector('#detail-panel-species').textContent`),/Not recorded/);
+    await evaluate('dialog.close()');
+  });
+  await check('moves stay game-specific with historical stats, all filters, sorting and cached metadata',async()=>{
+    await evaluate(`showDetails(state.pokemon.get(1))`);
+    await evaluate(`document.querySelector('#detail-tab-moves').click()`);
+    await waitFor(`!!document.querySelector('#moves-version') && document.querySelector('#moves-output')?.getAttribute('aria-busy')==='false'`);
+    const set=async(id,value)=>{await evaluate(`document.querySelector('#${id}').value=${JSON.stringify(value)};document.querySelector('#${id}').dispatchEvent(new Event('${id==='move-search'?'input':'change'}',{bubbles:true}))`);await waitFor(`document.querySelector('#moves-output').getAttribute('aria-busy')==='false'`);};
+    await set('moves-version','red-blue');
+    const rows=await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].map(n=>[...n.children].map(c=>c.textContent))`);
+    assert.equal(rows.find(r=>r[0]==='Tackle')[3],'35');assert.equal(rows.find(r=>r[0]==='Tackle')[4],'95%');
+    assert.deepEqual(rows.map(r=>r[0].toLowerCase().replaceAll(' ','-')).sort(),encyclopedia.learnset(encyclopediaFixture.resources['pokemon/1'],'red-blue').map(r=>r.name).sort());
+    await set('moves-version','black-2-white-2');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].find(n=>n.children[0].textContent==='Tackle').children[3].textContent`),'50');
+    await set('move-type','grass');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].every(n=>n.children[1].textContent==='Grass')`),true);
+    await set('move-type','all');await set('move-category','status');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].every(n=>n.children[2].textContent==='Status'&&n.children[3].textContent==='—')`),true);
+    await set('move-category','all');await set('move-method','level-up');await set('move-search','vine');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].every(n=>n.children[0].textContent==='Vine Whip'&&n.children[6].textContent==='Level Up')`),true);
+    await set('move-search','no-such-move');assert.match(await evaluate(`document.querySelector('#moves-output').textContent`),/No moves match/);
+    await set('move-search','');await set('move-method','all');await set('move-sort','power');
+    const powers=await evaluate(`[...document.querySelectorAll('#moves-output tbody tr')].map(n=>Number(n.children[3].textContent==='—'?-1:n.children[3].textContent))`);
+    assert.deepEqual(powers,[...powers].sort((a,b)=>b-a));
+    assert.equal(await evaluate(`window.qaResourceRequests['move/33']`),1);
+    await evaluate('dialog.close()');
+  });
+  await check('modern dual-type matchup tables show quadruple weaknesses, resistances and immunities',async()=>{
+    await evaluate(`if(dialog.open)dialog.close();showDetails(state.pokemon.get(6))`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Charizard' && !!document.querySelector('#detail-tab-matchups')`);
+    await evaluate(`document.querySelector('#detail-tab-matchups').click()`);
+    await waitFor(`document.querySelectorAll('#detail-panel-matchups table').length===3`);
+    const defense=await evaluate(`Object.fromEntries([...document.querySelector('#detail-panel-matchups table').querySelectorAll('tbody tr')].map(n=>[n.children[0].textContent,n.children[1].textContent]))`);
+    assert.equal(defense.Rock,'4×');assert.equal(defense.Ground,'0×');assert.equal(defense.Grass,'0.25×');
+    assert.match(await evaluate(`document.querySelector('#detail-panel-matchups').textContent`),/not coverage of its actual moveset/);
+    await evaluate('dialog.close()');
+  });
+  await check('encyclopedia failures retry and stale species responses cannot replace a newer selection',async()=>{
+    await evaluate(`window.qaResourceFailures=['pokemon-species/152'];showDetails(state.pokemon.get(152))`);
+    await waitFor(`!!document.querySelector('#detail-tab-species')`);
+    await evaluate(`document.querySelector('#detail-tab-species').click()`);
+    await waitFor(`document.querySelector('#detail-panel-species').textContent.includes('could not be loaded')`);
+    await evaluate(`window.qaResourceFailures=[];document.querySelector('#detail-panel-species button').click()`);
+    await waitFor(`!!document.querySelector('#entry-version')`);
+    for(const id of [252,387,494]){
+      await evaluate(`showDetails(state.pokemon.get(${id}))`);await evaluate(`document.querySelector('#detail-tab-species').click()`);
+      await waitFor(`!!document.querySelector('#entry-version')`);
+      assert.match(await evaluate(`document.querySelector('#detail-panel-species').textContent`),new RegExp(id===252?'Hoenn':id===387?'Sinnoh':'Unova'));
+    }
+    await evaluate(`showDetails(state.pokemon.get(236))`);await evaluate(`window.qaResourceDelay['pokemon-species/236']=400;document.querySelector('#detail-tab-species').click();showDetails(state.pokemon.get(649))`);
+    await waitFor(`document.querySelector('#detail-name')?.textContent==='Genesect'`);await sleep(450);
+    assert.equal(await evaluate(`document.querySelector('#detail-name').textContent`),'Genesect');
+    assert.equal(await evaluate(`document.querySelector('#detail-panel-overview').hidden`),false);
+    await evaluate('dialog.close()');assert.deepEqual(exceptions,[]);
+  });
+  await check('encyclopedia sections fit mobile/desktop in both themes with keyboard navigation',async()=>{
+    await evaluate(`showDetails(state.pokemon.get(1))`);
+    for(const theme of ['light','dark']){
+      if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
+      for(const width of [320,375,768,1280]){
+        await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+        for(const name of ['overview','stats','evolutions','moves','matchups','species']){
+          await evaluate(`document.querySelector('#detail-tab-${name}').click()`);await sleep(30);
+          assert.equal(await evaluate(`dialog.scrollWidth<=dialog.clientWidth`),true,`${theme} ${width} ${name}`);
+        }
+      }
+    }
+    await evaluate(`document.querySelector('#detail-tab-overview').focus()`);await key('End','End');
+    assert.equal(await evaluate('document.activeElement.id'),'detail-tab-species');
+    await key('Home','Home');assert.equal(await evaluate('document.activeElement.id'),'detail-tab-overview');
+    if(process.env.QA_SCREENSHOT_DIR){
+      await evaluate(`document.querySelector('#detail-tab-evolutions').click();dialog.scrollTop=0`);await sleep(80);
+      fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'encyclopedia-desktop.png'),Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
+      await command('Emulation.setDeviceMetricsOverride',{width:375,height:900,deviceScaleFactor:1,mobile:false});
+      await evaluate(`document.querySelector('#detail-tab-moves').click();dialog.scrollTop=0`);await sleep(80);
+      fs.writeFileSync(path.join(process.env.QA_SCREENSHOT_DIR,'encyclopedia-mobile.png'),Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
+      await command('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
+    }
+    await key('Escape','Escape');assert.equal(await evaluate('dialog.open'),false);assert.deepEqual(exceptions,[]);
   });
   await check('GitHub Pages project-path preview: no backend, correct brand/hero, generations, details and hash navigation',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/'});

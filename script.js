@@ -22,7 +22,7 @@ const TYPE_COLORS = {
   rock: '#cbb880', ghost: '#a79ace', dragon: '#ab9bf5', dark: '#c0aa98',
   steel: '#a6c5ce', fairy: '#eab1d8'
 };
-const state = { pokemon: new Map(), query: '', type: 'all', generation: 'all', sort: 'number', loading: false, typesLoaded: new Set(), statRanges: {}, statData: null };
+const state = { pokemon: new Map(), query: '', type: 'all', generation: 'all', sort: 'number', loading: false, typesLoaded: new Set(), statRanges: {}, statData: null, collectionFilter: 'all' };
 const detailRequests = new Map();
 let detailRevision = 0;
 const $ = (selector) => document.querySelector(selector);
@@ -116,7 +116,8 @@ function matches(pokemon) {
   const generation = GENERATIONS.find(g => g.id === state.generation) || GENERATIONS[0];
   return pokemon.id >= generation.start && pokemon.id <= generation.end
     && (!query || queryMatch) && (state.type === 'all' || pokemon.types.includes(state.type))
-    && (!Object.keys(state.statRanges).length || (state.statData?.has(pokemon.id) && globalThis.PokemonData.matches(state.statData.get(pokemon.id), state.statRanges)));
+    && (!Object.keys(state.statRanges).length || (state.statData?.has(pokemon.id) && globalThis.PokemonData.matches(state.statData.get(pokemon.id), state.statRanges)))
+    && (globalThis.TrainerProgress?.matches(pokemon.id, state.collectionFilter) ?? true);
 }
 
 function render() {
@@ -145,7 +146,7 @@ function render() {
   $('.collection-total').textContent = `${String(generation.start).padStart(3, '0')} — ${generation.end}`;
   $('#result-count').textContent = `Showing ${visible.length} of ${count} Pokémon${state.loading ? ' · updating index…' : ''}`;
   $('#empty-state').hidden = visible.length > 0 || state.loading || state.pokemon.size === 0;
-  $('#reset').hidden = !state.query && state.type === 'all' && state.generation === 'all' && !Object.keys(state.statRanges).length && state.sort === 'number';
+  $('#reset').hidden = !state.query && state.type === 'all' && state.generation === 'all' && !Object.keys(state.statRanges).length && state.sort === 'number' && state.collectionFilter === 'all';
   $('#collection-end').hidden = state.pokemon.size !== TOTAL || visible.length !== TOTAL;
   document.querySelectorAll('.filter-chip').forEach((chip) => chip.setAttribute('aria-pressed', String(chip.dataset.type === state.type)));
   globalThis.PokedexAccounts?.onPokemonUpdate();
@@ -157,6 +158,8 @@ function resetFilters() {
   state.generation = 'all';
   state.sort = 'number';
   state.statRanges = {};
+  state.collectionFilter = 'all';
+  const collectionFilter = $('#collection-filter'); if (collectionFilter) collectionFilter.value = 'all';
   $('#sort').value = 'number';
   globalThis.PokedexAdvanced?.reset();
   $('#generation').value = 'all';
@@ -205,10 +208,11 @@ function renderDetails(pokemon) {
   body.append(total);
   content.append(hero, body);
   globalThis.PokedexAccounts?.decorateDetails(content, pokemon);
+  globalThis.PokemonEncyclopedia?.enhance(content, pokemon);
   dialog.scrollTop = 0;
 }
 
-async function showDetails(pokemon) {
+async function showDetails(pokemon, { focusHeading = false } = {}) {
   if (!pokemon || !Number.isInteger(pokemon.id) || pokemon.id < 1 || pokemon.id > TOTAL) return;
   const revision = ++detailRevision;
   const content = $('#detail-content');
@@ -223,6 +227,10 @@ async function showDetails(pokemon) {
     const details = await ensureDetails(pokemon.id);
     if (revision !== detailRevision || !dialog.open) return;
     renderDetails(details);
+    if (focusHeading) {
+      const heading = $('#detail-name'); heading.tabIndex = -1;
+      requestAnimationFrame(() => { if (revision === detailRevision && dialog.open) heading.focus(); });
+    }
   } catch {
     if (revision !== detailRevision || !dialog.open) return;
     loading.lastChild.textContent = 'Details couldn’t be loaded. Check your connection and try again.';
@@ -282,6 +290,7 @@ async function fetchPokemon(id) {
       stats: data.stats.map((entry) => ({ name: entry.stat.name, value: entry.base_stat }))
     };
     if (!validRecord(pokemon, id)) throw new Error('Unexpected Pokémon data');
+    globalThis.PokemonEncyclopediaData?.remember('pokemon', id, data);
     try { localStorage.setItem(CACHE_PREFIX + id, JSON.stringify({ timestamp: Date.now(), data: pokemon })); } catch { /* Continue without persistent storage. */ }
     return pokemon;
   } finally {
@@ -435,7 +444,8 @@ function initializeCollection() {
 function initializeDetails() {
   if (!dialog) return;
   $('#close-dialog').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => { detailRevision++; });
+  // A queued close event from an earlier opening must not cancel a newly opened entry.
+  dialog.addEventListener('close', () => { if (!dialog.open) detailRevision++; });
   dialog.addEventListener('click', (event) => {
     if (event.target !== dialog) return;
     const rect = dialog.getBoundingClientRect();

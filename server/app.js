@@ -139,10 +139,27 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.delete('/api/favorites/:id', async (req, res) => {
     await repo.favorite(req.user.id, v.id(req.params.id, 649), false); res.status(204).end();
   });
+  const progression = operation => async (req, res) => {
+    try { res.json(await operation(req)); }
+    catch (error) {
+      if (error.code === 'ER_NO_SUCH_TABLE') throw new v.HttpError(503, 'Trainer progression is unavailable. Apply the manual v0.5.0 migration in MySQL Workbench; existing trainer features are still available.');
+      throw error;
+    }
+  };
+  app.get('/api/pokedex', progression(req => repo.progression.snapshot(req.user.id)));
+  app.get('/api/pokedex/:id', progression(async req => {
+    const id = v.id(req.params.id, 649);
+    const bundle = await repo.progression.snapshot(req.user.id);
+    return bundle.collection.find(row => row.pokemonId === id) || { pokemonId: id, status: 'not-registered', seenAt: null, caughtAt: null, updatedAt: null };
+  }));
+  app.put('/api/pokedex/:id', progression(req => repo.progression.set(req.user.id, v.id(req.params.id, 649), v.collectionStatus(req.body))));
+  app.delete('/api/pokedex/:id', progression(req => repo.progression.remove(req.user.id, v.id(req.params.id, 649))));
+  app.get('/api/progression', progression(async req => ({ statistics: (await repo.progression.snapshot(req.user.id)).statistics })));
+  app.get('/api/achievements', progression(async req => ({ achievements: (await repo.progression.snapshot(req.user.id)).achievements })));
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'artwork-fallback.svg']) {
+  for (const asset of ['styles.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));

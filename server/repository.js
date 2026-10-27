@@ -1,7 +1,9 @@
 'use strict';
 const { HttpError } = require('./validation');
+const { ProgressionRepository } = require('./progression-repository');
+const { awardTeamBuilder } = require('./progression');
 class Repository {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool) { this.pool = pool; this.progression = new ProgressionRepository(pool); }
   async user(id) {
     const [rows] = await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?', [id]);
     return rows[0] || null;
@@ -51,6 +53,7 @@ class Repository {
       for (let slot = 0; slot < pokemonIds.length; slot++) {
         await connection.execute('INSERT INTO team_pokemon (team_id, slot, pokemon_id) VALUES (?, ?, ?)', [teamId, slot + 1, pokemonIds[slot]]);
       }
+      if (pokemonIds.length === 6) await awardTeamBuilder(connection, userId);
       await connection.commit();
       return { id: teamId, name, pokemonIds };
     } catch (error) { await connection.rollback(); throw error; }

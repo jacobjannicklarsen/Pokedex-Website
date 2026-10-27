@@ -1,5 +1,33 @@
 # Dexhaven release notes
 
+## v0.5.0 — Trainer Progression & Pokédex Completion
+
+- Added personal Not registered/Seen/Caught controls on shared Pokémon cards and detail dialogs. Caught automatically counts as Seen, repeated status writes are idempotent and removing a registration clears only current collection progress.
+- Added All/Seen/Caught/Not Seen/Not Caught filters that combine with search, generations, types, advanced stats and sorting. Guests retain public browsing with disabled personal filters and a sign-in invitation.
+- Added private Trainer Hub Progress and Achievements sections. Progress shows current National/generation/type completion, counts/percentages, saved-team/favourite totals and recent registrations. Generation groups use species introduction intervals, not game-specific regional lists; dual-type memberships overlap.
+- Added eight backend-verified achievements with permanent unlock dates and separate current progress. Collection changes and awards are atomic; six-member team awards share the existing save transaction. Awards are unique and never accepted as client claims.
+- Added additive `user_pokedex`/`user_achievements` definitions to the new-install schema and a separate manual migration with Workbench instructions. The migration has **not** been applied and no live database records were modified. Before migration, progression reports an actionable 503 while existing trainer operations remain usable.
+- Added a shared in-memory collection controller, server-confirmed updates with failure recovery, cross-page reload/session persistence and cross-tab change notifications. Private records are not stored in browser storage; account changes clear the old trainer's state and late responses cannot overwrite a new identity.
+- Updated both versions to **0.5.0**, endpoint documentation, tests and setup/release guides. All uncommitted v0.4.0 work was preserved on the new `dev/v0.5.0` branch. Existing catalogue/encyclopedia/analytics, teams/favourites/profile/auth, themes and artwork remain intact.
+
+Validation: **63 automated tests passed**, **one opt-in live-MySQL test skipped**, and **52 Chrome browser checks passed**, including two trainers switching across tabs. SQL definitions, parameterization and transaction rollback were checked without executing the migration against MySQL. Live migration/constraint verification, existing-account review and real touch/screen-reader/Safari/Firefox checks remain manual.
+
+Review [PROGRESSION.md](PROGRESSION.md) and [database/MIGRATION_v0.5.0.md](database/MIGRATION_v0.5.0.md) before enabling tracking on the hosted backend. No migration, live database write, implementation commit, push, deployment or release was performed automatically.
+
+## v0.4.0 — Pokémon Encyclopedia
+
+- Expanded the shared detail dialog into Overview, Base Stats, Evolutions, Moves, Type Matchups and Pokédex Information sections. Added keyboard section navigation, previous/next Pokémon, heading focus after internal navigation and public shareable links such as `pokemon.html?pokemon=25`.
+- Added complete API-driven evolution families and branches with official artwork, IDs/names and recorded level/item/friendship/trade/time/form/special conditions. Species beyond #649 remain labelled reference entries; standalone species have a clear no-evolution state. Shared families reuse cached evolution chains.
+- Added Generation I–V game-group learnsets, move name/type/category/method filters, numeric/name/level sorting and 24-row pages. Moves/methods/levels stay within the selected game. Recorded historical metadata and the pre-IV type-based category split are applied; missing values use dashes and historical gaps are labelled.
+- Added modern defensive multipliers (including dual-type quarter/quadruple values and immunity precedence) and separate offensive type tables. The interface distinguishes modern rules from historical games and actual moveset coverage; abilities/items/weather are excluded explicitly.
+- Added species classifications, introduction/region, measurements, abilities, experience, capture/friendship/growth, egg groups, gender/habitat, legendary/mythical status and an English game-entry selector. Missing values are explicit.
+- New resources load on section activation with validation, seven-day memory/browser caches, in-flight coalescing, at most four concurrent requests, retry controls and stale-response protection. Existing detail responses seed learnset caches where available. Catalogue startup still avoids bulk learnsets or move metadata.
+- Updated both package versions to **0.4.0**, Express/static preview script allowlists, documentation and tests. Existing analytics, 649-species catalogue, advanced filters, Trainer Hub, auth, teams, favourites, themes and founder artwork remain intact.
+
+Validation: **52 automated tests passed**, **one opt-in live-MySQL test skipped**, **46 Chrome browser checks passed**, and the existing three-request live PokéAPI contract check passed. Real sampled resource fixtures cover all five generations; browser accounts/uploads remain isolated from the live application.
+
+The existing clean `dev/v0.4.0` branch initially pointed to the first release. It was fast-forwarded to the local committed v0.3.0 baseline before implementation, preserving the required existing features without a new merge commit. No migrations, live database writes, push, deployment or GitHub release were performed. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) and [QA_REPORT.md](QA_REPORT.md) for scope, changed files and remaining manual checks.
+
 ## v0.3.0 — Pokémon Analytics & Advanced Filtering
 
 - Added the public `dashboard.html` page with dataset-derived overview cards, interactive generation/type distributions, six-stat generation averages and top-ten rankings switchable between Total and every base stat. Dual-type memberships count toward both types; tied rankings use ascending National number.

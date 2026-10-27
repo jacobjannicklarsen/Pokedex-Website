@@ -1,10 +1,12 @@
 # Windows / VS Code setup
 
-The project is **Pokédex Website**; the public website is **Dexhaven v0.3.0**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
+The project is **Pokédex Website**; the public website is **Dexhaven v0.5.0**. The database remains `pokedex_app`. Existing `.env`, uploads and database records are preserved by this upgrade.
 
 **Upgrading an existing v0.1.0 installation:** follow [database/MIGRATION_v0.2.0.md](database/MIGRATION_v0.2.0.md) first. Do not recreate the database or replace your environment file. No migration is executed automatically. The steps below describe new installations and normal startup/testing.
 
-**Upgrading from v0.2.0, v0.2.1 or v0.2.2:** no database migration is needed. Restart Express after updating files. Test the homepage at http://localhost:3000/ and the National Pokédex at http://localhost:3000/pokemon.html and the Trainer Hub at http://localhost:3000/trainers.html. Test login/logout, Profile, My Teams, My Favourites, avatar uploads and theme/session persistence across all four pages. Test the new dashboard at http://localhost:3000/dashboard.html and stat bounds/sorts in the National Pokédex. The committed snapshot and Chart.js bundle need no build step; see [ANALYTICS.md](ANALYTICS.md) for optional refresh commands. Old `/profile`, `/teams` and `/favorites` links redirect to the hub.
+**Upgrading from v0.2.0–v0.4.0:** v0.5.0 requires two new collection/achievement tables. Preserve your `.env`, database, sessions and uploads; review [database/MIGRATION_v0.5.0.md](database/MIGRATION_v0.5.0.md) and apply its additive SQL manually in MySQL Workbench when approved. Do not recreate the database. No migration is executed automatically. Restart Express after updating files/migrating, then test all four pages and the hub's Progress/Achievements sections. See [PROGRESSION.md](PROGRESSION.md) for API/storage and manual tests.
+
+For the encyclopedia, open http://localhost:3000/pokemon.html?pokemon=1 and test all six detail sections. The new scripts must be present for static previews too. See [ENCYCLOPEDIA.md](ENCYCLOPEDIA.md) for game/ruleset scope, cache expiry and testing. The encyclopedia itself adds no database requirements; personal progression requires the separate manual v0.5.0 migration.
 
 ## 1. Prerequisites
 
@@ -20,7 +22,7 @@ Recommended with Workbench:
 1. Connect to your local MySQL server using an administrator account you control.
 2. Run `SHOW DATABASES LIKE 'pokedex_app';`. If that name is already used for unrelated data, inspect it and resolve the conflict before proceeding. Never drop an existing database for this setup.
 3. Choose **File → Open SQL Script** and open `E:\EK - IT-Arkitektur\Pokedex Website\database\schema.sql`.
-4. Execute the whole script. It selects only `pokedex_app` and creates its missing tables: `users`, `teams`, `team_pokemon`, `favorites`, `sessions`. It contains no DROP statements or data replacement. Existing tables are not migrated automatically.
+4. Execute the whole script. It selects only `pokedex_app` and creates its missing tables: `users`, `teams`, `team_pokemon`, `favorites`, `sessions`, `user_pokedex`, `user_achievements`. It contains no DROP statements or data replacement. Existing tables are not migrated automatically.
 5. Verify:
 
 ```sql

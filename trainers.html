@@ -16,8 +16,11 @@
     <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <script src="encyclopedia-data.js" defer></script>
     <script src="script.js" defer></script>
+    <script src="encyclopedia.js" defer></script>
     <script src="pokemon-selector.js" defer></script>
+    <script src="trainer-progress.js" defer></script>
     <script src="account.js" defer></script>
 </head>
 <body data-page="trainers">
@@ -66,6 +69,8 @@
       <a href="#view=profile" data-view="/profile">Trainer Profile</a>
       <a href="#view=teams" data-view="/teams">My Teams</a>
       <a href="#view=favorites" data-view="/favorites">My Favourites</a>
+      <a href="#view=progress" data-view="/progress">Pokédex Progress</a>
+      <a href="#view=achievements" data-view="/achievements">Achievements</a>
     </nav>
     <section id="trainer-area" class="trainer-area" aria-labelledby="trainer-heading" hidden>
       <h2 id="trainer-heading">Trainer Profile</h2>

@@ -41,6 +41,17 @@ function setup({failures=new Set(),mode='ok',blocked=false,collection=true,hero=
 }
 const ids=app=>app.nodes.get('#pokemon-grid').children.map(c=>Number(c.dataset.id));
 
+test('personal Seen/Caught predicates combine with all public predicates and reset all restores every species',async()=>{
+  const app=setup();await app.context.ready;
+  app.context.realRecords=require('../data/pokemon-summary.json').pokemon;
+  app.run("state.pokemon=new Map(realRecords.map(p=>[p.id,p]));state.statData=new Map(state.pokemon);globalThis.TrainerProgress={matches(id,filter){const status=id===445?'caught':id===443?'seen':'not-registered';return filter==='all'||filter==='seen'&&status!=='not-registered'||filter==='caught'&&status==='caught'||filter==='not-seen'&&status==='not-registered'||filter==='not-caught'&&status!=='caught';}};");
+  app.run("state.collectionFilter='seen';render()");assert.deepEqual(ids(app),[443,445]);
+  app.run("state.collectionFilter='caught';state.generation='4';state.type='dragon';state.query='garch';state.statRanges={attack:{min:100},speed:{min:90}};state.sort='stat:total:desc';render()");assert.deepEqual(ids(app),[445]);
+  app.run("resetFilters();state.collectionFilter='not-seen';render()");assert.equal(ids(app).length,647);
+  app.run("state.collectionFilter='not-caught';render()");assert.equal(ids(app).length,648);
+  app.run('resetFilters()');assert.equal(ids(app).length,649);assert.equal(app.run('state.collectionFilter'),'all');
+});
+
 test('advanced stat predicates and all new sorts integrate with collection generation/type/search/reset',async()=>{
   const app=setup();await app.context.ready;
   const records=require('../data/pokemon-summary.json').pokemon;

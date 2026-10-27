@@ -36,6 +36,8 @@ h1 { font-size:clamp(34px,3.5vw,49px); line-height:1.18; letter-spacing:-2px; ma
 .collection { padding-top:36px; border-top:1px solid var(--line); }
 #collection-title { font-size:30px; letter-spacing:-1px; }
 .home-features { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; padding-block:36px; border-top:1px solid var(--line); }
+.home-features article { display:flex; flex-direction:column; align-items:flex-start; }
+.home-features .explore-link { margin-top:auto; }
 .home-features h2 { font-size:22px; }
 .home-features article>p:not(.eyebrow) { color:var(--muted); line-height:1.8; }
 @media (max-width:700px) { .home-features { grid-template-columns:1fr; gap:24px; } #collection-title { font-size:24px; } }
@@ -124,6 +126,34 @@ body:has(dialog[open]) { overflow:hidden; }
 .stat-track { height:6px; background:var(--panel); border-radius:5px; overflow:hidden; }
 .stat-fill { display:block; height:100%; background:var(--type-color); border-radius:inherit; }
 .stat-total { display:flex; justify-content:space-between; border-top:1px solid var(--line); padding-top:15px; font-weight:600; font-size:12px; }
+.detail-navigation { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding:0 24px 18px; }
+.detail-tabs { display:flex; flex-wrap:wrap; gap:4px; border-block:1px solid var(--line); padding:8px 16px; background:var(--panel); }
+.detail-tab { background:transparent; border:0; border-bottom:2px solid transparent; padding:12px 10px; color:var(--muted); font-size:12px; }
+.detail-tab[aria-selected="true"] { color:var(--text); border-bottom-color:var(--mint); }
+.encyclopedia-panel { padding:24px 28px; }
+.detail-body[role="tabpanel"] { padding-top:24px; }
+.encyclopedia-panel h3 { margin-top:0; }
+.encyclopedia-control { display:grid; gap:8px; color:var(--muted); font-size:12px; margin-block:14px; }
+.encyclopedia-control select,.encyclopedia-control input { width:100%; min-width:0; padding:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:6px; font-size:16px; }
+.encyclopedia-facts { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-block:20px; }
+.encyclopedia-facts>div { min-width:0; padding:14px; background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow-wrap:anywhere; }
+.encyclopedia-facts dt { color:var(--muted); font-size:11px; }
+.encyclopedia-facts dd { margin:8px 0 0; line-height:1.6; font-size:13px; }
+.pokedex-description { margin:18px 0; border-left:3px solid var(--mint); padding:14px 20px; background:var(--panel); line-height:1.9; }
+.evolution-tree,.evolution-tree ul { list-style:none; padding-left:18px; margin-block:14px; }
+.evolution-tree { padding-left:0; }
+.evolution-tree>li>ul,.evolution-tree ul>li>ul { border-left:1px solid var(--line); }
+.evolution-card { display:flex; align-items:center; gap:14px; width:100%; padding:12px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; text-align:left; flex-wrap:wrap; }
+.evolution-card img { width:64px; height:64px; object-fit:contain; }
+.evolution-card strong { font-size:13px; }
+.evolution-card[aria-current] { border-color:var(--mint); }
+.evolution-unsupported { opacity:.75; border-style:dashed; }
+.evolution-card small { width:100%; color:var(--muted); }
+.evolution-tree .evolution-requirements { padding:0; color:var(--muted); font-size:11px; line-height:1.8; border:0; }
+.evolution-requirements li { margin-block:8px; overflow-wrap:anywhere; }
+.move-controls { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+.encyclopedia-panel .analytics-table { min-width:100%; }
+@media (max-width:700px) { .encyclopedia-panel { padding:20px; } .encyclopedia-facts,.move-controls { grid-template-columns:1fr; } .detail-tabs { padding-inline:10px; } .detail-tab { padding:10px 8px; } .detail-navigation { padding-inline:20px; } .evolution-tree ul { padding-left:12px; } }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media (min-width:1400px) { .pokemon-grid { grid-template-columns:repeat(5,minmax(0,1fr)); } }
 @media (max-width:1000px) { .site-header,main,footer { padding-inline:28px; } .pokemon-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .hero { gap:10px; } h1 { font-size:37px; } .header-label { display:none; } }
@@ -187,6 +217,31 @@ html.theme-ready :is(.hero-description,.header-label,.region,.filter-label,.resu
 .pokemon-tile { position:relative; min-width:0; }
 .pokemon-tile>.pokemon-card { width:100%; height:100%; }
 .pokemon-tile .card-top { padding-right:32px; }
+.pokemon-tile.has-collection { display:flex; flex-direction:column; }
+.pokemon-tile.has-collection>.pokemon-card { height:auto; flex:1; }
+.collection-control { display:grid; gap:8px; padding:12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; margin-top:8px; font-size:11px; color:var(--muted); }
+.collection-control select,.collection-filter-row select { min-width:0; width:100%; font-size:16px; border:1px solid var(--line); border-radius:6px; color:var(--text); background:var(--bg); padding:9px; }
+.collection-control[data-status="caught"] { border-color:var(--mint); }
+.detail-account-actions>.collection-control { width:100%; }
+.collection-filter-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:16px; margin-top:18px; border:1px solid var(--line); border-radius:8px; }
+.collection-filter-row>label { font-size:12px; color:var(--muted); }
+.collection-filter-row>select { max-width:280px; }
+.collection-filter-row>.form-help { width:100%; margin:0; }
+.personal-progress { display:grid; gap:8px; font-size:12px; color:var(--muted); margin-block:16px; }
+.personal-progress progress { width:100%; height:14px; accent-color:var(--mint); }
+.region-progress-grid,.achievement-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.region-progress-grid .trainer-panel { margin:0; }
+.recent-registrations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.recent-registration { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); text-align:left; }
+.recent-registration img { width:58px; height:58px; object-fit:contain; }
+.recent-registration time { display:block; width:100%; }
+.achievement-card { min-width:0; margin:0; }
+.achievement-card.unlocked { border-color:var(--mint); }
+.achievement-card h3 { margin-top:14px; }
+.achievement-card time { display:block; margin-top:8px; }
+.achievement-icon { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; border:1px solid var(--line); color:var(--text); font-size:26px; }
+.unlocked .achievement-icon { border-color:var(--mint); }
+@media (max-width:700px) { .region-progress-grid,.achievement-grid,.recent-registrations { grid-template-columns:1fr; } .collection-filter-row { align-items:stretch; } .collection-filter-row>select { max-width:100%; } }
 .favorite-button { display:grid; place-items:center; border:1px solid var(--line); background:var(--panel); color:var(--muted); border-radius:50%; width:34px; height:34px; font-size:24px; line-height:1; }
 .pokemon-tile>.favorite-button { position:absolute; right:12px; top:12px; z-index:1; transition:transform .22s,color .22s,background-color .22s; }
 .favorite-button[aria-pressed="true"] { color:var(--mint); }

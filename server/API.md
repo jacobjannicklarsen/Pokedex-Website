@@ -1,5 +1,28 @@
 # Express API
 
+## Trainer progression (v0.5.0)
+
+Requires the reviewed, manually applied [v0.5.0 migration](../database/MIGRATION_v0.5.0.md). Existing trainer endpoints remain unchanged. All progression endpoints run after the normal authentication middleware and infer ownership exclusively from `req.user.id`; no owner ID is accepted from the client. API responses remain `Cache-Control: no-store`.
+
+| Method | Endpoint | Body / result |
+| --- | --- | --- |
+| GET | `/api/pokedex` | `{collection, statistics, achievements}` consistent private bundle |
+| GET | `/api/pokedex/:id` | `{pokemonId,status,seenAt,caughtAt,updatedAt}`; an absent registration returns `not-registered` with null dates |
+| PUT | `/api/pokedex/:id` | `{status:"seen"}` or `{status:"caught"}` → updated private bundle |
+| DELETE | `/api/pokedex/:id` | Remove the current user's registration → updated private bundle |
+| GET | `/api/progression` | `{statistics}`: National/generation/type counts, percentages, recent registrations, team/favourite counts |
+| GET | `/api/achievements` | `{achievements}`: definition/key/icon, `current`, `goal`, optional `unit` and historical `unlockedAt` |
+
+IDs are integers 1–649; invalid IDs/statuses/extra PUT fields return 400. These endpoints never accept timestamps, owner identifiers or award claims. Guests receive 401 and bad CSRF/origin receives 403. Missing progression tables return 503 with the manual migration instruction; other SQL failures use the existing error protections. Mutations return 200 and a full authoritative bundle, and repeating an unchanged status or removing an absent record is idempotent.
+
+Collection entries use UTC ISO timestamps. Caught always implies Seen: the row's `seen_at` is non-null, while `caught_at` is nullable. Caught → Seen clears only Caught; DELETE removes the collection row. The `(user_id,pokemon_id)` primary key prevents double counts. All calculations and achievement criteria use backend-owned records plus the complete local species dataset, never client-submitted totals.
+
+Collection writes and award reconciliation lock the user row and commit in one transaction. Bundle/statistics/achievement GETs also reconcile qualifying awards, including pre-existing full teams. Saving six team members awards Team Builder within the existing team transaction. Awards have a unique `(user_id,achievement_key)` key and retain the first unlock date permanently after later collection/team removal. A missing pre-migration achievements table does not break existing team saves; genuine other errors still roll the team transaction back.
+
+See [PROGRESSION.md](../PROGRESSION.md) for exact formulas, thresholds, timestamps, browser synchronization and schema limitations. The public analytics JSON/dashboard remains global Pokémon data and does not expose collection records.
+
+Version 0.4.0 expands the public detail dialog without adding trainer API endpoints. Shareable entries use `/pokemon.html?pokemon=1` through `?pokemon=649`. The allowlisted `encyclopedia-data.js` and `encyclopedia.js` fetch public PokéAPI resources on demand; species/evolution/move/type data does not enter MySQL. Existing session, CSRF, ownership and team/favourite bounds remain unchanged.
+
 The frontend pages are `/` (Home), `/pokemon.html` (National Pokédex), `/trainers.html` (Trainer Hub) and `/dashboard.html` (public Pokémon Analytics). Hub sections use `#view=profile`, `#view=teams` and `#view=favorites`. Existing `/profile`, `/teams` and `/favorites` page URLs redirect to the matching hub section; API URLs and authorization are unchanged. Analytics reads the allowlisted public `/data/pokemon-summary.json` file and does not query private trainer records. Shared analytics scripts and the local `/vendor/chart.umd.js` bundle are explicitly allowlisted; maintenance scripts and `node_modules` remain inaccessible.
 
 All API responses use JSON except successful 204 responses. Errors use `{ "error": "message" }`. The frontend and API share the same origin; permissive CORS is not enabled. Static files are explicitly allowlisted; server files, credentials, SQL, tests and dependencies are not served.

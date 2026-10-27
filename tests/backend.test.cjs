@@ -42,6 +42,57 @@ async function register(client, suffix='one') {
   return client.call('/api/auth/register',{method:'POST',body:{username:`trainer_${suffix}`,email:`${suffix}@example.test`,password:'a sufficiently long test password'}});
 }
 
+test('private collection states, timestamps, completion and awards persist across login with owner isolation',async t=>{
+  const app=await setup(t),alice=app.client(),bob=app.client(),guest=app.client();
+  await guest.call('/api/auth/session');
+  for(const url of ['/api/pokedex','/api/pokedex/25','/api/progression','/api/achievements'])assert.equal((await guest.call(url)).status,401);
+  assert.equal((await guest.call('/api/pokedex/25',{method:'PUT',body:{status:'caught'}})).status,401);
+  await register(alice,'collection_alice');await register(bob,'collection_bob');
+  const empty=await alice.call('/api/pokedex');assert.match(empty.headers.get('cache-control'),/no-store/);assert.equal(empty.data.statistics.national.seen,0);assert.ok(empty.data.achievements.every(a=>!a.unlockedAt));
+  assert.equal((await alice.call('/api/pokedex/25')).data.status,'not-registered');
+  const caught=await alice.call('/api/pokedex/25',{method:'PUT',body:{status:'caught'}});assert.equal(caught.status,200);
+  assert.equal(caught.data.collection.length,1);assert.equal(caught.data.statistics.national.seen,1);assert.equal(caught.data.statistics.national.caught,1);
+  assert.equal(caught.data.statistics.national.caughtPercentage,100/649);assert.equal(caught.data.statistics.generations[0].caughtPercentage,100/151);
+  assert.ok(caught.data.collection[0].seenAt);assert.ok(caught.data.collection[0].caughtAt);
+  const awards=caught.data.achievements.filter(a=>a.unlockedAt);assert.deepEqual(awards.map(a=>a.key),['first-encounter','first-catch']);
+  const repeat=await alice.call('/api/pokedex/25',{method:'PUT',body:{status:'caught'}});assert.deepEqual(repeat.data.collection,caught.data.collection);assert.deepEqual(repeat.data.achievements, caught.data.achievements);
+  assert.equal((await bob.call('/api/pokedex/25?user_id=1')).data.status,'not-registered');
+  await bob.call('/api/pokedex/649',{method:'PUT',body:{status:'seen'}});
+  assert.equal((await alice.call('/api/pokedex')).data.collection.length,1);
+  const seen=await alice.call('/api/pokedex/25',{method:'PUT',body:{status:'seen'}});assert.equal(seen.data.collection[0].caughtAt,null);assert.equal(seen.data.collection[0].seenAt,caught.data.collection[0].seenAt);
+  assert.equal(seen.data.statistics.national.caught,0);assert.deepEqual(seen.data.achievements.filter(a=>a.unlockedAt).map(a=>a.unlockedAt),awards.map(a=>a.unlockedAt));
+  await alice.call('/api/auth/logout',{method:'POST'});assert.equal((await alice.call('/api/pokedex')).status,401);
+  await alice.call('/api/auth/session');await alice.call('/api/auth/login',{method:'POST',body:{identifier:'collection_alice@example.test',password:'a sufficiently long test password'}});
+  assert.equal((await alice.call('/api/pokedex/25')).data.status,'seen');
+  const removed=await alice.call('/api/pokedex/25',{method:'DELETE'});assert.equal(removed.data.collection.length,0);assert.equal(removed.data.statistics.national.notSeen,649);assert.equal(removed.data.achievements.filter(a=>a.unlockedAt).length,2);
+  assert.equal((await alice.call('/api/pokedex/25',{method:'DELETE'})).data.collection.length,0);
+  assert.equal((await bob.call('/api/pokedex')).data.collection[0].pokemonId,649);
+});
+test('collection API rejects invalid IDs, forged awards/owners and CSRF, and reports manual migration requirements',async t=>{
+  const app=await setup(t),client=app.client();await register(client,'prog_valid');
+  for(const id of ['0','650','-1','1.5','01','1e2','unknown'])for(const method of ['GET','PUT','DELETE'])assert.equal((await client.call(`/api/pokedex/${id}`,{method,...(method==='PUT'?{body:{status:'seen'}}:{})})).status,400);
+  for(const body of [{},{status:'not-registered'},{status:'caught',user_id:2},{status:'caught',achievement:'national-pokedex-master'},{status:true},['caught']])assert.equal((await client.call('/api/pokedex/1',{method:'PUT',body})).status,400);
+  assert.equal((await client.call('/api/pokedex/1',{method:'PUT',body:{status:'caught'},headers:{'X-CSRF-Token':''}})).status,403);
+  assert.equal((await client.call('/api/achievements',{method:'POST',body:{key:'national-pokedex-master'}})).status,404);
+  assert.ok((await client.call('/api/achievements')).data.achievements.every(a=>!a.unlockedAt));
+  app.repo.progression.snapshot=async()=>{const error=Error('missing table');error.code='ER_NO_SUCH_TABLE';throw error;};
+  const unavailable=await client.call('/api/pokedex');assert.equal(unavailable.status,503);assert.match(unavailable.data.error,/manual v0.5.0 migration/);
+  assert.equal((await client.call('/api/teams',{method:'POST',body:{name:'Still works'}})).status,201);
+});
+test('server awards collector and full-team milestones once and keeps timestamps after records/team deletion',async t=>{
+  const app=await setup(t),client=app.client();await register(client,'awards');
+  for(let id=1;id<=25;id++)await client.call(`/api/pokedex/${id}`,{method:'PUT',body:{status:'caught'}});
+  const first=(await client.call('/api/achievements')).data.achievements.find(a=>a.key==='pokemon-collector');assert.ok(first.unlockedAt);assert.equal(first.current,25);
+  const created=await client.call('/api/teams',{method:'POST',body:{name:'Six members'}});const id=created.data.team.id;
+  await client.call(`/api/teams/${id}`,{method:'PUT',body:{name:'Six members',pokemonIds:[1,25,152,252,387,649]}});
+  const teamAward=(await client.call('/api/achievements')).data.achievements.find(a=>a.key==='team-builder');assert.ok(teamAward.unlockedAt);
+  await client.call(`/api/teams/${id}`,{method:'DELETE'});for(let n=1;n<=25;n++)await client.call(`/api/pokedex/${n}`,{method:'DELETE'});
+  const after=(await client.call('/api/achievements')).data.achievements;
+  assert.equal(after.find(a=>a.key==='pokemon-collector').unlockedAt,first.unlockedAt);assert.equal(after.find(a=>a.key==='pokemon-collector').current,0);
+  assert.equal(after.find(a=>a.key==='team-builder').unlockedAt,teamAward.unlockedAt);assert.equal(after.find(a=>a.key==='team-builder').current,0);
+  const stats=(await client.call('/api/progression')).data.statistics;assert.equal(stats.teams,0);assert.equal(stats.national.caught,0);
+});
+
 test('public homepage and Pokédex serve without authentication; legacy trainer routes remain available',async t=>{
   const app=await setup(t),client=app.client();
   for(const route of ['/','/index.html']) {
@@ -59,7 +110,7 @@ test('public homepage and Pokédex serve without authentication; legacy trainer 
   const dashboard=await client.call('/dashboard.html',{raw:true});assert.equal(dashboard.status,200);
   assert.match(dashboard.data,/id="comparison-chart"/);
   const snapshot=await client.call('/data/pokemon-summary.json');assert.equal(snapshot.status,200);assert.equal(snapshot.data.pokemon.length,649);
-  for(const asset of ['/pokemon-data.js','/advanced-filters.js','/dashboard.js','/vendor/chart.umd.js'])assert.equal((await client.call(asset,{raw:true})).status,200);
+  for(const asset of ['/pokemon-data.js','/advanced-filters.js','/dashboard.js','/encyclopedia-data.js','/encyclopedia.js','/vendor/chart.umd.js'])assert.equal((await client.call(asset,{raw:true})).status,200);
   for(const secret of ['/scripts/update-pokemon-data.cjs','/node_modules/chart.js/package.json'])assert.equal((await client.call(secret)).status,404);
 });
 

@@ -36,4 +36,9 @@ function team(body, includeMembers = true) {
   if (new Set(pokemonIds).size !== pokemonIds.length) fail('A team cannot contain duplicate Pokémon.');
   return { name, pokemonIds };
 }
-module.exports = { HttpError, fail, object, text, id, registration, login, team };
+function collectionStatus(body) {
+  object(body);
+  if (Object.keys(body).some(key => key !== 'status') || !['seen', 'caught'].includes(body.status)) fail('Choose a Seen or Caught status. Use DELETE to remove a registration.');
+  return body.status;
+}
+module.exports = { HttpError, fail, object, text, id, registration, login, team, collectionStatus };

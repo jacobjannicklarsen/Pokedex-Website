@@ -17,8 +17,11 @@
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css">
     <script src="pokemon-data.js" defer></script>
+    <script src="encyclopedia-data.js" defer></script>
     <script src="script.js" defer></script>
+    <script src="encyclopedia.js" defer></script>
     <script src="advanced-filters.js" defer></script>
+    <script src="trainer-progress.js" defer></script>
     <script src="account.js" defer></script>
 </head>
 <body>
@@ -67,6 +70,13 @@
         <div class="sort-box"><label for="sort">Sort by</label><select id="sort"><option value="number">Pokédex number</option><option value="name">Name A–Z</option><option value="reverse">Number: high to low</option><optgroup id="stat-sort-options" label="Base statistics" disabled><option value="stat:hp:desc">Highest HP</option><option value="stat:attack:desc">Highest Attack</option><option value="stat:defense:desc">Highest Defense</option><option value="stat:special-attack:desc">Highest Special Attack</option><option value="stat:special-defense:desc">Highest Special Defense</option><option value="stat:speed:desc">Highest Speed</option><option value="stat:total:desc">Highest Total Base Stats</option><option value="stat:total:asc">Lowest Total Base Stats</option></optgroup></select></div>
       </div>
       <div class="filter-row"><span class="filter-label" id="type-label">FILTER BY TYPE</span><div id="type-filters" class="type-filters" role="group" aria-labelledby="type-label"></div></div>
+      <div class="collection-filter-row">
+        <label for="collection-filter">Your collection</label>
+        <select id="collection-filter" aria-describedby="collection-filter-help" disabled><option value="all">All Pokémon</option><option value="seen">Seen (includes Caught)</option><option value="caught">Caught</option><option value="not-seen">Not Seen</option><option value="not-caught">Not Caught</option></select>
+        <button id="collection-login" class="text-button" type="button" hidden>Log in to track</button>
+        <button id="collection-retry" class="text-button" type="button" hidden>Retry collection</button>
+        <p id="collection-filter-help" class="form-help" role="status">Checking your trainer session…</p>
+      </div>
       <details id="advanced-filters" class="advanced-filters">
         <summary>Advanced Filters <span id="advanced-summary">No stat limits</span></summary>
         <p class="form-help">Combine any base stat limits with your search, generation and type. Blank bounds are unrestricted. Values use current Pok&eacute;API base stats.</p>

@@ -6,7 +6,7 @@
   const isTrainerHub = document.body.dataset.page === 'trainers';
   const viewTarget = view => `${new URL('trainers.html', siteRoot).pathname}#view=${view.slice(1) || 'profile'}`;
   const viewFromLocation = () => {
-    const hash = location.hash.match(/^#view=(teams|favorites|profile)$/);
+    const hash = location.hash.match(/^#view=(teams|favorites|profile|progress|achievements)$/);
     return hash ? `/${hash[1]}` : isTrainerHub ? '/profile' : '/';
   };
   let activeView = viewFromLocation();
@@ -62,8 +62,11 @@
   }
   async function refreshSession() {
     const data = await request('/auth/session');
+    const identityChanged = session.user?.id !== data.user?.id;
     session.user = data.user; session.csrf = data.csrfToken;
+    if (identityChanged) { session.teams = []; session.favorites.clear(); }
     session.ready = true; updateAccountUI();
+    if (identityChanged && isTrainerHub) renderPage();
     if (session.user) await loadPrivateData();
     else { session.teams = []; session.favorites.clear(); }
     session.ready = true; updateAccountUI();
@@ -102,6 +105,18 @@
       $('#trainer-session-loading').hidden = session.ready;
       $('#trainer-area').hidden = !authenticated;
     }
+    globalThis.TrainerProgress?.setUser(authenticated ? session.user : null, {
+      authReady: session.ready, request, notice, login: () => openAuth(),
+      onChange() { if (grid) render(); if (['/progress', '/achievements'].includes(activeView)) renderPage(); },
+      async onExternal() {
+        const previous = session.user?.id;
+        try { await refreshSession(); }
+        finally {
+          if (previous !== session.user?.id || ['/progress', '/achievements'].includes(activeView)) renderPage();
+          globalThis.TrainerProgress?.refresh();
+        }
+      }
+    });
   }
   function openAuth(mode = 'login') {
     authMode = mode;
@@ -148,6 +163,7 @@
     try {
       await request(`/favorites/${id}`, { method: selected ? 'DELETE' : 'PUT' });
       selected ? session.favorites.delete(id) : session.favorites.add(id);
+      globalThis.TrainerProgress?.refresh();
       notice(selected ? 'Removed from favourites.' : 'Added to favourites.');
       if (activeView === '/favorites' || activeView === '/profile') renderPage();
     } catch (error) { notice(error.message, true); }
@@ -155,11 +171,13 @@
   }
   function decorateCard(tile, pokemon) {
     if (!tile.querySelector('[data-favorite]')) tile.append(favoriteButton(pokemon));
+    globalThis.TrainerProgress?.decorate(tile, pokemon);
   }
   function decorateDetails(container, pokemon) {
     const controls = element('div', 'detail-account-actions');
     controls.append(favoriteButton(pokemon), element('span', '', 'Favourite this Pokémon'));
     controls.append(action('Add to a team', () => openTeamPicker(pokemon.id)));
+    globalThis.TrainerProgress?.decorate(controls, pokemon);
     container.append(controls);
   }
   function miniPokemon(id) {
@@ -183,7 +201,7 @@
       if (view !== '/') location.assign(viewTarget(view));
       return;
     }
-    activeView = ['/teams', '/favorites', '/profile'].includes(view) ? view : '/profile';
+    activeView = ['/teams', '/favorites', '/profile', '/progress', '/achievements'].includes(view) ? view : '/profile';
     if (push) {
       const target = viewTarget(activeView);
       if (location.pathname + location.hash !== target) history.pushState({}, '', target);
@@ -209,7 +227,7 @@
     if (!isTrainerHub) return;
     teamSelectors.forEach(selector => selector.close()); teamSelectors.clear();
     content.replaceChildren();
-    $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile' })[activeView] || 'Trainer';
+    $('#trainer-heading').textContent = ({ '/teams': 'My Teams', '/favorites': 'My Favourites', '/profile': 'Trainer Profile', '/progress': 'Pokédex Progress', '/achievements': 'Achievements' })[activeView] || 'Trainer';
     if (!session.ready) { content.append(element('p', 'form-help', 'Loading your trainer account…')); return; }
     if (!session.user) return;
     if (!trainerCatalogueStarted) loadTrainerCatalogue();
@@ -227,6 +245,8 @@
       content.append(grid); renderFavoriteGrid();
     }
     if (activeView === '/profile') renderProfile();
+    if (activeView === '/progress') globalThis.TrainerProgress?.renderProgress(content);
+    if (activeView === '/achievements') globalThis.TrainerProgress?.renderAchievements(content);
   }
   function renderFavoriteGrid() {
     const savedGrid = $('#favorite-grid');
@@ -305,6 +325,7 @@
         const { team } = await request('/teams', { method: 'POST', body: { name: name.value } });
         session.teams.unshift(team);
         notice('Team created. Choose up to six Pokémon and save.');
+        globalThis.TrainerProgress?.refresh();
         if (activeView === '/teams') renderPage();
       }
       catch (error) { notice(error.message, true); } finally { submit.disabled = false; }
@@ -341,6 +362,7 @@
         try {
           await request(`/teams/${team.id}`, { method: 'DELETE' });
           session.teams = session.teams.filter(saved => saved.id !== team.id);
+          globalThis.TrainerProgress?.refresh();
           notice('Team deleted.');
           if (activeView === '/teams' || activeView === '/profile') renderPage();
         } catch (error) { notice(error.message, true); }
@@ -358,6 +380,7 @@
           const { team: saved } = await request(`/teams/${team.id}`, { method: 'PUT', body: { name: title.value, pokemonIds } });
           session.teams = session.teams.map(existing => existing.id === team.id ? { ...existing, ...saved } : existing);
           team.name = saved.name; team.pokemonIds = saved.pokemonIds;
+          globalThis.TrainerProgress?.refresh();
           remove.setAttribute('aria-label', `Delete team ${saved.name}`);
           notice('Team saved.');
         }
@@ -378,7 +401,7 @@
       if (team.pokemonIds.includes(pokemonId)) { notice('That Pokémon is already on this team.', true); return; }
       if (team.pokemonIds.length >= 6) { notice('That team already has six Pokémon. Replace a slot in My Teams.', true); return; }
       add.disabled = true;
-      try { await request(`/teams/${team.id}`, { method: 'PUT', body: { name: team.name, pokemonIds: [...team.pokemonIds, pokemonId] } }); await loadPrivateData(); notice('Pokémon added to your team.'); picker.remove(); }
+      try { await request(`/teams/${team.id}`, { method: 'PUT', body: { name: team.name, pokemonIds: [...team.pokemonIds, pokemonId] } }); globalThis.TrainerProgress?.refresh(); await loadPrivateData(); notice('Pokémon added to your team.'); picker.remove(); }
       catch (error) { notice(error.message, true); } finally { add.disabled = false; }
     });
     picker.append(label, add); controls.append(picker);
