@@ -2,7 +2,7 @@
 module.exports=async({origin,evaluate,command,waitFor,repo,uploadDir})=>{
  const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),sharp=require('sharp');
  await waitFor(`document.querySelector('#guest-actions')?.hidden===false`);
- const username=process.env.QA_STUDIO_ONLY?'browser_trainer':'baseline_trainer';
+ const username=(process.env.QA_STUDIO_ONLY||process.env.QA_PROFILE_ONLY)?'browser_trainer':'baseline_trainer';
  const user=await evaluate(`(async()=>{const auth=await(await fetch('/api/auth/session')).json();return(await(await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrfToken},body:JSON.stringify({username:'${username}',email:'baseline@example.test',password:'baseline secure password'})})).json()).user})()`);
  const filename='12345678-1234-4123-8123-123456789abc.webp';
  fs.mkdirSync(uploadDir,{recursive:true});fs.writeFileSync(path.join(uploadDir,filename),await sharp({create:{width:256,height:256,channels:3,background:'#ee9955'}}).webp().toBuffer());

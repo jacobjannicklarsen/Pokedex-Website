@@ -1,6 +1,6 @@
 # Pokédex QA review
 
-This report records successive project stages. The **Dexhaven v0.6.1 sprites and Trainer Card Studio** section at the end describes the current version and latest verification; earlier sections document previous reviews.
+This report records successive project stages. The **Dexhaven v0.7.0 Community Forums & Battle Arena** section at the end describes the current version and latest verification; earlier sections document previous reviews.
 
 Reviewed search, filtering, sorting, details, loading, API failures, cache behavior, accessibility, keyboard interaction, and responsive geometry. The design and existing features are preserved; each development stage below records its dependency and verification scope.
 
@@ -311,3 +311,74 @@ Completed sprite integration and expanded the existing Studio using a shared saf
 Browser tests use temporary profiles, fixture sessions/uploads and MemoryRepository, with downloaded upstream sprite samples supplied through browser interception. GIF failure handling includes an injected image error to avoid an already-decoded image cache. Live upstream asset checks ran separately. These tests do not validate a live MySQL migration or real-account restart persistence, Safari, screen readers or low-end-device CPU usage.
 
 The [manual v0.6.1 migration](database/MIGRATION_v0.6.1.md) remains unapplied and needs explicit approval. Existing reads default new fields safely; expanded saves give migration guidance before approval/application. No tag, release, push or deployment. See [the implementation report](IMPLEMENTATION_v0.6.1.md) for all options, root causes and files.
+
+
+## Dexhaven v0.6.2 Ranks & Administration
+
+Executed full automated suite: **109 passed**, one opt-in real-MySQL test skipped and one existing founder-image SHA mismatch retained (111 total). The supplied image and historical expected checksum were preserved; npm test still exits nonzero. New staff/rank/schema tests: **15/15 passed**, covering per-endpoint authorization, role spoofing, hierarchy/Owner/self protection, Owner-only appointment and permission subsets, live-session changes, suspension limits/expiry/revocation, CSRF, literal/batched SQL binding, stale/concurrent fixture updates, audit failure rollback, scoped logs, private-content ownership, bootstrap arguments, additive readiness schema and every rank threshold/privacy transition. Administrator demotion/re-promotion cannot clear an Owner-assigned subset; removing panel.access blocks all administrative APIs.
+
+Full Chromium regression: **73/73 passed**. Existing login/registration, crop avatars, personal/public profiles, teams/six-slot/caught sources, favourites, collection/awards, filtering, Encyclopedia, sharing/analysis, Studio/sprites and theme/navigation checks remained. New browser flows verify guest/Trainer gates and hidden staff links, Owner role/permission/restriction/revocation confirmations, audit presence, Moderator limits, live demotion, failed-save restoration, keyboard Tab/Escape/focus, touch activation, hover without width changes, reduced motion and rank updates/public opt-in. New panel geometry spans 320/375/768/1280px in both themes; rank profiles also fit 320/375px. Reviewed Admin screenshots in both themes.
+
+Firefox BiDi: **24/24 focused desktop/mobile theme layouts passed** across Studio, directory, public profile and Admin overview/user cards/modal, at 375 and 1280px. Checked modal initial focus and containment. This is a focused layout review, not the full Chromium interaction suite. Temporary-profile cleanup now uses browser.close; no existing browser profile is targeted.
+
+No live database migration, Owner bootstrap, MySQL privilege/grant check, true database race test or existing-account restart persistence test was executed. Browser/security tests use temporary fixture sessions/uploads and MemoryRepository; SQL mocks assert the real repository's guard order, binding and rollback calls without proving deployed InnoDB behavior. Follow [the manual migration guide](database/MIGRATION_v0.6.2.md) after approval. Safari, screen readers and physical-device performance remain untested.
+
+The source is versioned 0.6.2, with no commit, tag, push, release or deployment. See [ADMINISTRATION.md](ADMINISTRATION.md) and [the implementation report](IMPLEMENTATION_v0.6.2.md) for the full permission matrix, policies, endpoint contracts and file list.
+
+
+## Community hover repair and staff-name presentation
+
+Reproduced the hover bug before editing in an isolated Chromium fixture: the stretched profile-link pseudo-element measured roughly 372x575px at rest and 117x44px when hover introduced a containing block. Sampling the same pointer position showed the link alternating hover states. The card's own hover translation also moved its bounds. Removed both the stretched overlay and card translation; avatar, name, profile and shared-team links now have explicit, independent hitboxes. Rank controls and biography text no longer sit under a navigation overlay.
+
+Enhanced community spacing, partner sprite framing, team-slot presentation, role labels, action rows, search clearing, skeleton/loading states, retry feedback and stale/aborted response handling. Loading results are inert; long search strings wrap without mobile overflow. Shared staff-name rendering adds gold/rose Owner, violet/blue Administrator and mint/cyan Moderator treatment with bounded pointer-transparent SVG glitter. Motion preferences retain static names/stars, and forced-colour mode uses solid text. Only published profiles expose the backend-derived staffRole enum; permission arrays, revisions, restrictions and private data remain excluded. Demotion/removal of publication removes the label on subsequent API reads. No new migration, real account change or live database write was performed for this repair.
+
+Executed verification:
+
+- 18 targeted community/public-staff tests passed, including batch/parameter binding, role spoof rejection, unpublished staff exclusion, demotion and privacy.
+- Full automated suite: 111 passed, one live-MySQL test skipped, one existing founder-image checksum mismatch (113 total). Kept the supplied artwork and historical expectation unchanged.
+- Full Chromium regression: 77/77 passed. Added repeated pointer hitbox measurements, independent rank clicks, actual role colour distinctions, ordinary-name exclusion, loading/clear/retry/stale-search behavior, 320/375/768/1280px layouts in both themes, long-query wrapping, keyboard/touch profile navigation and reduced motion. Existing application checks remain intact.
+- Firefox: 24/24 layout checks passed, expanded with actual pointer hover over the community card, stable bounds, no biography overlay and trusted Owner-name rendering in mobile/desktop themes. This remains a focused Firefox review, not the entire Chromium interaction suite.
+
+Reviewed screenshots in the temporary dexhaven-community-polish directory; baseline evidence is separately retained in dexhaven-community-hover-before. Tests use fixture accounts/data and temporary profiles, not the live MySQL database. Existing staff setup is reused; restart Express and refresh Community after source updates. See COMMUNITY.md for the new public role-label boundary.
+
+## Profile structure, title treatments and identity layout follow-up
+
+Chromium: **81/81** full regression checks passed with an isolated Express/in-memory repository. Added checks for hero hover/focus glow and stable hitboxes; picture-before-biography structure; eight distinct live title treatments and save/reload; profile/Studio geometry at 320, 390 and 1280px in both themes; section shortcut focus; and separate motto/biography rendering with privacy revocation. Staff role and title share a center line. Existing avatar cropping, authentication, teams, favourites and account isolation checks still pass. Firefox: **24/24** desktop/mobile theme layout checks passed. Its biography-hover fixture now explicitly shares a real biography rather than relying on the removed placeholder.
+
+Automated tests: **112 passed, one skipped live-MySQL check, one existing founder-art checksum failure**. The title constraint expansion and fresh-schema checks are covered, including specific upgrade guidance for an older CHECK. No real MySQL migration was executed; live database persistence after that manual upgrade remains unverified. The checksum assertion and artwork were left intact.
+
+## Dexhaven v0.7.0 - Community Forums & Battle Arena
+
+`npm.cmd test`: **131 passed, one skipped live-MySQL integration test, one existing
+founder-image checksum failure**. All **19 new forum/battle tests** passed.
+Existing assertions and custom artwork were preserved. The aggregate command
+therefore still exits nonzero and is not described as a completely green release.
+
+Chromium full regression: **89/89 passed**. New scenarios cover registration,
+posting/XSS-safe text, Pokemon references, title editing, quote/reply/edit,
+reactions/follows, public-team revocation, notifications/read state, staff reports,
+hiding/locking/category configuration, selector/level/moveset changes, manual and
+auto battles, restart/pause/speed, forum summary drafts, reduced motion, keyboard
+focus, 320/390/1280px geometry, both themes and loading/error retry. A focused
+follow-up also verified lazy name suggestions, author removal via confirmation
+and the final mobile header/selector styling with scrollbar-aware width checks.
+Firefox: **37/37 passed**, with new list/discussion/Arena layouts at 375/1280px in
+both themes, plus manual/auto controls and existing Studio/directory/profile/admin
+coverage. Screenshots were reviewed from OS temporary review folders.
+
+Security/storage fixtures cover ownership, restrictions, fresh staff permissions,
+hierarchy, CSRF, optimistic edit conflicts, soft removal/retained restoration,
+transactional audit failure, private-team revocation, safe quotes, notification
+isolation/deduplication, pagination/deep links, literal search, reaction/follow
+uniqueness and write rate limiting. Battle tests check all 649 species at levels
+1/100, historical values/types, integer stat/damage examples, criticals, accuracy,
+PP, stage/status effects, priority/ties, immunities, knockouts, Struggle, AI,
+seeded reproducibility and stale timer cancellation.
+
+The forum migration is prepared only. Tests use in-memory repositories and mocked
+SQL contracts, not the real MySQL schema. Live import, actual MySQL constraints/
+concurrency, backup recovery and restart persistence require the manual checklist
+in [MIGRATION_v0.7.0.md](database/MIGRATION_v0.7.0.md). Browser artwork and external
+API calls use fixtures, so upstream sprite/network availability is not established.
+The battle rules are intentionally simplified; unsupported moves are explicitly
+disabled and cartridge-perfect behavior is not claimed.

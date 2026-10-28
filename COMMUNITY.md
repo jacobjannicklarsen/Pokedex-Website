@@ -123,3 +123,37 @@ TrainerCardConfig normalizes the same safe choices in the API and Studio. Traine
 Featured Partners use the selected species' verified Generation V battle sprites; compact teams use party icons in the stored slot order with the existing empty slots. Expanded shared teams keep statistics/analysis and use larger static battle sprites. No extra private data or shiny state is inferred. Reduced motion selects static sprites. The [sprite and Studio report](IMPLEMENTATION_v0.6.1.md) documents upstream checks, fallbacks and browser testing.
 
 Expanded persistence requires the separate [v0.6.1 manual migration](database/MIGRATION_v0.6.1.md). Old decoration reads have a legacy/default fallback; writes report the missing upgrade rather than silently discarding new fields. All existing profile, avatar, biography, achievement and team visibility gates remain.
+
+
+## v0.6.2 rank and staff privacy
+
+Public profiles and directory cards may include a rank DTO only when the existing shareProgress option is enabled. It contains current caught/total, rank, next threshold, remaining species and interval progress, derived by the backend from the existing collection. No raw collection, private staff context or extra permissions are exposed. Directory counts use the indexed existing unique species rows and are not stored separately.
+
+The new Administration workspace exposes only permitted basic account/role/restriction records, not emails, biographies, avatars, teams, favourites or caught history. Every staff role retains the existing private-content ownership rules and public-sharing gates. A temporary restriction blocks authentication/private tools; it does not silently publish, delete or unpublish already approved public content. See [ADMINISTRATION.md](ADMINISTRATION.md).
+
+
+## Community hover and staff-name follow-up
+
+Fixed the actual hover loop: the stretched profile-link pseudo-element covered a card body (about 372×575px in reproduction), but hover transforms/filter made its containing block shrink to the 117×44px button. This repeatedly changed the pointer target. Removed that overlay and the card's hover translation. Cards now highlight in place, with separate accessible avatar/name/profile/team links and independent rank controls.
+
+Improved partner presentation, compact team spacing, aligned action rows, theme contrast, search clearing, loading placeholders, retry feedback and stale-response cancellation. Loading results are inert until the current request finishes. Long queries wrap on mobile. Existing card customization, privacy, team order and sprite fallbacks remain.
+
+Published profiles/cards expose only a trusted staffRole label for Owner, Administrator and Moderator. It is batch-read from existing user_roles, joined to enabled public profiles; ordinary Trainers have no staffRole field. Owner names use gold/rose highlights, Administrators violet/blue and Moderators mint/cyan, with small pointer-transparent SVG glitter. Public profile names and the signed-in trainer's own name share this treatment. Reduced motion retains static decoration; forced colours keep solid readable text. No permission context, restriction metadata, private profile data or new authority is exposed. Missing staff tables gracefully use ordinary name styling. No new migration or account modification is required. Restart Express after updating backend code, then refresh the Community page.
+
+## Profile structure and title styles
+
+Trainer Hub uses a dedicated `trainer-hub.css` layout for the overview/rank/counts, picture and Biography forms, privacy controls, Studio and compact summaries. Picture editing remains first in DOM and mobile reading order. Settings shortcuts focus their section heading without replacing the current profile or losing unsaved edits. Teams and favourites retain their full dedicated views.
+
+Directory cards and profile headers have separate username/motto and role/title rows. The motto sits on the right and may wrap on narrow screens. A biography appears below only when the backend approves it through **Show biography publicly**; the motto never replaces missing biography text. Both fields remain safe text content.
+
+Eight title treatments share the existing renderer: Ribbon, Pill, Minimal, Outlined, Medallion, Ticket, Gradient and Champion. New choices require the [manual CHECK expansion](database/MIGRATION_trainer-title-styles.md) on existing databases. Until applied, saving a new style returns specific upgrade guidance; old options still work. Champion is a cosmetic treatment, separate from earned rank and staff role. No database migration was run for this update.
+
+## v0.7.0 discussion and battle spaces
+
+The trainer directory remains at `community.html`. Main navigation and Community
+subnavigation now connect it to [Forums](FORUMS.md) and the [Battle Arena](BATTLE_ARENA.md).
+Forums reuse current public identities, progression consent and team share links;
+no second profile or sharing system was created. Staff moderation lives in the
+existing Admin Panel. See the separate [manual migration](database/MIGRATION_v0.7.0.md).
+The Arena is a local, unranked simulation; posting its summary requires an explicit
+forum composer submission and never grants progression or competitive authority.

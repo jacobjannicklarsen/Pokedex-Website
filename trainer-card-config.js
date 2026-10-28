@@ -6,7 +6,7 @@
     pattern:['aurora','constellation','grid','waves','petals','plain','nebula','depths','ember','forest','royal'],
     frame:['classic','halo','double','laurel','hexagon','orbit','rounded','diamond','neon','minimal','champion'],
     effect:['none','sparkles','shimmer','starfield','holographic','glow','electric','particles'],
-    borderStyle:['solid','double','dashed','etched'], titleStyle:['ribbon','pill','minimal']
+    borderStyle:['solid','double','dashed','etched'], titleStyle:['ribbon','pill','minimal','outlined','medallion','ticket','gradient','champion']
   };
   const defaults=()=>({palette:'mint',pattern:'aurora',frame:'classic',effect:'none',title:'',motto:'',pinnedBadges:[],accentColor:null,borderColor:null,frameColor:null,borderStyle:'solid',titleStyle:'ribbon'});
   const labels={classic:'Circle',halo:'Halo',double:'Double ring',laurel:'Laurel',hexagon:'Hexagon',orbit:'Orbit',rounded:'Rounded square',diamond:'Diamond',neon:'Neon ring',minimal:'Minimal border',champion:'Champion',grid:'Cyber grid',waves:'Coastal waves',plain:'Minimal',depths:'Ocean depths',holographic:'Holographic shine',glow:'Subtle glow',electric:'Electric accents',particles:'Floating particles'};

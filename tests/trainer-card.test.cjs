@@ -28,23 +28,35 @@ test('SQL persistence binds all cosmetics to the authenticated owner, reads lega
  assert.equal((await repo.decoration(42)).accentColor,null);assert.equal((await repo.decoration(42)).title,'Legacy');assert.equal(legacyReads,2);
  pool.execute=async sql=>{if(sql.includes('achievement_key'))return [[]];throw Object.assign(Error("Unknown column 'accent_color'"),{code:'ER_BAD_FIELD_ERROR'});};
  await assert.rejects(repo.saveDecoration(42,old),e=>e.status===503&&e.message.includes('v0.6.1-trainer-studio.sql'));
+ pool.execute=async sql=>{if(sql.includes('achievement_key'))return [[]];throw Object.assign(Error("Check constraint 'ck_decoration_title_style' is violated."),{code:'ER_CHECK_CONSTRAINT_VIOLATED'});};
+ await assert.rejects(repo.saveDecoration(42,{...old,titleStyle:'champion'}),e=>e.status===503&&e.message.includes('database/migrations/trainer-title-styles.sql'));
+});
+
+test('title expansion preserves all legacy styles and changes only their named database check',()=>{
+ const sql=fs.readFileSync(path.join(__dirname,'../database/migrations/trainer-title-styles.sql'),'utf8');
+ assert.deepEqual(config.choices.titleStyle.slice(0,3),['ribbon','pill','minimal']);
+ assert.equal(config.choices.titleStyle.length,8);
+ assert.match(sql,/DROP CHECK ck_decoration_title_style/);
+ assert.equal((sql.match(/ALTER TABLE/g)||[]).length,1);
+ assert.ok(!/\b(?:DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE|UPDATE |INSERT INTO)\b/.test(sql));
 });
 test('v0.6.1 schema changes are additive and retain every previous option; version metadata is consistent',()=>{
  const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
  const sql=read('database/migrations/v0.6.1-trainer-studio.sql'),schema=read('database/schema.sql');
  assert.match(sql,/USE pokedex_app;/);assert.equal((sql.match(/ALTER TABLE/g)||[]).length,1);
  assert.ok(!/\b(?:DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE|UPDATE |INSERT INTO)\b/.test(sql));
- const fresh=schema.slice(schema.indexOf('CREATE TABLE IF NOT EXISTS trainer_decorations'));
+ const fresh=schema.match(/CREATE TABLE IF NOT EXISTS trainer_decorations \([\s\S]*?ENGINE=InnoDB;/)[0];
  assert.equal((fresh.match(/ENGINE=InnoDB;/g)||[]).length,1);
  for(const line of sql.split(/\r?\n/)){
   const column=line.match(/^  ADD COLUMN (.*),$/),constraint=line.match(/^  ADD (CONSTRAINT .*?)[,;]?$/);
+  if(constraint?.[1].includes('ck_decoration_title_style'))continue;
   if(column)assert.ok(fresh.includes(column[1]),`fresh column: ${column[1]}`);
   if(constraint)assert.ok(fresh.includes(constraint[1]),`fresh constraint: ${constraint[1]}`);
  }
  for(const [key,values]of Object.entries(config.choices)){
   const column=key.replace(/[A-Z]/g,c=>'_'+c.toLowerCase());
   const check=`CONSTRAINT ck_decoration_${column} CHECK (${column} IN (${values.map(v=>"'"+v+"'").join(',')}))`;
-  assert.ok(sql.includes(check));assert.ok(schema.includes(check));
+  assert.ok((key==='titleStyle'?read('database/migrations/trainer-title-styles.sql'):sql).includes(check));assert.ok(schema.includes(check));
  }
- assert.equal(require('../package.json').version,'0.6.1');const lock=require('../package-lock.json');assert.equal(lock.version,'0.6.1');assert.equal(lock.packages[''].version,'0.6.1');
+ assert.equal(require('../package.json').version,'0.7.0');const lock=require('../package-lock.json');assert.equal(lock.version,'0.7.0');assert.equal(lock.packages[''].version,'0.7.0');
 });

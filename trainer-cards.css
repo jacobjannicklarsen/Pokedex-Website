@@ -12,6 +12,21 @@
 .trainer-card-surface[data-title-style="pill"] .trainer-title-ribbon { border-radius:30px; background:var(--bg); border:1px solid color-mix(in srgb,var(--card-accent) 65%,var(--line)); }
 .trainer-card-surface[data-title-style="minimal"] .trainer-title-ribbon { padding-inline:0; border:0; background:none; color:var(--text); }
 .trainer-card-surface .trainer-title-ribbon,.trainer-card-surface .showcase-badge { color:var(--text); }
+.trainer-name-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; min-width:0; }
+.trainer-name-row>:is(h1,h2,h3) { margin:0; min-width:0; max-width:100%; }
+.trainer-motto-inline { flex:0 1 auto; margin:0 0 0 auto; max-width:55%; font-size:12px; font-style:italic; color:var(--muted); line-height:1.6; text-align:right; white-space:pre-wrap; overflow-wrap:anywhere; }
+.trainer-identity-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px; min-width:0; }
+.trainer-identity-meta [data-trainer-title-slot] { display:contents; }
+.trainer-identity-meta :is(.trainer-title-ribbon,.community-staff-label,.staff-badge) { margin:0; display:inline-flex; align-items:center; min-height:30px; line-height:1.3; }
+.trainer-identity-meta:not(:has(.trainer-title-ribbon,.community-staff-label,.staff-badge)) { display:none; }
+.trainer-card-surface[data-title-style="outlined"] .trainer-title-ribbon { border:2px solid var(--card-accent); background:transparent; border-radius:6px; font-weight:600; letter-spacing:.4px; }
+.trainer-card-surface[data-title-style="medallion"] .trainer-title-ribbon { border-radius:30px; border:3px double var(--card-accent); background:color-mix(in srgb,var(--card-accent) 8%,var(--panel)); font-weight:600; gap:7px; }
+.trainer-card-surface[data-title-style="medallion"] .trainer-title-ribbon::before { content:''; width:7px; height:7px; flex-shrink:0; border-radius:50%; background:var(--card-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--card-accent) 20%,transparent); }
+.trainer-card-surface[data-title-style="ticket"] .trainer-title-ribbon { border-radius:3px; border-style:dashed; border-color:var(--card-accent); background:color-mix(in srgb,var(--card-accent) 7%,var(--panel)); padding-inline:15px; font-family:'Space Grotesk',sans-serif; }
+.trainer-card-surface[data-title-style="gradient"] .trainer-title-ribbon { border-radius:8px; border-color:color-mix(in srgb,var(--card-accent) 55%,var(--line)); background:linear-gradient(115deg,color-mix(in srgb,var(--card-accent) 20%,var(--panel)),color-mix(in srgb,var(--card-secondary) 18%,var(--panel))); font-weight:600; box-shadow:inset 0 1px #ffffff12; }
+.trainer-card-surface[data-title-style="champion"] .trainer-title-ribbon { border:2px solid #c6a35c; border-radius:6px; background:linear-gradient(120deg,color-mix(in srgb,#c6a35c 14%,var(--panel)),var(--panel)); font-weight:600; letter-spacing:.4px; gap:8px; }
+.trainer-card-surface[data-title-style="champion"] .trainer-title-ribbon::before { content:''; width:7px; height:7px; flex-shrink:0; background:#c6a35c; transform:rotate(45deg); }
+@media(max-width:700px) { .trainer-motto-inline { max-width:100%; } }
 .trainer-card-surface[data-pattern="nebula"]::before { background:radial-gradient(ellipse at 25% 10%,#be90ed90,transparent 48%),radial-gradient(ellipse at 80% 110%,var(--card-accent),transparent 60%),radial-gradient(circle at 65% 30%,#fff 1px,transparent 2px),#17263c; background-size:100% 100%,100% 100%,53px 43px,100% 100%; }
 .trainer-card-surface[data-pattern="depths"]::before { background:repeating-radial-gradient(ellipse at 50% -120%,transparent 0 22px,#a4f3ff24 23px 25px,transparent 26px 42px),linear-gradient(160deg,#20597b,#112c47 70%,#111e32); }
 .trainer-card-surface[data-pattern="ember"]::before { background:radial-gradient(circle at 15% 80%,#ffc778 1px,transparent 2px),radial-gradient(ellipse at 70% 130%,#dc632c,transparent 70%),linear-gradient(130deg,#4f2534,#35202d); background-size:67px 53px,100% 100%,100% 100%; }

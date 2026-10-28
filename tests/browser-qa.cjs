@@ -33,7 +33,7 @@ async function main() {
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['forums.html','battle.html','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-runner.js','data/battle-v5.json','about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-hub.css','community.css','trainer-names.js','interactions.css','trainer-ranks.js','admin.html','admin.css','admin.js','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -150,6 +150,11 @@ async function main() {
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await command('Page.navigate', { url: origin });
+  if(process.env.QA_V070_ONLY){await require('./support/v070-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_COMMUNITY_ONLY){await require('./support/community-polish.cjs').run({check,origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_COMMUNITY_BASELINE){await require('./support/community-polish.cjs').baseline({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});return;}
+  if(process.env.QA_ADMIN_ONLY){await require('./support/admin-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_PROFILE_ONLY){await require('./support/card-baseline.cjs')({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});await require('./support/profile-refresh.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_STUDIO_ONLY){await require('./support/card-baseline.cjs')({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});await require('./support/studio-expansion.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo,uploadDir,spriteFailures,spriteRequests});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_CARD_BASELINE){await require('./support/card-baseline.cjs')({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});return;}
   await check('trainer navigation stays hidden while authentication is loading, then exposes Login/Register only',async()=>{
@@ -1340,6 +1345,10 @@ async function main() {
     assert.deepEqual(exceptions,[]);
   });
   await require('./support/studio-expansion.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo,uploadDir,spriteFailures,spriteRequests});
+  await require('./support/profile-refresh.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
+  await require('./support/admin-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
+  await require('./support/community-polish.cjs').run({check,origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});
+  await require('./support/v070-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
   await check('static community preview gives a clear backend-required state without exposing private data',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/community.html'});
     await waitFor(`document.querySelector('.community-error')`);

@@ -89,3 +89,55 @@ Authenticated GET /api/profile/decorations returns {decoration,choices,badges}; 
 Public decoration projections expose these cosmetic values only through already enabled public profiles/cards. They cannot publish hidden content. No changes to authentication, uploads, teams or collection APIs. Pre-upgrade reads normalize old rows; expanded writes require database/migrations/v0.6.1-trainer-studio.sql and return 503 with guidance if fields/checks are missing. The migration is manual only.
 
 Sprites are client image assets selected from existing species IDs; the utility adds no API endpoints and no private data fields. The Express allowlist explicitly serves trainer-card-config.js, trainer-cards.css, sprite-availability.js and pokemon-sprites.js. Development scripts, manifests under tests, SQL and server source remain private.
+
+
+## Ranks & Administration v0.6.2
+
+All eight administrative endpoints, bodies, capability names, policies and status codes are specified in [ADMINISTRATION.md](../ADMINISTRATION.md#api-contract). Every administrative call needs current panel.access plus its specific capability; mutations also retain the existing session CSRF/origin checks. Owner bootstrap is a separate explicitly invoked local command, never an HTTP route.
+
+GET /api/auth/session and private profile results include the caller's own staff context (available/role/permissions/roleVersion). No client role claim is trusted. Restrictions are checked at login, session refresh, private API access and private avatar reads; denied active sessions are cleared. Administrative role changes re-read authority under a serialized guard and require an expected target version. Audit insertion is in the same transaction. Private content ownership is unchanged for staff.
+
+Private progression bundles include a server-calculated rank. Existing shareProgress controls whether public profile/directory projections include it; private staff permission context is not added publicly. Published profiles/cards may include only an allowlisted staffRole label for Owner/Administrator/Moderator name styling; no permissions, revisions or restriction data. No stored rank/count or new Pokémon API requests. Exact tiers: Rookie 0-24, Bronze 25-99, Silver 100-249, Gold 250-449, Diamond 450-648, Champion 649.
+
+The additive v0.6.2 tables and readiness behavior are documented in [the manual migration guide](../database/MIGRATION_v0.6.2.md). Complete absence leaves base Trainer use available with no staff privileges; a partial administrative installation fails closed. No migration is performed at startup.
+
+## v0.7.0 forums and notifications
+
+See [FORUMS.md](../FORUMS.md) for identity/privacy, moderation hierarchy and limits.
+All responses inherit `/api` no-store behavior. Public reads are unauthenticated;
+all writes and notification/staff reads reuse authenticated sessions. Every write
+requires the existing CSRF token and allowed origin. Forum schema failures return
+503 with manual upgrade guidance; other trainer APIs remain separate.
+
+| Method | Path | Request / behavior |
+| --- | --- | --- |
+| GET | `/api/forums/categories` | Database categories, flags, thread/reply totals and latest activity |
+| GET | `/api/forums/threads` | `category`, literal title `q`, `sort=activity/newest/replies`, `page` (20/thread page) |
+| GET | `/api/forums/threads/:id` | `page`; optional `post` resolves that post's page; visible posts/quotes/current public team DTOs and signed-in ownership/reaction/follow state |
+| POST | `/api/forums/threads` | `categoryId,title,body`; optional `teamShareId,quotePostId` (a new thread has no existing quote source) |
+| PATCH | `/api/forums/threads/:id` | Own unlocked thread: `title,version` |
+| POST | `/api/forums/threads/:id/posts` | `body`; optional owned-public `teamShareId` and visible same-thread `quotePostId`; returns post ID/page |
+| PATCH | `/api/forums/posts/:id` | Own unlocked post: `body,version`; optional `teamShareId,quotePostId`; original quote identity cannot change |
+| DELETE | `/api/forums/posts/:id` | Own unlocked post: `version`; retains the row and audit |
+| PUT / DELETE | `/api/forums/posts/:id/reaction` | Add/remove own unique reaction |
+| PUT / DELETE | `/api/forums/threads/:id/follow` | Add/remove own unique subscription |
+| POST | `/api/forums/threads/:id/reports` | `reason`; optional `postId`; duplicate pending reports rejected |
+| GET | `/api/notifications` | Own notifications, unread count and `page` (30 per page); no post body/private/removed previews |
+| PUT | `/api/notifications/:id/read` | Mark only an owned notification read |
+| GET | `/api/admin/forums/reports` | Pending reports within current staff authority; `page` (25 per page) |
+| GET | `/api/admin/forums/history` | Owner: all forum actions; other staff: own actions; `page` |
+| GET | `/api/admin/forums/threads/:id` | Inspect current/retained thread/post content within authority; `page` (20 posts) |
+| POST | `/api/admin/forums/moderate` | `threadId,action,version,reason`; optional `postId,reportId`; boolean `value` required for `lock`/`pin`; actions `hide,remove,restore,lock,pin,resolve` (resolve requires report) |
+| POST | `/api/admin/forums/categories` | `name,description,announcements,active,position`; configuration permission |
+| PUT | `/api/admin/forums/categories/:id` | Same complete fields; archive with `active:false`, preserving discussions |
+
+State changes return committed JSON only. Unknown fields, malformed IDs/choices,
+forged authors and stale versions are rejected. HTTP 400 validation, 401 login,
+403 permission/CSRF/restriction, 404 unavailable/foreign content, 409 conflict,
+429 rate limit and 503 missing schema are meaningful failure states. The existing
+16 KB JSON limit applies. New capabilities are `forums.moderate` and
+`forums.configure`, each also requiring `panel.access`.
+
+The Battle Arena has no result-writing API or battle tables. `GET
+/data/battle-v5.json` serves its pinned public snapshot through the static
+allowlist; summaries are untrusted forum text only.

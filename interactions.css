@@ -1,0 +1,101 @@
+/* Shared, restrained feedback across Dexhaven's existing controls. */
+:is(button,.action-button,.trainer-nav a,.explore-link,.text-button) { touch-action:manipulation; transition:background-color .16s,border-color .16s,box-shadow .16s,transform .12s; }
+button:not(:disabled),.trainer-nav a,.action-button { min-height:44px; }
+/* Make the linked founders artwork visibly respond without changing its hitbox. */
+.hero-art { cursor:pointer; border-radius:24px; }
+.hero-art::after { opacity:.65; transition:opacity .24s,filter .24s; }
+.hero-art img { transition:filter .24s; }
+.hero-art .hero-orbit { transition:border-color .24s,box-shadow .24s; }
+.hero-art:is(:focus-visible,:active) { --hero-glow:#80e5b899; }
+.hero-art:is(:focus-visible,:active)::after { opacity:1; filter:blur(3px); }
+.hero-art:is(:focus-visible,:active) .hero-orbit { border-color:var(--mint); box-shadow:0 0 30px #80e5b84d,inset 0 0 18px #80e5b81a; }
+@media(hover:hover) {
+ .hero-art:hover { --hero-glow:#80e5b899; }
+ .hero-art:hover::after { opacity:1; filter:blur(3px); }
+ .hero-art:hover .hero-orbit { border-color:var(--mint); box-shadow:0 0 30px #80e5b84d,inset 0 0 18px #80e5b81a; }
+}
+:root[data-theme="light"] .hero-art:is(:hover,:focus-visible,:active) { --hero-glow:#1c9b6880; }
+@media(prefers-reduced-motion:reduce) { .hero-art img,.hero-art::after,.hero-art .hero-orbit { transition:none; } }
+/* Text underlines do not change button size or shift nearby controls. */
+:is(.text-button,#auth-submit) {
+ text-decoration-line:underline;
+ text-decoration-color:transparent;
+ text-decoration-thickness:1.5px;
+ text-underline-offset:.25em;
+}
+html.theme-ready :is(.text-button,#auth-submit) {
+ transition:background-color .16s,color .16s,border-color .16s,box-shadow .16s,transform .12s,text-decoration-color .16s;
+}
+:is(.text-button,#auth-submit):not(:disabled):is(:focus-visible,:active) { text-decoration-color:currentColor; }
+@media(hover:hover) {
+ :is(.text-button,#auth-submit):not(:disabled):hover { text-decoration-color:currentColor; }
+}
+/* Homepage discovery links keep their aligned layout while responding to input. */
+.home-features .explore-link {
+ --link-accent:var(--mint);
+ position:relative;
+ min-height:44px;
+ max-width:100%;
+ padding-right:4px;
+ border-bottom-color:transparent;
+ transition:color .16s,transform .12s;
+}
+:root[data-theme="light"] .home-features .explore-link { --link-accent:var(--accent-ink); }
+.home-features .explore-link::after {
+ content:'';
+ position:absolute;
+ inset-inline:0;
+ bottom:-1px;
+ height:2px;
+ background:var(--link-accent);
+ transform:scaleX(0);
+ transform-origin:left;
+ transition:transform .18s ease-out;
+ pointer-events:none;
+}
+.home-features .explore-link>span { transition:transform .18s ease-out; }
+.home-features .explore-link:is(:focus-visible,:active) { color:var(--link-accent); }
+.home-features .explore-link:is(:focus-visible,:active)::after { transform:scaleX(1); }
+.home-features .explore-link:active { transform:translateY(1px); }
+@media(hover:hover) {
+ .home-features .explore-link:hover { color:var(--link-accent); }
+ .home-features .explore-link:hover::after { transform:scaleX(1); }
+ .home-features .explore-link:hover>span { transform:translate(3px,-3px); }
+}
+@media(prefers-reduced-motion:reduce) {
+ .home-features .explore-link::after,.home-features .explore-link>span { transition:none; }
+ .home-features .explore-link>span { transform:none !important; }
+}
+@media(hover:hover) {
+ button:not(:disabled):hover,.action-button:hover { box-shadow:0 3px 12px #0002; }
+ .action-button:hover { filter:brightness(1.05); transform:translateY(-1px); }
+ .trainer-nav a:hover,.text-button:hover { color:var(--mint); }
+ select:hover { box-shadow:inset 0 0 0 1px var(--mint); }
+ .rank-badge:hover { box-shadow:0 0 0 3px color-mix(in srgb,var(--rank-colour) 18%,transparent); }
+}
+button:not(:disabled):active,.action-button:active { transform:translateY(1px); box-shadow:none; }
+button:disabled { cursor:not-allowed; opacity:.65; }
+[aria-busy="true"] button:disabled { cursor:wait; }
+:is(input,select,textarea,summary):focus-visible { outline:2px solid var(--mint); outline-offset:3px; }
+.trainer-nav a[aria-current="page"] { color:var(--mint); box-shadow:0 2px var(--mint); }
+:root[data-theme="light"] .trainer-nav a[aria-current="page"] { color:var(--accent-ink); }
+@media(hover:hover) { :root[data-theme="light"] .trainer-nav a:hover,:root[data-theme="light"] .text-button:hover { color:var(--accent-ink); } }
+:root[data-theme="light"] :is(textarea,summary):focus-visible { outline-color:var(--accent-ink); }
+.rank-card { --rank-colour:#a9c1b4; display:inline-block; vertical-align:top; max-width:100%; margin-block:8px; }
+.rank-card[data-rank="bronze"] { --rank-colour:#d99f73; }
+.rank-card[data-rank="silver"] { --rank-colour:#c4d7e9; }
+.rank-card[data-rank="gold"] { --rank-colour:#efd078; }
+.rank-card[data-rank="diamond"] { --rank-colour:#97e9ee; }
+.rank-card[data-rank="champion"] { --rank-colour:#d2b1ff; }
+.rank-badge { display:inline-flex; align-items:center; gap:9px; cursor:pointer; padding:9px 14px; min-height:44px; border:1px solid var(--rank-colour); border-radius:30px; background:color-mix(in srgb,var(--rank-colour) 12%,var(--panel)); color:var(--text); font:600 13px 'Space Grotesk',sans-serif; }
+.rank-badge::marker { content:''; }
+.rank-badge::-webkit-details-marker { display:none; }
+.rank-mark { color:var(--rank-colour); font-size:20px; }
+.rank-details { padding:16px; border:1px solid var(--line); background:var(--panel); border-radius:12px; margin-top:10px; max-width:350px; }
+.rank-details progress { display:block; width:100%; height:8px; margin-block:12px; accent-color:var(--rank-colour); }
+.staff-badge { display:inline-flex; align-items:center; min-height:30px; margin:6px 10px 6px 0; padding:5px 10px; font-size:11px; font-weight:600; border:1px solid var(--line); border-radius:7px; background:var(--bg); color:var(--muted); }
+.staff-badge[data-staff-role="owner"] { color:var(--text); border-color:#caa158; background:color-mix(in srgb,#caa158 15%,var(--panel)); }
+.staff-badge[data-staff-role="administrator"] { color:var(--text); border-color:#ad8ecb; }
+.staff-badge[data-staff-role="moderator"] { color:var(--text); border-color:var(--mint); }
+[aria-busy="true"] { cursor:progress; }
+@media(prefers-reduced-motion:reduce) { :is(button,a,input,select,textarea,summary) { transition:none !important; animation:none !important; transform:none !important; } }

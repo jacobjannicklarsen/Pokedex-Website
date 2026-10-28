@@ -19,7 +19,7 @@ class ProgressionRepository {
     const saved = new Set(awards.map(a=>a.key)), missing = logic.eligible(statistics,teams).filter(key=>!saved.has(key));
     for (const key of missing) await logic.award(connection, userId, key);
     if(missing.length) [awards] = await connection.execute(awardQuery, [userId]);
-    return { collection, statistics, achievements: logic.achievements(statistics, teams, awards) };
+    return { collection, statistics, rank:require('./trainer-ranks').calculate(statistics.national.caught), achievements: logic.achievements(statistics, teams, awards) };
   }
   async transaction(userId, mutation) {
     const connection = await this.pool.getConnection();

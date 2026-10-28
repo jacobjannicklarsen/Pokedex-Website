@@ -1,0 +1,8 @@
+'use strict';
+const v=require('./validation');
+function fields(body,allowed,required=allowed){v.object(body);if(Object.keys(body).some(k=>!allowed.includes(k))||required.some(k=>!(k in body)))v.fail('Send only the required forum fields.');return body;}
+function post(body,editing=false){fields(body,editing?['body','teamShareId','quotePostId','version']:['body','teamShareId','quotePostId'],editing?['body','version']:['body']);return{body:v.text(body.body,'Post',1,6000),teamShareId:body.teamShareId==null?null:require('./community').shareId(body.teamShareId),quotePostId:body.quotePostId==null?null:v.id(body.quotePostId),...(editing?{version:v.id(body.version)}:{})};}
+function thread(body){fields(body,['categoryId','title','body','teamShareId','quotePostId'],['categoryId','title','body']);return{...post(Object.fromEntries(Object.entries(body).filter(([k])=>!['categoryId','title'].includes(k)))),categoryId:v.id(body.categoryId),title:v.text(body.title,'Discussion title',3,120)};}
+function query(q){const page=q.page===undefined?1:v.id(q.page,10000),sort=q.sort||'activity';if(!['activity','newest','replies'].includes(sort))v.fail('Choose a supported discussion sort.');return{page,sort,q:v.text(q.q||'','Search',0,100),categoryId:q.category===undefined?null:v.id(q.category)};}
+function category(body){fields(body,['name','description','announcements','active','position']);if(typeof body.active!=='boolean'||typeof body.announcements!=='boolean')v.fail('Category switches must be true or false.');return{name:v.text(body.name,'Category name',3,80),description:v.text(body.description,'Description',0,300),announcements:body.announcements,active:body.active,position:v.id(body.position,1000)};}
+module.exports={fields,post,thread,query,category};

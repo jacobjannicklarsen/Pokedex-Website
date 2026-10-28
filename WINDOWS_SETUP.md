@@ -1,5 +1,7 @@
 # Windows / VS Code setup
 
+**v0.6.2 upgrade:** review [database/MIGRATION_v0.6.2.md](database/MIGRATION_v0.6.2.md) for backup, Workbench execution, validation, recovery and explicit existing-ID Owner bootstrap. No staff migration or Owner assignment has been run. Existing accounts remain Trainers, with ranks calculated from existing Caught records. See [ADMINISTRATION.md](ADMINISTRATION.md) for the permission matrix and suspension policy.
+
 **v0.6.1:** review the separate [Trainer Card Studio migration](database/MIGRATION_v0.6.1.md) for existing decoration tables. It is prepared only and must be approved before application. Fresh installs use the updated schema. Sprite images require access to the public PokéAPI sprite host and fall back to a local placeholder.
 
 Biography now has one editor and an explicit **Show biography publicly** setting. Existing databases require the [manual single-biography migration](database/MIGRATION_single-biography.md); old public text is archived and sharing starts off. Trainer Hub puts picture editing above Biography and offers All/Caught search sources in each team editor.
@@ -157,3 +159,14 @@ This test creates random `qa_...` users inside `pokedex_app`, verifies constrain
 - **Production:** use HTTPS, `NODE_ENV=production`, an HTTPS APP_ORIGIN and a strong secret. Cookies become Secure automatically; local HTTP development intentionally uses non-Secure cookies. If using exactly one trusted HTTPS reverse proxy, configure TRUST_PROXY=true and bind the app so clients cannot bypass that proxy. Persist/back up both MySQL and `uploads/avatars`. The built-in rate limiter is per process; multiple production instances need a shared limiter and shared upload storage.
 
 Password reset and email verification are outside this implementation's requested scope. Registration/login/logout and private trainer data are implemented.
+
+## v0.7.0 local testing
+
+Restart Express with `npm.cmd start`, then open `http://localhost:3000/forums.html`
+and `http://localhost:3000/battle.html`. The Arena runs locally without new SQL.
+Forums show a readable upgrade message until the reviewed [manual forum migration](database/MIGRATION_v0.7.0.md)
+has been approved and applied in Workbench. Existing staff overrides may need
+Owner review for the new forum capabilities; no accounts/permissions are rewritten
+automatically. Test MySQL persistence and privacy revocation before publishing.
+`npm.cmd run data:battle` is an explicit developer-only rebuild of the pinned
+public battle snapshot, not a database migration or normal startup step.

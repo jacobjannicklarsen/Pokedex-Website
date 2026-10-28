@@ -54,11 +54,11 @@
     const response = await fetch(new URL(`api${url}`, siteRoot), { method, credentials: 'same-origin', headers, body: form || (body !== undefined ? JSON.stringify(body) : undefined) });
     const data = response.status === 204 ? {} : await response.json().catch(() => ({ error: 'The account server is unavailable. Start the Express server and try again.' }));
     if (!response.ok) {
-      if (response.status === 401 && session.user) {
+      if ((response.status === 401 || data.code==='ACCOUNT_RESTRICTED') && session.user) {
         session.user = null; session.favorites.clear(); session.teams = []; session.privateReady = false; updateAccountUI();
         if (activeView !== '/') renderPage();
       }
-      throw new Error(data.error || 'The request failed. Please try again.');
+      const failure=new Error(data.error || 'The request failed. Please try again.');failure.status=response.status;failure.code=data.code;throw failure;
     }
     return data;
   }
@@ -68,6 +68,7 @@
     session.user = data.user; session.csrf = data.csrfToken;
     if (identityChanged) { session.teams = []; session.favorites.clear(); session.privateReady = false; session.privateError = ''; }
     session.ready = true; updateAccountUI();
+    if(data.code==='ACCOUNT_RESTRICTED')notice(data.error,true);
     if (identityChanged && isTrainerHub) renderPage();
     if (session.user) await loadPrivateData();
     else { session.teams = []; session.favorites.clear(); }
@@ -92,6 +93,9 @@
     document.querySelectorAll('[data-view]').forEach(link => {
       link.href = viewTarget(link.dataset.view);
     });
+    document.querySelectorAll('[data-staff-link]').forEach(link=>{link.hidden=!authenticated||!session.user.staff?.available||!session.user.staff.permissions.includes('panel.access');if(document.body.dataset.page==='admin')link.setAttribute('aria-current','page');});
+    const personalRole=document.querySelector('.profile-panel .staff-badge');if(personalRole&&authenticated){globalThis.TrainerRanks?.updateRole(personalRole,session.user.staff?.role||'trainer');const name=document.querySelector('.profile-panel h2');if(name)globalThis.TrainerNames?.decorate(name,session.user.staff?.role);}
+    globalThis.dispatchEvent(new CustomEvent('dexhaven:session',{detail:{user:session.user,ready:session.ready}}));
     const profile = $('#header-profile');
     const avatar = $('#header-avatar');
     const initial = $('#header-avatar-initial');
@@ -113,7 +117,7 @@
     }
     globalThis.TrainerProgress?.setUser(authenticated ? session.user : null, {
       authReady: session.ready, request, notice, login: () => openAuth(),
-      onChange() { caughtFilters.forEach(refresh => refresh()); if (grid) render(); if (['/progress', '/achievements'].includes(activeView)) renderPage(); },
+      onChange() { document.querySelectorAll('[data-trainer-rank]').forEach(target=>globalThis.TrainerProgress?.renderRank(target)); caughtFilters.forEach(refresh => refresh()); if (grid) render(); if (['/progress', '/achievements'].includes(activeView)) renderPage(); },
       async onExternal() {
         const previous = session.user?.id;
         try { await refreshSession(); }
@@ -282,9 +286,14 @@
     const panel = element('div', 'trainer-panel profile-panel');
     if (user.avatarUrl) { const img = element('img', 'trainer-avatar'); img.src = user.avatarUrl; img.alt = `${user.username}'s profile picture`; panel.append(img); }
     else panel.append(element('span', 'trainer-avatar avatar-initial', user.username[0].toUpperCase()));
-    const identity = element('div'); identity.append(element('h2', '', user.username), element('p', 'form-help', `Dexhaven trainer · Joined ${new Date(user.createdAt).toLocaleDateString()}`), element('p', '', user.email));
-    const biography = element('p', 'profile-biography', user.bio || 'Your story is still unwritten. Add a biography below.'); biography.dataset.profileBio = ''; identity.append(biography);
-    panel.append(identity); content.append(panel);
+    const identity=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element('h2','',user.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;nameRow.append(name,motto);
+    const meta=element('div','trainer-identity-meta'),titleSlot=element('span');titleSlot.dataset.trainerTitleSlot='';globalThis.TrainerRanks?.role(meta,user.staff?.role||'trainer');meta.append(titleSlot);
+    const biography=element('p','profile-biography',user.bio||'Your story is still unwritten. Add a biography below.');biography.dataset.profileBio='';
+    identity.append(element('p','eyebrow','YOUR TRAINER CARD'),nameRow,meta,biography,element('p','profile-account-details',`${user.email} · Joined ${new Date(user.createdAt).toLocaleDateString()}`));
+    const progress=element('aside','profile-progress'),rank=element('div');rank.dataset.trainerRank='';progress.append(element('h3','','Your collection rank'),rank);globalThis.TrainerProgress?.renderRank(rank);
+    const totals=element('div','profile-totals');for(const [label,value,view]of [['Teams',session.teams.length,'/teams'],['Favourites',session.favorites.size,'/favorites']]){const counter=action(label,()=>navigate(view),'profile-counter');counter.prepend(element('strong','',value));totals.append(counter);}progress.append(totals);
+    globalThis.TrainerNames?.decorate(name,user.staff?.role);panel.append(identity,progress);content.append(panel);
+    const shortcuts=element('nav','profile-shortcuts');shortcuts.setAttribute('aria-label','Profile settings');for(const [label,selector]of [['Edit profile','.profile-editor'],['Privacy & sharing','.community-settings'],['Card studio','.decoration-studio']])shortcuts.append(action(label,()=>{const section=content.querySelector(selector);if(!section)return;const heading=section.querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}section.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},'text-button'));content.append(shortcuts);
     const form = element('form', 'account-form trainer-panel');
     const label = element('label', '', 'Biography');
     const bio = element('textarea'); bio.name = 'bio'; bio.maxLength = 500; bio.rows = 4; bio.value = user.bio; label.append(bio);
@@ -321,18 +330,21 @@
         session.user=result.user;updateAccountUI();notice('Profile picture updated.');if(activeView==='/profile')renderPage();
       }catch(error){if(session.user?.id===user.id&&avatarForm.isConnected)notice(error.message,true);}finally{file.disabled=false;cropper.setBusy(false);upload.disabled=!cropper.getCrop();}
     });
-    content.append(avatarForm, form);
+    const editor=element('section','profile-editor');editor.append(element('h3','account-subheading','Edit your profile'),element('p','form-help','Update your picture and biography here. Choose what visitors can see in Privacy & sharing.'));
+    const fields=element('div','profile-editor-grid');fields.append(avatarForm,form);editor.append(fields);content.append(editor);
     globalThis.DexhavenCommunity?.settings(content, { user, teams: session.teams, request, notice, currentUserId: () => session.user?.id, trackSelector: selector => teamSelectors.add(selector) });
     globalThis.TrainerDecorations?.mount(content, panel, {user,request,notice,currentUserId:()=>session.user?.id});
-    content.append(element('h2', 'account-subheading', `Teams · ${session.teams.length}`));
-    session.teams.forEach(team => {
-      const summary = element('div', 'trainer-panel'); summary.append(element('h3', '', team.name));
-      const members = element('div', 'mini-roster'); team.pokemonIds.forEach(id => members.append(miniPokemon(id))); summary.append(members); content.append(summary);
-    });
-    content.append(action('Manage teams', () => navigate('/teams'), 'text-button'), element('h2', 'account-subheading', `Favourites · ${session.favorites.size}`));
-    const favorites = element('div', 'mini-roster'); [...session.favorites].forEach(id => favorites.append(miniPokemon(id)));
-    content.append(favorites, action('View all favourites', () => navigate('/favorites'), 'text-button'));
+    const summaries=element('div','profile-summary-grid'),teams=element('section','trainer-panel profile-summary'),favorites=element('section','trainer-panel profile-summary');
+    teams.append(element('h3','',`Teams · ${session.teams.length}`));
+    if(!session.teams.length)teams.append(element('p','form-help','Your next team starts with one favourite partner.'));
+    for(const team of session.teams.slice(0,3)){const summary=element('div','profile-team-summary');summary.append(element('h4','',team.name));const members=element('div','mini-roster');team.pokemonIds.forEach(id=>members.append(miniPokemon(id)));summary.append(members);teams.append(summary);}
+    if(session.teams.length>3)teams.append(element('p','form-help','Showing your three latest teams.'));
+    teams.append(action('Manage all teams',()=>navigate('/teams'),'text-button'));
+    favorites.append(element('h3','',`Favourites · ${session.favorites.size}`));const roster=element('div','mini-roster');[...session.favorites].slice(0,6).forEach(id=>roster.append(miniPokemon(id)));favorites.append(roster);
+    if(!session.favorites.size)favorites.append(element('p','form-help','Tap a heart in the National Pokédex to start your collection.'));else if(session.favorites.size>6)favorites.append(element('p','form-help',`Showing 6 of ${session.favorites.size} favourites.`));
+    favorites.append(action('View all favourites',()=>navigate('/favorites'),'text-button'));summaries.append(teams,favorites);content.append(summaries);
   }
+
   function renderTeams() {
     const selectorFactory = globalThis.PokemonSelector?.create;
     if (!selectorFactory) {
@@ -513,9 +525,12 @@
   updateAccountUI();
   [...(grid?.children || [])].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
   navigate(activeView, false);
-  refreshSession().then(() => { if (activeView !== '/') renderPage(); }).catch(() => {
+  globalThis.DexhavenAccount={request,refresh:refreshSession,getUser:()=>session.user};
+  let focusRefresh;globalThis.addEventListener('focus',()=>{clearTimeout(focusRefresh);focusRefresh=setTimeout(()=>refreshSession().catch(()=>{}),150);});
+  refreshSession().then(() => { if (activeView !== '/') renderPage(); }).catch(error => {
     session.ready = true;
     updateAccountUI();
+    globalThis.dispatchEvent(new CustomEvent('dexhaven:session-error',{detail:{message:error.message}}));
     if (activeView !== '/') { renderPage(); notice('Accounts are unavailable. Start the Express server and check the database configuration.', true); }
   });
 })();

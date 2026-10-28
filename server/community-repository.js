@@ -12,6 +12,13 @@ const legacyDecorationSelect="palette, pattern, frame, effect, title, motto, pin
 const missingDecorationColumns=error=>error.code==='ER_BAD_FIELD_ERROR'&&/accent_color|border_color|frame_color|border_style|title_style/.test(error.message);
 class CommunityRepository {
   constructor(pool, repo) { this.pool = pool; this.repo = repo; }
+  async publicRoles(userIds){
+    if(!userIds.length)return new Map();
+    try{
+      const [rows]=await this.pool.execute(`SELECT r.user_id AS userId, r.role FROM user_roles r JOIN trainer_public_settings s ON s.user_id = r.user_id AND s.enabled = 1 WHERE r.user_id IN (${userIds.map(()=>'?').join(',')}) AND r.role IN ('owner','administrator','moderator')`,userIds);
+      return new Map(rows.filter(r=>['owner','administrator','moderator'].includes(r.role)).map(r=>[r.userId,r.role]));
+    }catch(error){if(['ER_NO_SUCH_TABLE','ER_BAD_FIELD_ERROR'].includes(error.code))return new Map();throw error;}
+  }
   async decoration(userId) {
     try {
       let rows;
@@ -32,7 +39,7 @@ class CommunityRepository {
     try{
       const names=Object.values(decorationColumns),values=Object.keys(decorationColumns).map(key=>key==='pinnedBadges'?JSON.stringify(value[key]):value[key]);
       await this.pool.execute(`INSERT INTO trainer_decorations (user_id, ${names.join(', ')}) VALUES (?, ${names.map(()=>'?').join(', ')}) ON DUPLICATE KEY UPDATE ${names.map(n=>n+' = VALUES('+n+')').join(', ')}`,[userId,...values]);
-    }catch(error){if(missingDecorationColumns(error)||error.code==='ER_CHECK_CONSTRAINT_VIOLATED')throw new HttpError(503,'Expanded card settings require the manual database/migrations/v0.6.1-trainer-studio.sql migration.');if(error.code==='ER_NO_SUCH_TABLE')throw new HttpError(503,'Saving decorations requires the manual database/migrations/profile-decorations.sql migration.');throw error;}
+    }catch(error){if(error.code==='ER_CHECK_CONSTRAINT_VIOLATED'&&error.message.includes('ck_decoration_title_style'))throw new HttpError(503,'Saving this title style requires the manual database/migrations/trainer-title-styles.sql upgrade.');if(missingDecorationColumns(error)||error.code==='ER_CHECK_CONSTRAINT_VIOLATED')throw new HttpError(503,'Expanded card settings require the manual database/migrations/v0.6.1-trainer-studio.sql migration.');if(error.code==='ER_NO_SUCH_TABLE')throw new HttpError(503,'Saving decorations requires the manual database/migrations/profile-decorations.sql migration.');throw error;}
     return value;
   }
   async settings(userId) {
@@ -70,7 +77,7 @@ class CommunityRepository {
   async directory(after,query='') {
     const limit=24,pattern=`%${query.replace(/[=%_]/g,'=$&')}%`;
     const [totals]=await this.pool.execute("SELECT COUNT(*) AS total FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.username LIKE ? ESCAPE '='",[pattern]);
-    const directorySql="SELECT u.id, u.username, u.bio, u.avatar_filename, u.created_at, s.share_bio AS shareBio, s.share_avatar AS shareAvatar, s.featured_pokemon_id AS featuredPokemonId, (SELECT COUNT(*) FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id) AS publicTeamCount, (SELECT t.id FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id ORDER BY (t.id = s.featured_team_id) DESC, t.id DESC LIMIT 1) AS showcaseTeamId FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.id > ? AND u.username LIKE ? ESCAPE '=' ORDER BY u.id LIMIT 25";
+    const directorySql="SELECT u.id, u.username, u.bio, u.avatar_filename, u.created_at, s.share_bio AS shareBio, s.share_avatar AS shareAvatar, s.share_progress AS shareProgress, CASE WHEN s.share_progress = 1 THEN (SELECT COUNT(*) FROM user_pokedex up WHERE up.user_id = u.id AND up.caught_at IS NOT NULL) ELSE NULL END AS caughtCount, s.featured_pokemon_id AS featuredPokemonId, (SELECT COUNT(*) FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id) AS publicTeamCount, (SELECT t.id FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id ORDER BY (t.id = s.featured_team_id) DESC, t.id DESC LIMIT 1) AS showcaseTeamId FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.id > ? AND u.username LIKE ? ESCAPE '=' ORDER BY u.id LIMIT 25";
     let rows;
     try { [rows]=await this.pool.execute(directorySql,[after,pattern]); }
     catch(error) {
@@ -92,7 +99,8 @@ class CommunityRepository {
         for(const row of members){if(!teams.has(row.id))teams.set(row.id,{ownerId:row.user_id,name:row.name,shareId:row.shareId,pokemonIds:[]});if(row.pokemon_id)teams.get(row.id).pokemonIds.push(row.pokemon_id);}
       }
     }
-    return {trainers:page.map(u=>{const team=teams.get(u.showcaseTeamId);return directoryCard(u,u,styles.get(u.id)||decorations.defaults(),u.publicTeamCount,team?.ownerId===u.id?team:null);}),next:rows.length>limit?page.at(-1).id:null,total:Number(totals[0].total)};
+    const publicRoles=await this.publicRoles(page.map(u=>u.id));
+    return {trainers:page.map(u=>{const team=teams.get(u.showcaseTeamId);if(u.caughtCount!==null&&u.caughtCount!==undefined)u.caughtCount=Number(u.caughtCount);return directoryCard({...u,staffRole:publicRoles.get(u.id)},u,styles.get(u.id)||decorations.defaults(),u.publicTeamCount,team?.ownerId===u.id?team:null);}),next:rows.length>limit?page.at(-1).id:null,total:Number(totals[0].total)};
   }
   async teamSettings(userId, teamId) {
     const [rows] = await this.pool.execute('SELECT t.id, s.share_id AS shareId, COALESCE(s.is_public, 0) AS isPublic FROM teams t LEFT JOIN team_sharing s ON s.team_id = t.id WHERE t.id = ? AND t.user_id = ?', [teamId,userId]);
@@ -119,12 +127,11 @@ class CommunityRepository {
     return rows.map(row => ({ ...row, pokemonIds: members.filter(m => m.team_id === row.id).map(m => m.pokemon_id) }));
   }
   async publicTeam(shareId) {
-    const [rows] = await this.pool.execute('SELECT t.id, t.user_id, t.name, u.username, s.share_id AS shareId FROM teams t JOIN users u ON u.id = t.user_id JOIN team_sharing s ON s.team_id = t.id AND s.is_public = 1 WHERE s.share_id = ?', [shareId]);
+    const [rows] = await this.pool.execute('SELECT t.id, t.user_id, t.name, u.username, s.share_id AS shareId, tp.pokemon_id FROM teams t JOIN users u ON u.id = t.user_id JOIN team_sharing s ON s.team_id = t.id AND s.is_public = 1 LEFT JOIN team_pokemon tp ON tp.team_id = t.id WHERE s.share_id = ? ORDER BY tp.slot', [shareId]);
     if (!rows.length) throw new HttpError(404, 'Shared team unavailable.');
     const row = rows[0];
-    const [members] = await this.pool.execute('SELECT pokemon_id FROM team_pokemon WHERE team_id = ? ORDER BY slot', [row.id]);
     const settings = await this.settings(row.user_id);
-    return { name: row.name, username: row.username, profileAvailable: settings.enabled, shareId: row.shareId, pokemonIds: members.map(m => m.pokemon_id) };
+    return { name: row.name, username: row.username, profileAvailable: settings.enabled, shareId: row.shareId, pokemonIds: rows.filter(m=>m.pokemon_id!==null&&m.pokemon_id!==undefined).map(m=>m.pokemon_id) };
   }
   async publicProgress(userId) {
     const collection = await this.repo.progression.collection(this.pool, userId);

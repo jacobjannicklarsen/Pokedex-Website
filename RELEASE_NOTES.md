@@ -1,5 +1,42 @@
 # Dexhaven release notes
 
+## v0.7.0 - Community Forums & Battle Arena (local development)
+
+- Added MySQL-backed categories, paginated discussions/replies, title/post editing,
+  quoting, reactions, follows, reports and private polling notifications.
+- Integrated current trainer identity/privacy, safe Pokemon references with name
+  suggestions, and revocable owned public-team embeds without duplicate records.
+- Extended the Admin Panel with permission/hierarchy-aware moderation, retained
+  content inspection/restoration, audit history, locks/pins and category management.
+- Added a separate historical Black/White snapshot covering 649 species and 559
+  moves; 201 effects/moves are supported and unsupported choices are disabled.
+- Added levels, calculated stats, four-move configuration, player/CPU and auto
+  battles, cancellable pause/restart, HP/status/PP/log feedback and explicit forum
+  summary drafts. Simulations do not award progression or competitive records.
+- Prepared additive forum SQL and updated package/lock metadata to **0.7.0**.
+  No migration, push, deployment or release was executed.
+
+Verification: **131 automated passes**, one skipped live-MySQL check and the
+existing founder-art checksum failure; **89/89 Chromium** regression checks and
+**37/37 Firefox** checks. Live MySQL import/restart persistence remains untested.
+See [the implementation report](IMPLEMENTATION_v0.7.0.md), [forum guide](FORUMS.md),
+[battle mechanics](BATTLE_ARENA.md) and [manual migration](database/MIGRATION_v0.7.0.md).
+
+Local profile follow-up: added hover/focus glow to the linked homepage artwork; reorganized Trainer Profile into an overview, picture/biography editor, privacy controls, a side-by-side Card Studio and compact team/favourite summaries. Community cards place the motto beside the username, align role/title, and render only an explicitly shared biography below. Added Outlined, Medallion, Ticket, Gradient and Champion title treatments (cosmetic only). Saving the five new styles on an existing database requires the separate [manual title-style constraint upgrade](database/MIGRATION_trainer-title-styles.md); it has not been applied automatically. Existing styles remain supported.
+
+Local community follow-up: fixed unstable hover hitboxes by removing the stretched card link and hover movement; improved explicit links, partner/team presentation, search loading/clear/retry behavior and responsive spacing. Added backend-derived staff name colours/glitter on published profiles (Owner gold, Administrator violet/blue, Moderator mint/cyan), with no permissions exposed and no new migration.
+
+## v0.6.2 — Ranks & Administration
+
+- Added explicit Owner, Administrator, Moderator and Trainer roles, central per-request permissions, protected Owner/self/hierarchy rules and Owner-controlled permission subsets. Administrator role changes preserve Owner limits, and disabling panel access blocks administrative APIs.
+- Added admin.html with overview totals, basic account search/pagination, role/permission confirmation dialogs, temporary suspension/revocation and scoped read-only audit logs. Staff roles grant no private trainer-content bypass.
+- Added an explicit existing-ID Owner bootstrap command, serialized/versioned changes and atomic audit logging. No privileged public registration or hardcoded Owner identity.
+- Added exact unique-Caught Rookie/Bronze/Silver/Gold/**Diamond**/Champion ranks with next-rank progress and privacy-gated public summaries; historical achievements and staff permissions remain independent.
+- Added reusable hover/press/focus, loading/error/confirmation and touch-friendly interaction styles, retaining both themes and reduced motion.
+- Updated package/lock versions to **0.6.2** and prepared the separate [manual four-table migration](database/MIGRATION_v0.6.2.md). No migration, live Owner bootstrap, commit, push, tag, deployment or release was performed.
+
+Verification: **109 automated passes**, one skipped live-MySQL test and the existing founder-image checksum mismatch; **15/15** new security/rank/schema tests, **73/73 Chromium regression checks** and **24/24 Firefox layout checks**. Fixtures do not prove a real MySQL migration, concurrency or restart persistence. See [IMPLEMENTATION_v0.6.2.md](IMPLEMENTATION_v0.6.2.md) for files, policies and limitations.
+
 ## v0.6.1 — Pokémon Sprites & Trainer Card Studio Expansion
 
 - Added authentic Gen V battle animations for Featured Partners, party/menu icons for compact shared/private team previews, and larger static battle sprites in expanded teams. Official artwork remains the National Pokédex default.

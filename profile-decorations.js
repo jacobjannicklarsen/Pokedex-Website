@@ -41,8 +41,11 @@
     panel.querySelector('.trainer-decoration-copy')?.remove();
     const identity=panel.querySelector('.trainer-identity-copy')||panel.lastElementChild;
     const copy=element('div','trainer-decoration-copy');
-    if(value.title)copy.append(element('span','trainer-title-ribbon',value.title));
-    if(value.motto)copy.append(element('p','trainer-motto',value.motto));
+    const titleSlot=panel.querySelector('[data-trainer-title-slot]'),mottoSlot=panel.querySelector('[data-trainer-motto-slot]');
+    titleSlot?.replaceChildren();
+    if(value.title)(titleSlot||copy).append(element('span','trainer-title-ribbon',value.title));
+    if(mottoSlot){mottoSlot.textContent=value.motto;mottoSlot.hidden=!value.motto;}
+    else if(value.motto)copy.append(element('p','trainer-motto',value.motto));
     const shelf=element('div','trainer-badge-shelf');
     (value.pinnedBadges||[]).forEach(key=>{const award=badges.find(a=>a.key===key);if(award)shelf.append(badge(award));});
     copy.append(shelf);identity.append(copy);
@@ -57,7 +60,11 @@
       apply(identity,saved,result.badges);
       const preview=element('div','trainer-panel public-identity decoration-preview');preview.setAttribute('aria-label','Trainer card decoration preview');
       if(ctx.user.avatarUrl){const img=element('img','trainer-avatar');img.src=ctx.user.avatarUrl;img.alt='Your profile picture';preview.append(img);}else preview.append(element('span','trainer-avatar avatar-initial',ctx.user.username[0].toUpperCase()));
-      const copy=element('div','trainer-identity-copy');copy.append(element('p','eyebrow','LIVE PREVIEW'),element('h3','',ctx.user.username));preview.append(copy);studio.append(preview);
+      const copy=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element('h3','',ctx.user.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;
+      globalThis.TrainerNames?.decorate(name,ctx.user.staff?.role);nameRow.append(name,motto);
+      const meta=element('div','trainer-identity-meta'),title=element('span');title.dataset.trainerTitleSlot='';const staff=globalThis.TrainerNames?.badge(ctx.user.staff?.role);if(staff)meta.append(staff);meta.append(title);
+      copy.append(element('p','eyebrow','LIVE PREVIEW'),nameRow,meta);preview.append(copy);
+      const workspace=element('div','decoration-workspace');workspace.append(preview);studio.append(workspace);
       const form=element('form','decoration-form');
       const presetLabel=element('label','','Start with a look'),preset=element('select');preset.name='preset';
       const custom=element('option','','Choose a preset (keeps your title and badges)');custom.value='';preset.append(custom);for(const name of Object.keys(presets)){const option=element('option','',name);option.value=name;preset.append(option);}presetLabel.append(preset);form.append(presetLabel);
@@ -91,7 +98,7 @@
       });form.append(pins,pinStatus);
       const actions=element('div','team-actions'),save=element('button','action-button','Save decorations');save.type='submit';
       const reset=element('button','text-button','Reset preview');reset.type='button';reset.onclick=()=>{draft=structuredClone(saved);sync();preset.value='';pinStatus.textContent='Preview reset to saved decorations.';update();};
-      const message=element('p','form-help');message.setAttribute('role','status');const defaultButton=element('button','text-button','Reset to default');defaultButton.type='button';defaultButton.onclick=()=>{if(JSON.stringify(saved)!==JSON.stringify(defaults())&&!confirm('Reset your card preview to Dexhaven defaults? Your saved card changes only when you save.'))return;draft=defaults();sync();preset.value='';pinStatus.textContent='Default preview ready. Save decorations to apply it.';update();};actions.append(save,reset,defaultButton);form.append(actions,message);studio.append(form);update();
+      const message=element('p','form-help');message.setAttribute('role','status');const defaultButton=element('button','text-button','Reset to default');defaultButton.type='button';defaultButton.onclick=()=>{if(JSON.stringify(saved)!==JSON.stringify(defaults())&&!confirm('Reset your card preview to Dexhaven defaults? Your saved card changes only when you save.'))return;draft=defaults();sync();preset.value='';pinStatus.textContent='Default preview ready. Save decorations to apply it.';update();};actions.append(save,reset,defaultButton);form.append(actions,message);workspace.append(form);update();
       form.onsubmit=async event=>{
         event.preventDefault();save.disabled=true;reset.disabled=true;defaultButton.disabled=true;form.setAttribute('aria-busy','true');form.querySelectorAll('input,select,fieldset').forEach(node=>{node.disabled=true;});message.className='form-help';message.textContent='Saving decorations…';ctx.notice('Saving trainer decorations…');
         try{const response=await ctx.request('/profile/decorations',{method:'PUT',body:structuredClone(draft)});if(ctx.currentUserId()!==ctx.user.id||!studio.isConnected)return;saved=normalize(response.decoration);draft=structuredClone(saved);sync();update();apply(identity,saved,result.badges);message.className='form-help';message.textContent='Decorations saved. Your profile visibility settings stay in control.';ctx.notice('Trainer decorations saved.');}

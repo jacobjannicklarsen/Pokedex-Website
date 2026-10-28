@@ -1,0 +1,73 @@
+/* A clear overview followed by editing, privacy, studio and compact summaries. */
+.hub-intro { max-width:820px; padding-block:36px 20px; }
+.hub-nav { gap:8px; padding-block:12px; }
+.hub-nav a { min-height:44px; display:inline-flex; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--muted); }
+.hub-nav a[aria-current] { border:1px solid var(--mint); color:var(--text); background:color-mix(in srgb,var(--mint) 8%,var(--panel)); }
+.hub-nav a:hover { border-color:var(--mint); color:var(--text); }
+.profile-panel { display:grid; grid-template-columns:112px minmax(0,1fr) minmax(230px,.7fr); align-items:start; gap:24px; }
+.profile-panel .trainer-identity-copy { min-width:0; }
+.profile-panel>.trainer-avatar { width:112px; height:112px; }
+.profile-panel .avatar-frame { --avatar-size:112px; }
+.profile-panel h2 { font:600 clamp(25px,3vw,34px) 'Space Grotesk',sans-serif; margin:0; }
+.profile-panel .eyebrow { font-size:10px; margin:0 0 12px; }
+.profile-panel .profile-biography { line-height:1.8; margin-block:14px; }
+.profile-account-details { font-size:11px; color:var(--muted); line-height:1.8; margin:12px 0 0; overflow-wrap:anywhere; }
+.profile-progress { padding:18px; min-width:0; border:1px solid var(--line); border-radius:14px; background:var(--bg); }
+.profile-progress h3 { font-size:12px; color:var(--muted); font-weight:500; margin:0 0 12px; }
+.profile-progress .rank-card { display:block; margin:0; }
+.profile-progress .rank-details { max-width:100%; font-size:12px; }
+.profile-progress .rank-details .form-help { margin-bottom:0; }
+.profile-totals { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+.profile-counter { display:grid; justify-items:center; gap:7px; background:var(--panel); border:1px solid var(--line); color:var(--muted); border-radius:10px; padding:12px; font-size:11px; }
+.profile-counter strong { color:var(--text); font:600 24px 'Space Grotesk',sans-serif; }
+.profile-counter:hover { border-color:var(--mint); }
+.profile-shortcuts { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0 30px; padding:8px; background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+.profile-shortcuts button { padding-inline:14px; }
+.profile-editor,.community-settings,.decoration-studio { scroll-margin-top:24px; }
+.profile-editor>h3 { font-size:22px; margin-bottom:10px; }
+.profile-editor-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; margin-block:20px 30px; }
+.profile-editor-grid>.trainer-panel { margin:0; }
+.profile-editor-grid .account-form { align-content:start; }
+.community-settings { margin-block:30px; }
+.community-settings h3,.decoration-studio h3 { font-size:22px; margin-block:0 12px; }
+.community-settings form { grid-template-columns:1fr 1fr; padding:0; align-items:start; }
+.community-settings form>.form-help,.community-settings form>.privacy-option:first-child { grid-column:1/-1; }
+.community-settings form .privacy-option { min-height:44px; line-height:1.7; align-items:center; }
+.community-settings>.public-preview:not(:empty) { margin-top:24px; }
+.decoration-studio { padding:28px; }
+.decoration-workspace { display:grid; grid-template-columns:minmax(250px,.75fr) minmax(0,1.25fr); gap:30px; align-items:start; margin-top:24px; }
+.decoration-workspace .decoration-preview { position:sticky; top:24px; display:grid; grid-template-columns:1fr; gap:18px; margin:0; }
+.decoration-preview .trainer-identity-copy { min-width:0; }
+.decoration-preview .trainer-name-row { flex-direction:column; align-items:flex-start; gap:10px; }
+.decoration-preview .trainer-motto-inline { margin:0; max-width:100%; text-align:left; }
+.decoration-preview .trainer-identity-meta { margin-top:12px; }
+.decoration-workspace .decoration-form { padding:20px; border:1px solid var(--line); background:var(--bg); border-radius:14px; }
+.decoration-form .team-actions { flex-wrap:wrap; }
+.decoration-choices { align-items:stretch; }
+.decoration-choice { min-height:44px; }
+.profile-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-block:30px; align-items:start; }
+.profile-summary { margin:0; min-width:0; }
+.profile-summary h3 { font-size:22px; margin:0 0 18px; }
+.profile-team-summary { border-top:1px solid var(--line); padding-block:14px; }
+.profile-team-summary h4 { margin:0 0 10px; }
+.profile-summary .mini-roster { gap:8px; }
+.profile-summary .mini-pokemon { min-width:0; }
+@media(max-width:1100px) {
+ .profile-panel { grid-template-columns:112px minmax(0,1fr); }
+ .profile-progress { grid-column:1/-1; }
+ .decoration-workspace { grid-template-columns:1fr; }
+ .decoration-workspace .decoration-preview { position:relative; top:auto; grid-template-columns:96px minmax(0,1fr); }
+ .decoration-preview .trainer-name-row { flex-direction:row; align-items:center; }
+}
+@media(max-width:700px) {
+ .profile-panel { grid-template-columns:1fr; gap:20px; }
+ .profile-editor-grid,.profile-summary-grid,.community-settings form { grid-template-columns:1fr; gap:18px; }
+ .profile-shortcuts { gap:4px; }
+ .profile-shortcuts button { flex:1 1 auto; padding-inline:10px; }
+ .decoration-studio { padding:18px; }
+ .decoration-workspace { gap:18px; }
+ .decoration-workspace .decoration-preview { grid-template-columns:1fr; }
+ .decoration-workspace .decoration-form { padding:14px; }
+ .decoration-choice { flex:1 1 40%; min-width:0; }
+ .profile-summary-grid { margin-top:20px; }
+}

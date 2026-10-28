@@ -37,8 +37,10 @@
     const header=element('div','trainer-panel public-identity public-profile-hero');
     if(p.avatarUrl){const img=element('img','trainer-avatar');img.src=p.avatarUrl;img.alt=`${p.username}'s public profile picture`;header.append(img);}
     else header.append(element('span','trainer-avatar avatar-initial',p.username[0].toUpperCase()));
-    const info=element('div','trainer-identity-copy');info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),element(preview?'h3':'h1','public-profile-name',p.username),element('p','form-help',`Trainer since ${new Date(p.createdAt).toLocaleDateString()}`));
-    if(p.bio)info.append(element('p','profile-biography',p.bio));header.append(info);target.append(header);
+    const info=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element(preview?'h3':'h1','public-profile-name',p.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;TrainerNames.decorate(name,p.staffRole);nameRow.append(name,motto);
+    const meta=element('div','trainer-identity-meta'),title=element('span');title.dataset.trainerTitleSlot='';const staffLabel=TrainerNames.badge(p.staffRole);if(staffLabel)meta.append(staffLabel);meta.append(title);
+    info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),nameRow,meta);if(p.bio)info.append(element('p','profile-biography',p.bio));
+    info.append(element('p','form-help',`Trainer since ${new Date(p.createdAt).toLocaleDateString()}`));if(p.rank){const rank=element('div');TrainerRanks.render(rank,p.rank);info.append(rank);}header.append(info);target.append(header);
     globalThis.TrainerDecorations?.apply(header,p.decoration,p.pinnedBadges||[]);
     if(!preview)copyLink(target,`trainer/${encodeURIComponent(p.username)}`);
     if(p.featuredPokemonId){target.append(element('h3','','Featured Pokémon'));roster(target,[p.featuredPokemonId],records,false,'battle');}
@@ -94,12 +96,15 @@
     const style=TrainerCardConfig.normalize(t.decoration);
     const top=element('div','directory-card-top'),avatar=element('span','trainer-avatar avatar-initial directory-avatar');avatar.append(element('span','',t.username[0].toUpperCase()));
     if(t.avatarUrl){const image=element('img');image.src=t.avatarUrl;image.alt=`${t.username}'s public profile picture`;image.loading='lazy';image.addEventListener('error',()=>image.remove(),{once:true});avatar.append(image);}
-    top.append(avatar,element('span','directory-card-stamp','TRAINER CARD'));card.append(top);
-    const body=element('div','directory-card-body'),identity=element('div','directory-card-identity');identity.append(element('h3','',t.username));
-    if(style.title)identity.append(element('span','trainer-title-ribbon',style.title));body.append(identity);
-    body.append(element('p','directory-card-bio',t.bio||style.motto||'A new chapter is waiting. This trainer has not added a public biography yet.'));
-    if(t.featuredPokemonId){const partner=element('div','directory-partner');const text=element('div'),name=element('strong','',directoryPokemonLabel(t.featuredPokemonId));name.dataset.publicPokemonName=t.featuredPokemonId;text.append(element('span','eyebrow','FEATURED PARTNER'),name);partner.append(directoryPokemonArt(t.featuredPokemonId),text);body.append(partner);}
+    const avatarLink=link('',`trainer/${encodeURIComponent(t.username)}`,'directory-avatar-link');avatarLink.setAttribute('aria-label',`View ${t.username}'s public profile`);avatarLink.append(avatar);
+    top.append(avatarLink,element('span','directory-card-stamp','TRAINER CARD'));card.append(top);
+    const body=element('div','directory-card-body'),identity=element('div','directory-card-identity'),nameRow=element('div','trainer-name-row'),heading=element('h3'),nameLink=link(t.username,`trainer/${encodeURIComponent(t.username)}`,'directory-name-link');TrainerNames.decorate(nameLink,t.staffRole);heading.append(nameLink);nameRow.append(heading);
+    if(style.motto)nameRow.append(element('p','trainer-motto-inline',style.motto));identity.append(nameRow);
+    const metaRow=element('div','trainer-identity-meta'),staffLabel=TrainerNames.badge(t.staffRole);if(staffLabel)metaRow.append(staffLabel);if(style.title)metaRow.append(element('span','trainer-title-ribbon',style.title));if(metaRow.children.length)identity.append(metaRow);body.append(identity);
+    if(t.bio)body.append(element('p','directory-card-bio',t.bio));
+    if(t.featuredPokemonId){const partner=element('div','directory-partner');const text=element('div'),name=element('strong','',directoryPokemonLabel(t.featuredPokemonId));name.dataset.publicPokemonName=t.featuredPokemonId;text.append(element('span','eyebrow','FEATURED PARTNER'),name);const art=element('div','directory-partner-art');art.append(directoryPokemonArt(t.featuredPokemonId));partner.append(art,text);body.append(partner);}
     if(t.showcaseTeam){const showcase=element('div','directory-showcase');showcase.append(element('p','',t.showcaseTeam.name));const row=element('div','directory-mini-roster');for(let slot=0;slot<6;slot++){const id=t.showcaseTeam.pokemonIds[slot];if(id){const img=directoryPokemonArt(id,'party');img.title=directoryPokemonLabel(id);row.append(img);}else row.append(element('span','directory-empty-slot','·'));}showcase.append(row);body.append(showcase);}
+    if(t.rank){const rank=element('div');TrainerRanks.render(rank,t.rank,{compact:true});body.append(rank);}
     const meta=element('div','directory-card-meta');meta.append(element('span','',`${t.publicTeamCount} shared ${t.publicTeamCount===1?'team':'teams'}`));
     if(Number.isFinite(Date.parse(t.createdAt)))meta.append(element('span','',`Joined ${new Intl.DateTimeFormat(undefined,{month:'short',year:'numeric'}).format(new Date(t.createdAt))}`));body.append(meta);
     const actions=element('div','directory-card-actions'),profileLink=link('Meet the trainer',`trainer/${encodeURIComponent(t.username)}`,'action-button directory-profile-link');profileLink.setAttribute('aria-label',`View ${t.username}'s public profile`);actions.append(profileLink);if(t.showcaseTeam)actions.append(link('View team ↗',`team/${t.showcaseTeam.shareId}`));body.append(actions);card.append(body);TrainerDecorations.appearance(card,style);return card;
@@ -111,28 +116,28 @@
     target.replaceChildren();target.removeAttribute('aria-live');document.title='Trainer Community — Dexhaven';
     const heading=element('div','community-directory-heading'),copy=element('div');copy.append(element('p','eyebrow','THE TRAINER DIRECTORY'),element('h2','','A face behind every journey.'));heading.append(copy);
     const form=element('form','community-search'),label=element('label','sr-only','Search trainers by username'),input=element('input');input.id='community-search';input.type='search';input.maxLength=64;input.placeholder='Find a trainer by username…';input.autocomplete='off';label.htmlFor=input.id;
-    const submit=element('button','community-search-submit','Search');submit.type='submit';form.append(label,input,submit);heading.append(form);target.append(heading);
+    const submit=element('button','community-search-submit','Search');submit.type='submit';const clear=button('Clear',()=>{input.value='';search();});clear.className='community-search-clear';clear.setAttribute('aria-label','Clear trainer search');clear.hidden=true;form.append(label,input,clear,submit);heading.append(form);target.append(heading);
     const info=element('div','community-directory-info'),count=element('p','form-help','Loading trainers…');count.setAttribute('role','status');info.append(count,element('span','community-public-note','Shared by choice. Discover at your pace.'));target.append(info);
     const list=element('div','community-directory');list.setAttribute('aria-label','Public trainer cards');target.append(list);
     const feedback=element('div','community-directory-feedback'),more=button('Discover more trainers',()=>load(false));more.classList.add('community-load-more');more.hidden=true;target.append(feedback,more);
-    let query=new URLSearchParams(location.search).get('q')?.slice(0,64)||'',cursor=null,version=0,controller,timer,total=0;const loaded=new Map();input.value=query;
+    let query=new URLSearchParams(location.search).get('q')?.slice(0,64)||'',cursor=null,version=0,controller,timer,total=0;const loaded=new Map();input.value=query;clear.hidden=!query;
     const updateCount=()=>{count.textContent=`${loaded.size} of ${total} ${total===1?'trainer':'trainers'}${query?` matching “${query}”`:''}`;};
     async function load(reset){
-      const request=++version;controller?.abort();controller=new AbortController();more.disabled=true;list.setAttribute('aria-busy','true');feedback.replaceChildren();count.textContent=query?'Finding your trainer…':'Discovering trainers…';
+      const request=++version;controller?.abort();controller=new AbortController();more.disabled=true;list.setAttribute('aria-busy','true');list.inert=true;feedback.replaceChildren();if(reset){loaded.clear();list.replaceChildren();for(let i=0;i<3;i++){const skeleton=element('div','community-skeleton');skeleton.setAttribute('aria-hidden','true');list.append(skeleton);}}count.textContent=query?'Finding your trainer…':'Discovering trainers…';
       const nextCursor=reset?null:cursor;
       try{
         const params=new URLSearchParams();if(query)params.set('q',query);if(nextCursor!==null)params.set('after',nextCursor);
         const data=await publicRequest(`trainers${params.size?'?'+params:''}`,{signal:controller.signal});if(request!==version||!target.isConnected)return;
         if(!Array.isArray(data.trainers)||!Number.isInteger(data.total)||data.total<0)throw Error('Trainer cards could not be loaded. Please try again.');
-        if(reset){loaded.clear();list.replaceChildren();}
+        if(reset)list.replaceChildren();
         total=data.total;cursor=data.next;
         for(const trainer of data.trainers)if(!loaded.has(trainer.username.toLowerCase())){loaded.set(trainer.username.toLowerCase(),trainer);list.append(directoryCard(trainer));}
         more.hidden=cursor===null;updateCount();
         if(!loaded.size){list.append(query?communityMessage('No trainer found. Yet.',`We couldn't find a public trainer matching “${query}”. Try another name.`,{clear:()=>{input.value='';search();}}):communityMessage('Every community starts with a first hello.','Make your trainer card, choose what to share, and give the next visitor someone to meet.',{action:{label:'Create your public profile',path:'trainers.html#view=profile'}}));}
-      }catch(error){if(request!==version||error.name==='AbortError'||!target.isConnected)return;count.textContent=loaded.size?`${loaded.size} trainers ready to explore`:'Trainers are taking a little longer to arrive.';const message=communityMessage('A little pause in the journey.',error.message);message.classList.add('community-error');message.append(button('Try again',()=>load(reset)));feedback.append(message);more.hidden=true;}
-      finally{if(request===version){list.setAttribute('aria-busy','false');more.disabled=false;}}
+      }catch(error){if(request!==version||error.name==='AbortError'||!target.isConnected)return;if(reset)list.replaceChildren();count.textContent=loaded.size?`${loaded.size} trainers ready to explore`:'Trainers are taking a little longer to arrive.';const message=communityMessage('A little pause in the journey.',error.message);message.classList.add('community-error');message.append(button('Try again',()=>load(reset)));feedback.append(message);more.hidden=true;}
+      finally{if(request===version){list.setAttribute('aria-busy','false');list.inert=false;more.disabled=false;}}
     }
-    function search(){clearTimeout(timer);query=input.value.trim();const url=new URL(location.href);if(query)url.searchParams.set('q',query);else url.searchParams.delete('q');history.replaceState({},'',url);load(true);}
+    function search(){clearTimeout(timer);query=input.value.trim();clear.hidden=!query;const url=new URL(location.href);if(query)url.searchParams.set('q',query);else url.searchParams.delete('q');history.replaceState({},'',url);load(true);}
     input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(search,250);});form.addEventListener('submit',event=>{event.preventDefault();search();});
     PokemonData.load().then(snapshot=>{for(const p of snapshot.pokemon)directoryPokemon.set(p.id,p);if(target.isConnected)target.querySelectorAll('[data-public-pokemon-name]').forEach(node=>{node.textContent=directoryPokemonLabel(Number(node.dataset.publicPokemonName));});target.querySelectorAll('img[data-sprite-id]').forEach(img=>{img.alt=`${directoryPokemonLabel(Number(img.dataset.spriteId))} ${img.classList.contains('sprite-party')?'party icon':'battle sprite'}`;});}).catch(()=>{/* Trainer cards stay usable when optional species labels cannot load. */});
     await load(true);

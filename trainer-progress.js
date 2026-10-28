@@ -130,8 +130,10 @@
     wrapper.append(element('span', '', `${label}: ${count} / ${total} (${percent.toFixed(2)}%)`));
     const bar = element('progress'); bar.max = total; bar.value = count; bar.textContent = `${percent.toFixed(2)}%`; wrapper.append(bar); return wrapper;
   }
+  function renderRank(target){target.replaceChildren();if(ready&&bundle?.rank)globalThis.TrainerRanks?.render(target,bundle.rank);else target.append(element('span','form-help',error||'Loading trainer rank…'));}
   function renderProgress(target) {
     if (pendingView(target)) return;
+    const rank=element('div');rank.dataset.trainerRank='';renderRank(rank);target.append(rank);
     const stats = bundle.statistics, national = stats.national;
     target.append(element('p', 'form-help', 'Your private collection, not global Pokémon statistics. Caught Pokémon also count as Seen. Percentages reflect current registrations.'));
     const cards = element('div', 'overview-grid');
@@ -184,5 +186,5 @@
   $('#collection-filter')?.addEventListener('change', event => { state.collectionFilter = event.target.value; render(); });
   $('#collection-login')?.addEventListener('click', () => config.login?.());
   $('#collection-retry')?.addEventListener('click', refresh);
-  globalThis.TrainerProgress = { caughtState: () => ({ ready: Boolean(userId && ready), loading, error, ids: new Set([...records].filter(([, row]) => row.status === 'caught').map(([id]) => id)) }), setUser, refresh, update, decorate, matches, renderProgress, renderAchievements };
+  globalThis.TrainerProgress = { caughtState: () => ({ ready: Boolean(userId && ready), loading, error, ids: new Set([...records].filter(([, row]) => row.status === 'caught').map(([id]) => id)) }), renderRank, setUser, refresh, update, decorate, matches, renderProgress, renderAchievements };
 })();

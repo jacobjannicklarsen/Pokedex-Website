@@ -3,6 +3,8 @@ const { HttpError } = require('../../server/validation');
 const logic = require('../../server/progression');
 class MemoryRepository {
   constructor() {
+    this.administration=new(require('./memory-admin.cjs').MemoryAdmin)(this);
+    this.forums=new(require('../../server/forums').Forums)(this,new(require('./memory-forums.cjs').MemoryForums)(this));
     this.community = new (require('./memory-community.cjs').MemoryCommunity)(this);
     this.users = []; this.savedTeams = []; this.savedFavorites = new Map(); this.sequence = 0;
     this.collections = new Map(); this.awards = new Map();
@@ -23,7 +25,7 @@ class MemoryRepository {
     const saved = this.awards.get(userId) || new Map();
     for(const key of logic.eligible(statistics,teams))if(!saved.has(key))saved.set(key,new Date().toISOString());
     this.awards.set(userId,saved);
-    return {collection,statistics,achievements:logic.achievements(statistics,teams,[...saved].map(([key,unlockedAt])=>({key,unlockedAt})))};
+    return {collection,statistics,rank:require('../../server/trainer-ranks').calculate(statistics.national.caught),achievements:logic.achievements(statistics,teams,[...saved].map(([key,unlockedAt])=>({key,unlockedAt})))};
   }
   async user(id) { const user = this.users.find(user => user.id === id); return user ? { ...user } : null; }
   async findLogin(identifier) { return this.users.find(user => [user.username,user.email].some(value => value.toLowerCase() === identifier.toLowerCase())) || null; }

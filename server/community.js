@@ -26,12 +26,15 @@ function shareId(value) {
 }
 function directoryCard(user,settings,decoration,publicTeamCount,showcaseTeam=null) {
   // Directory cards are an explicit public projection, never a user/settings row.
-  return { username:user.username,bio:settings.shareBio ? user.bio || '' : '',createdAt:user.created_at,
+  const card={ username:user.username,bio:settings.shareBio ? user.bio || '' : '',createdAt:user.created_at,
     avatarUrl:settings.shareAvatar&&user.avatar_filename?`/api/public/trainers/${encodeURIComponent(user.username)}/avatar`:null,
     featuredPokemonId:settings.featuredPokemonId,
     decoration:{...require('./decorations').normalize(decoration),pinnedBadges:[]},
     publicTeamCount:Number(publicTeamCount),
     showcaseTeam:showcaseTeam?{name:showcaseTeam.name,shareId:showcaseTeam.shareId,pokemonIds:[...showcaseTeam.pokemonIds]}:null };
+  if(settings.shareProgress&&Number.isInteger(user.caughtCount))card.rank=require('./trainer-ranks').calculate(user.caughtCount);
+  if(['owner','administrator','moderator'].includes(user.staffRole))card.staffRole=user.staffRole;
+  return card;
 }
 // Explicit projection: never spread a user, settings row, or private bundle into public JSON.
 async function profile(repo, user, settings, preview = false) {
@@ -43,6 +46,8 @@ async function profile(repo, user, settings, preview = false) {
     featuredTeamId: publicTeams.some(t => t.id === settings.featuredTeamId) ? settings.featuredTeamId : null,
     teams: publicTeams.map(team => ({ name: team.name, shareId: team.shareId, pokemonIds: team.pokemonIds, featured: team.id === settings.featuredTeamId })) };
   const decoration=await repo.community.decoration(user.id);
+  const publicRole=(await repo.community.publicRoles([user.id])).get(user.id);
+  if(publicRole)result.staffRole=publicRole;
   result.decoration={...decoration,pinnedBadges:[]};
   result.pinnedBadges=[];
   if (preview && settings.shareAvatar && user.avatar_filename) result.avatarUrl = `/media/avatars/${user.avatar_filename}`;
@@ -50,7 +55,7 @@ async function profile(repo, user, settings, preview = false) {
   if (settings.shareProgress || settings.shareAchievements) {
     // Read-only public statistics: never reconcile or expose raw collection records.
     const progress = await repo.community.publicProgress(user.id);
-    if (settings.shareProgress) result.statistics = { national: progress.statistics.national, generations: progress.statistics.generations };
+    if (settings.shareProgress) {result.statistics = { national: progress.statistics.national, generations: progress.statistics.generations };result.rank=require('./trainer-ranks').calculate(progress.statistics.national.caught);}
     if (settings.shareAchievements) {
       result.achievements = progress.achievements.filter(a => a.unlockedAt).map(a => ({ key: a.key, name: a.name, description: a.description, icon:a.icon, rarity:a.rarity, category:a.category, unlockedAt: a.unlockedAt }));
       result.pinnedBadges=decoration.pinnedBadges.map(key=>result.achievements.find(a=>a.key===key)).filter(Boolean);

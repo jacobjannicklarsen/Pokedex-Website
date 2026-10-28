@@ -19,7 +19,11 @@ async function main(){
  });
  const user=await repo.createUser({username:'firefox_trainer',email:'firefox@example.test'},await require('argon2').hash('firefox secure password'));
  const avatar='34567890-1234-4123-8123-123456789abc.webp';fs.mkdirSync(uploadDir,{recursive:true});fs.writeFileSync(path.join(uploadDir,avatar),await sharp({create:{width:180,height:300,channels:3,background:'#ee9955'}}).webp().toBuffer());await repo.updateAvatar(user.id,avatar);
- await repo.community.saveSettings(user.id,{...privacy.defaults(),enabled:true,shareAvatar:true,featuredPokemonId:151});
+ await repo.administration.bootstrapOwner(user.id);
+ for(let id=1;id<=25;id++)await repo.progression.set(user.id,id,'caught');
+ const adminTarget=await repo.createUser({username:'firefox_target',email:'private-target@example.test'},'fixture-only');
+ await repo.updateBio(user.id,'A Firefox trainer biography for independent hover hitbox checks.');
+ await repo.community.saveSettings(user.id,{...privacy.defaults(),enabled:true,shareAvatar:true,shareBio:true,featuredPokemonId:151});
  await repo.community.saveDecoration(user.id,{...config.defaults(),palette:'violet',pattern:'nebula',frame:'hexagon',effect:'sparkles',accentColor:'#89c9ff',frameColor:'#e6b776',borderColor:'#d0ac63',title:'Across every region'});
  const profileDir=path.join(temp,'profile');fs.mkdirSync(profileDir);
  const reservation=http.createServer();await new Promise(r=>reservation.listen(0,'127.0.0.1',r));const bidiPort=reservation.address().port;await new Promise(r=>reservation.close(r));
@@ -56,14 +60,36 @@ async function main(){
    assert.match(await evaluate(`getComputedStyle(document.querySelector('${selector} .trainer-avatar')).clipPath`),/polygon/);
    assert.equal(await evaluate(`getComputedStyle(document.querySelector('${selector} .trainer-avatar')).objectFit`),'cover');
    assert.equal(await evaluate(`getComputedStyle(document.querySelector('${selector} .card-finish')).pointerEvents`),'none');
+   if(route==='community.html'){
+    assert.equal(await evaluate(`document.querySelector('.directory-name-link').dataset.staffNameRole`),'owner');assert.equal(await evaluate(`document.querySelectorAll('.directory-name-link .staff-name-star svg').length`),4);
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('.directory-profile-link'),'::after').content`),'none');
+    const before=await evaluate(`(()=>{const c=document.querySelector('.trainer-directory-card'),r=c.getBoundingClientRect(),b=c.querySelector('.directory-card-bio').getBoundingClientRect();return{top:r.top,width:r.width,height:r.height,x:Math.round(b.x+20),y:Math.round(b.y+10)}})()`);
+    await send('input.performActions',{context,actions:[{type:'pointer',id:'community-mouse',parameters:{pointerType:'mouse'},actions:[{type:'pointerMove',x:before.x,y:before.y,origin:'viewport',duration:0}]}]});await sleep(220);
+    const after=await evaluate(`(()=>{const c=document.querySelector('.trainer-directory-card'),r=c.getBoundingClientRect();return{top:r.top,width:r.width,height:r.height}})()`);assert.deepEqual(after,{top:before.top,width:before.width,height:before.height});
+    assert.equal(await evaluate(`document.elementFromPoint(${before.x},${before.y}).closest('a')`),null);
+   }
    const shot=await send('browsingContext.captureScreenshot',{context,origin:'viewport',format:{type:'image/png'}});fs.writeFileSync(path.join(output,`${route.split(/[\/#]/)[0]}-${theme}-${width}.png`),Buffer.from(shot.data,'base64'));checks++;
   }
   if(route.startsWith('trainers')){
    for(const effect of ['none','shimmer','sparkles']){await evaluate(`document.querySelector('.decoration-form [name="effect"][value="${effect}"]').click()`);assert.equal(await evaluate(`document.querySelectorAll('.decoration-preview .card-finish').length`),effect==='none'?0:1);}
   }
  }
- console.log(`PASS Firefox: ${checks}/12 desktop/mobile theme layouts; real Studio, directory and public profile; hex clipping and effect switching. Screenshots: ${output}`);
- await send('session.end');
+ await send('browsingContext.navigate',{context,url:origin+'/admin.html',wait:'interactive'});await wait(`document.querySelectorAll('.admin-overview article').length===3`);
+ for(const theme of ['dark','light'])for(const width of [375,1280]){
+  await send('browsingContext.setViewport',{context,viewport:{width,height:1000},devicePixelRatio:1});await evaluate(`(()=>{document.documentElement.dataset.theme='${theme}';document.querySelector('[data-admin-tab="overview"]').click();})()`);await wait(`document.querySelectorAll('.admin-overview article').length===3`);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);checks++;
+  await evaluate(`document.querySelector('[data-admin-tab="users"]').click()`);await wait(`document.querySelectorAll('.admin-user').length===2`);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);checks++;
+  await evaluate(`[...document.querySelectorAll('.admin-user[data-user-id="${adminTarget.id}"] button')].find(b=>b.textContent==='Suspend').click()`);await wait(`document.querySelector('.admin-dialog')?.open===true`);assert.equal(await evaluate('document.activeElement.name'),'hours');assert.equal(await evaluate(`document.querySelector('.admin-dialog').getBoundingClientRect().right<=innerWidth`),true);checks++;
+  await sleep(250);const shot=await send('browsingContext.captureScreenshot',{context,origin:'viewport',format:{type:'image/png'}});fs.writeFileSync(path.join(output,`admin-${theme}-${width}.png`),Buffer.from(shot.data,'base64'));await evaluate(`document.querySelector('.admin-form button[type="button"]').click()`);
+ }
+ const forumThread=await repo.forums.create(user.id,{categoryId:2,title:'Firefox community discussion',body:'A shared strategy [[pokemon:151]]',teamShareId:null,quotePostId:null});
+ for(const [route,ready]of [['forums.html',`document.querySelector('.forum-thread-card')`],['forums.html#thread='+forumThread.id,`document.querySelector('.forum-post')`],['battle.html',`document.querySelector('#battle-start')`]]){
+  await send('browsingContext.navigate',{context,url:origin+'/'+route,wait:'interactive'});await wait(ready);
+  for(const theme of ['dark','light'])for(const width of [375,1280]){await send('browsingContext.setViewport',{context,viewport:{width,height:1000},devicePixelRatio:1});await evaluate(`document.documentElement.dataset.theme='${theme}'`);assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,route+' '+width+' '+theme);await sleep(250);const shot=await send('browsingContext.captureScreenshot',{context,origin:'viewport',format:{type:'image/png'}});fs.writeFileSync(path.join(output,`v070-${route.split(/[.#]/)[0]}-${route.includes('thread')?'thread-':''}${theme}-${width}.png`),Buffer.from(shot.data,'base64'));checks++;}
+  if(route==='battle.html'){await evaluate(`(()=>{Math.random=()=>.5;document.querySelector('#battle-start').click();document.querySelector('.battle-move-button').click()})()`);await wait(`document.querySelector('.battle-turn').textContent==='Turn 1'`);await evaluate(`(()=>{document.querySelector('[data-battle-mode=auto]').click();document.querySelector('#battle-start').click();document.querySelector('#battle-pause').click()})()`);await sleep(950);assert.equal(await evaluate(`document.querySelector('.battle-turn').textContent`),'Turn 0');await evaluate(`document.querySelector('#battle-pause').click()`);await wait(`document.querySelector('.battle-turn').textContent!=='Turn 0'`);await evaluate(`document.querySelector('#battle-pause').click()`);checks++;}
+ }
+ console.log(`PASS Firefox: ${checks}/37 checks; shared pages, Forums, Battle Arena, mobile/desktop themes and manual/auto battle controls. Screenshots: ${output}`);
+ await send('browser.close');
+ await Promise.race([new Promise(r=>browser.once('exit',r)),sleep(3000)]);
 }
 main().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{
  if(socket?.readyState===WebSocket.OPEN)socket.close();if(browser&&browser.exitCode===null){browser.kill();await Promise.race([new Promise(r=>browser.once('exit',r)),sleep(3000)]);}server?.close();

@@ -17,16 +17,20 @@ const typeChart = require('../data/type-chart.json');
 const teamAnalysis = require('../team-analysis-data');
 const decorations = require('./decorations');
 
-const publicUser = user => ({
+const publicUser = (user,staff) => ({
   id: user.id, username: user.username, email: user.email, bio: user.bio,
   avatarUrl: user.avatar_filename ? `/media/avatars/${user.avatar_filename}` : null,
-  createdAt: user.created_at
+  createdAt: user.created_at,
+  ...(staff?{staff:{available:staff.available,role:staff.role,permissions:staff.permissions,roleVersion:staff.roleVersion}}:{})
 });
 const sessionCall = (req, method) => new Promise((resolve, reject) => req.session[method](error => error ? reject(error) : resolve()));
 const avatarPattern = /^[0-9a-f-]{36}\.webp$/;
 
 async function createApp({ repo, store, config, authLimit = 30 }) {
   const app = express();
+  if(!repo.administration)throw Error('Repository must provide the administration adapter.');
+  const staffFor=async user=>({id:user.id,...await repo.administration.access(user.id)});
+  const restricted=staff=>{const error=new v.HttpError(403,`Account suspended until ${staff.restriction.expiresAt}. ${staff.restriction.reason}`);error.code='ACCOUNT_RESTRICTED';error.restriction={expiresAt:staff.restriction.expiresAt,reason:staff.restriction.reason};return error;};
   const root = path.join(__dirname, '..');
   await fs.mkdir(config.uploadDir, { recursive: true });
   const dummyHash = await argon2.hash(crypto.randomBytes(32), { type: argon2.argon2id });
@@ -55,9 +59,11 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     if (!req.session.csrf) req.session.csrf = crypto.randomBytes(32).toString('hex');
     const user = req.session.userId ? await repo.user(req.session.userId) : null;
     if (!user) delete req.session.userId;
+    const staff=user?await staffFor(user):null;
+    if(staff?.restriction){delete req.session.userId;await sessionCall(req,'save');return res.json({user:null,csrfToken:req.session.csrf,code:'ACCOUNT_RESTRICTED',error:restricted(staff).message});}
     // Save before responding, so a subsequent write sees the initialized session.
     await sessionCall(req, 'save');
-    res.json({ user: user ? publicUser(user) : null, csrfToken: req.session.csrf });
+    res.json({ user: user ? publicUser(user,staff) : null, csrfToken: req.session.csrf });
   });
   app.use('/api', (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
@@ -69,11 +75,12 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     next();
   });
   async function signIn(req, user) {
+    const staff=await staffFor(user);if(staff.restriction)throw restricted(staff);
     await sessionCall(req, 'regenerate');
     req.session.userId = user.id;
     req.session.csrf = crypto.randomBytes(32).toString('hex');
     await sessionCall(req, 'save');
-    return { user: publicUser(user), csrfToken: req.session.csrf };
+    return { user: publicUser(user,staff), csrfToken: req.session.csrf };
   }
   app.post('/api/auth/register', authLimiter, async (req, res) => {
     const data = v.registration(req.body);
@@ -129,13 +136,18 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     const team = await repo.community.publicTeam(community.shareId(req.params.shareId));
     return { team, analysis: teamAnalysis.analyze(team.pokemonIds, speciesData, typeChart.resources) };
   }));
+  require('./forum-routes').routes(app,repo,true);
   app.use('/api', async (req, res, next) => {
     const user = req.session.userId ? await repo.user(req.session.userId) : null;
     if (!user) return next(new v.HttpError(401, 'Please log in to continue.'));
+    req.staff=await staffFor(user);
+    if(req.staff.restriction){delete req.session.userId;await sessionCall(req,'save');throw restricted(req.staff);}
     req.user = user;
     next();
   });
-  app.get('/api/profile', (req, res) => res.json({ user: publicUser(req.user) }));
+  require('./admin-routes').routes(app,repo);
+  require('./forum-routes').routes(app,repo);
+  app.get('/api/profile', (req, res) => res.json({ user: publicUser(req.user,req.staff) }));
   app.get('/api/profile/decorations', communityOperation(async req => {
     await repo.progression.snapshot(req.user.id);
     return { decoration:await repo.community.decoration(req.user.id), choices:decorations.choices, badges:await repo.community.earnedBadges(req.user.id) };
@@ -154,7 +166,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.patch('/api/profile', async (req, res) => {
     v.object(req.body);
     const user = await repo.updateBio(req.user.id, v.text(req.body.bio, 'Biography', 0, 500));
-    res.json({ user: publicUser(user) });
+    res.json({ user: publicUser(user,req.staff) });
   });
   const upload = multer({
     storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1, fields: 1, parts: 2, fieldSize: 1024 },
@@ -184,7 +196,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     try { old = await repo.updateAvatar(req.user.id, filename); }
     catch (error) { await fs.unlink(target).catch(() => {}); throw error; }
     if (old && avatarPattern.test(old)) await fs.unlink(path.join(config.uploadDir, old)).catch(() => {});
-    res.json({ user: publicUser(await repo.user(req.user.id)) });
+    res.json({ user: publicUser(await repo.user(req.user.id),req.staff) });
   });
   app.get('/api/teams', async (req, res) => res.json({ teams: await repo.teams(req.user.id) }));
   app.post('/api/teams', async (req, res) => res.status(201).json({ team: await repo.createTeam(req.user.id, v.team(req.body, false).name) }));
@@ -219,7 +231,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['styles.css', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
+  for (const asset of ['forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
@@ -228,9 +240,12 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     // Existing avatar URLs are owner-only. Public pictures use a revocable profile route.
     const owner = req.session.userId ? await repo.user(req.session.userId) : null;
     if (!owner || owner.avatar_filename !== req.params.filename) throw new v.HttpError(404, 'Image not found.');
+    const staff=await staffFor(owner);if(staff.restriction)throw restricted(staff);
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(config.uploadDir, req.params.filename));
   });
+  for(const page of ['forums.html','battle.html'])app.get('/'+page,(req,res)=>res.sendFile(path.join(root,page)));
+  app.get('/data/battle-v5.json',(req,res)=>res.sendFile(path.join(root,'data/battle-v5.json')));
   app.get('/pokemon.html', (req, res) => res.sendFile(path.join(root, 'pokemon.html')));
   app.get('/dashboard.html', (req, res) => res.sendFile(path.join(root, 'dashboard.html')));
   app.get('/data/pokemon-summary.json', (req, res) => res.sendFile(path.join(root, 'data/pokemon-summary.json')));
@@ -238,6 +253,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(root, 'vendor/chart.umd.js')));
   app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
   app.get('/community.html', (req, res) => res.sendFile(path.join(root, 'community.html')));
+  app.get('/admin.html', (req,res)=>res.set('Cache-Control','no-store').sendFile(path.join(root,'admin.html')));
   app.get('/about.html', (req, res) => res.sendFile(path.join(root, 'about.html')));
   for (const route of ['/trainer/:username', '/team/:shareId']) app.get(route, async (req, res) => {
     // Relative assets still work in a static subpath; clean backend URLs use the root.
@@ -256,7 +272,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     if ((error.code?.startsWith('ER_') && error.code !== 'ER_DUP_ENTRY') || ['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(error.code)) { status = 503; message = 'Database unavailable. Please try again later.'; }
     if (status >= 500) { console.error('Request failed:', error.code || error.name); message = status === 503 ? message : 'Something went wrong. Please try again.'; }
     if (error.type === 'entity.parse.failed') message = 'Request body must be valid JSON.';
-    res.status(status).json({ error: message });
+    res.status(status).json({ error: message, ...(error.code==='ACCOUNT_RESTRICTED'?{code:error.code,restriction:error.restriction}:{}) });
   });
   return app;
 }

@@ -1,6 +1,17 @@
-# Dexhaven v0.6.1 — Pokémon Sprites & Trainer Card Studio Expansion
+# Dexhaven v0.7.0 — Community Forums & Battle Arena
+
+Version **0.7.0** adds [community forums](FORUMS.md), moderation/notifications and
+[a local Battle Arena](BATTLE_ARENA.md) for all 649 species. The Arena has player
+and auto modes, levels 1-100, historical Black/White data and 201 supported moves.
+Forums require the separate [manual MySQL upgrade](database/MIGRATION_v0.7.0.md);
+it has not been executed. See [implementation, tests and limitations](IMPLEMENTATION_v0.7.0.md).
+
+
+Version **0.6.2** adds independent Rookie/Bronze/Silver/Gold/**Diamond**/Champion caught ranks, protected staff roles, a responsive Administration panel, temporary restrictions and transactional audit history. See [ADMINISTRATION.md](ADMINISTRATION.md), [the implementation report](IMPLEMENTATION_v0.6.2.md) and the [manual upgrade/Owner bootstrap guide](database/MIGRATION_v0.6.2.md). No migration or real Owner assignment runs automatically.
 
 Version **0.6.1** adds verified Generation V sprites, expanded card presets and colours, and shared fixes for Hexagon frames and Sparkles. See [the implementation report](IMPLEMENTATION_v0.6.1.md) and [manual database upgrade](database/MIGRATION_v0.6.1.md). No migration, release or deployment runs automatically.
+
+Trainer Profile now groups the overview, picture/biography editor, privacy controls and Card Studio, with shortcuts and compact summaries. Five extra cosmetic title styles require the separate [manual title-style constraint upgrade](database/MIGRATION_trainer-title-styles.md) on existing databases. No account data is changed.
 
 Biography now has one editor and an explicit **Show biography publicly** setting. Existing databases require the [manual single-biography migration](database/MIGRATION_single-biography.md); old public text is archived and sharing starts off. Trainer Hub puts picture editing above Biography and offers All/Caught search sources in each team editor.
 

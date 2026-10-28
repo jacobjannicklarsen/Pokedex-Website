@@ -4,7 +4,7 @@ const { ProgressionRepository } = require('./progression-repository');
 const { awardTeamBuilder } = require('./progression');
 const { CommunityRepository } = require('./community-repository');
 class Repository {
-  constructor(pool) { this.pool = pool; this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); }
+  constructor(pool) { this.pool = pool; this.forums=new(require('./forums').Forums)(this,new(require('./forum-store').ForumStore)(pool,this)); this.administration = new(require('./admin-repository').AdminRepository)(pool); this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); }
   async user(id) {
     const [rows] = await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?', [id]);
     return rows[0] || null;
