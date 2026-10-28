@@ -239,3 +239,22 @@ allowlist; summaries are untrusted forum text only.
 GET /api/shoutbox/messages supports before, limit (1-50) and up to 200 comma-separated ids for deletion reconciliation. POST accepts only {message}, requires the session/CSRF pipeline, enforces 500 characters, five-second cooldown, ten/minute/account and recent duplicates. DELETE /api/shoutbox/messages/:id accepts {reason} (5-300), requires current forums.moderate plus panel access/hierarchy and atomically soft-deletes/audits. Missing tables return 503 until the manual migration.
 
 GET /api/local/gba/games, /launch/:id, /rom/:id, /player?game=:id and /runtime/* are private development-only, loopback/Host/Origin/same-site/live Owner guarded. ROM ids use a fixed map; arbitrary filesystem queries are rejected. Launch returns SHA-256 identity and a revision-pinned ROM URL; a changed revision returns 409. No saves are accepted by these APIs. See GAME_LIBRARY.md for installation and public preview limitations.
+## v0.7.2.1 private soundtrack
+
+These endpoints run after existing authentication and require the live Owner,
+explicit development enablement, loopback binding/socket, accepted local Host/
+Origin, no proxy and non-cross-site requests. Production disables access.
+
+- `GET /api/local/music/tracks[?refresh=1]`: cached recursive catalog; optional
+  explicit rescan. Returns `{tracks,playlists,refreshedAt}`. Tracks contain stable
+  ID, safe title/filename, folder playlist, format/MIME and duration `null` until
+  the browser reads media metadata. Absolute paths are not returned.
+- `GET|HEAD /api/local/music/stream/:id`: selected audio, no path query accepted;
+  exact MIME, no-store, content length and byte-range support. Single bounded,
+  suffix and open ranges return 206; unsatisfiable/malformed ranges return 416
+  with `Content-Range: bytes */size`. Whole-track GET is streamed, not buffered.
+- Missing/unconfigured collection: 503; invalid/missing/escaping track: 404;
+  unexpected options: 400; guest: 401; non-Owner: 403; nonlocal/disabled: 404.
+
+No uploads, database tables, cloud synchronization or public audio route exists.
+See [SOUNDTRACK.md](../SOUNDTRACK.md) for setup and known browser restrictions.

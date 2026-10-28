@@ -10,11 +10,7 @@ const games=Object.freeze([
  {id:'lightplatinum',title:'Pokémon Light Platinum',region:'A fan-made Ruby adventure',description:'The distinct GBA ROM hack associated with WesleyFG.',file:'Pokémon - Light Platinum Version.gba',color:'platinum'}
 ]);
 const safeId=id=>games.find(g=>g.id===id);
-function local(req,config){
- const socket=req.socket.remoteAddress||'',loopback=socket==='::1'||/^(?:::ffff:)?127\.\d+\.\d+\.\d+$/.test(socket);
- const origin=new URL(config.origin),allowed=new Set(['localhost','127.0.0.1'].map(h=>h+(origin.port?':'+origin.port:'')));
- return config.gbaEnabled===true&&!config.production&&config.host==='127.0.0.1'&&!config.trustProxy&&loopback&&allowed.has(req.get('host')?.toLowerCase())&&(!req.get('origin')||req.get('origin')===config.origin)&&req.get('sec-fetch-site')!=='cross-site';
-}
+const local=(req,config)=>require('./private-local').local(req,config,config.gbaEnabled);
 async function romFile(config,id){
  const game=safeId(id);if(!game)throw new v.HttpError(404,'Unknown game.');
  if(!config.gbaRomsDir)throw new v.HttpError(503,'The private ROM directory is not configured.');

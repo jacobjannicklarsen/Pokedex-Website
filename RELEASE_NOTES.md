@@ -171,3 +171,9 @@ The existing code has generation, search, type and sort filters and six statisti
 Validation: **37 automated tests passed**, **one opt-in real-MySQL test skipped**, and **33/33 headless Chrome checks passed** using deterministic PokéAPI fixtures and an isolated in-memory account repository. The separate read-only live PokéAPI contract check also passed. See [QA_REPORT.md](QA_REPORT.md) for scope and remaining manual checks.
 
 For local review, run `npm.cmd start` with the existing MySQL configuration, then visit http://localhost:3000/ and http://localhost:3000/pokemon.html. Test registration/login, teams, favourites, theme persistence and page navigation before publishing. No new database migration is required from v0.2.0; installations still on v0.1.0 need the existing manual v0.2.0 migration.
+# v0.7.2.1 — Pokémon Soundtrack Player (draft)
+
+Private recursive soundtrack discovery, native audio controls, browser-local
+restoration, shuffle/repeat, multiple-tab cooperation and GBA pause/resume.
+Human release `v0.7.2.1`; npm remains `0.7.2`. See
+[the release draft](RELEASE_v0.7.2.1.md). No database operations or publishing.

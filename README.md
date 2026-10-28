@@ -1,4 +1,13 @@
-# Dexhaven v0.7.2 - Game Library & Community Shoutbox
+# Dexhaven v0.7.2.1 - Pokémon Soundtrack Player
+
+The private Owner soundtrack player discovers the existing `Dexhaven-Music`
+collection, streams audio locally, restores playback preferences across pages
+and pauses around GBA gameplay. See [Windows setup and controls](SOUNDTRACK.md),
+[implementation/tests](IMPLEMENTATION_v0.7.2.1.md) and
+[draft release](RELEASE_v0.7.2.1.md). npm remains valid SemVer `0.7.2`; the human
+release label is stored separately as `dexhavenRelease: "0.7.2.1"`. No database
+operation is needed. **Nine music files were already tracked in Git; resolve
+their tracking/history before any public push.** Audio files were not modified.
 
 Version **0.7.2** adds the private six-game GBA library, automatic Owner-only local ROM loading, EmulatorJS/mGBA, browser-local saves and the homepage Community Shoutbox. This is an independent personal software project.
 

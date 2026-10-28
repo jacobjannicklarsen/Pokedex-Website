@@ -1,0 +1,37 @@
+.music-player { --music-accent:var(--accent-ink,var(--mint)); position:fixed; z-index:30; bottom:18px; right:24px; width:min(390px,calc(100vw - 32px)); border:1px solid var(--line); border-radius:18px; background:var(--panel); color:var(--text); box-shadow:0 12px 40px #0003; font:12px 'DM Sans',sans-serif; }
+.music-bar { display:flex; align-items:center; gap:8px; padding:10px; }
+.music-symbol { display:grid; place-items:center; width:32px; height:32px; border-radius:10px; flex-shrink:0; color:var(--music-accent); background:color-mix(in srgb,var(--mint) 12%,transparent); }
+.music-copy { min-width:0; flex:1; }
+.music-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.music-copy small { display:block; color:var(--muted); font-size:10px; margin-top:4px; }
+.music-button { display:inline-grid; place-items:center; flex-shrink:0; min-width:40px; min-height:40px; padding:8px; border:1px solid transparent; border-radius:11px; background:transparent; color:var(--text); cursor:pointer; touch-action:manipulation; transition:background .15s,border-color .15s; }
+.music-player svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+.music-button:hover:not(:disabled),.music-button[aria-pressed=true] { background:color-mix(in srgb,var(--mint) 12%,transparent); color:var(--music-accent); border-color:color-mix(in srgb,var(--music-accent) 40%,var(--line)); }
+.music-button:active:not(:disabled) { background:color-mix(in srgb,var(--mint) 23%,transparent); }
+.music-button:disabled { opacity:.4; cursor:default; }
+.music-play { background:var(--mint); color:#102820; border-color:transparent; }
+.music-panel { border-top:1px solid var(--line); padding:18px; max-height:min(540px,calc(100dvh - 155px)); overflow-y:auto; overscroll-behavior:contain; }
+.music-heading { font:600 19px 'Space Grotesk',sans-serif; margin:0 0 6px; }
+.music-status { color:var(--muted); font-size:11px; line-height:1.6; margin:8px 0 14px; }
+.music-controls { display:flex; align-items:center; justify-content:center; gap:8px; margin-block:12px; }
+.music-progress { display:flex; justify-content:space-between; color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums; }
+.music-player input[type=range] { width:100%; min-width:0; min-height:32px; margin:0; padding:0; accent-color:var(--music-accent); cursor:pointer; }
+.music-volume { display:flex; align-items:center; gap:8px; margin-block:12px; }
+.music-volume output { color:var(--muted); font-size:10px; min-width:30px; text-align:right; }
+.music-player select { width:100%; max-width:none; margin-top:8px; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; min-height:42px; }
+.music-playlist-label { display:block; color:var(--muted); font-size:11px; }
+.music-track-list { list-style:none; padding:0; margin:12px 0; max-height:180px; overflow-y:auto; overscroll-behavior:contain; }
+.music-track { display:flex; gap:10px; width:100%; align-items:center; text-align:left; padding:12px 10px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--text); font:inherit; cursor:pointer; }
+.music-track span:first-child { min-width:22px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.music-track span:last-child { overflow-wrap:anywhere; }
+.music-track:hover,.music-track[aria-current=true] { background:color-mix(in srgb,var(--mint) 10%,transparent); }
+.music-track[aria-current=true] { color:var(--music-accent); border-color:color-mix(in srgb,var(--music-accent) 35%,var(--line)); }
+.music-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.music-tools button { font-size:11px; min-height:40px; }
+.music-button[data-mode=one] { position:relative; }
+.music-button[data-mode=one]::after { content:'1'; position:absolute; right:3px; top:0; font-size:9px; font-weight:700; }
+body:has(.music-player:not([hidden])) { padding-bottom:90px; }
+body:has(dialog[open]) .music-player { visibility:hidden; }
+body[data-page=games]:has(.games-player:not([hidden])) .music-player { bottom:10px; }
+@media(max-width:700px) { .music-player { right:16px; bottom:12px; } .music-button { min-width:42px; min-height:42px; } .music-panel { padding:14px; } }
+@media(prefers-reduced-motion:reduce) { .music-button { transition:none; } }

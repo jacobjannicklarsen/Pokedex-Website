@@ -490,3 +490,25 @@ Git index/history rewrite, commit, push or deployment was performed. See
 [the full report](IMPLEMENTATION_v0.7.2.md),
 [setup/manual checklist](GAME_LIBRARY.md) and
 [Workbench instructions](database/MIGRATION_v0.7.2.md).
+# v0.7.2.1 — Pokémon Soundtrack Player
+
+Full Node suite: **184 tests, 182 passed, 0 failed, 2 existing skips**. New music
+tests: **9/9 passed**, including post-index directory-junction escape rejection,
+Owner/local-only boundaries, discovery, safe metadata, streaming ranges and queue
+preferences. No database operations were used.
+
+Focused Chrome with the nine original MP3s: **13/13 groups passed**. Native media
+playback clocks, pause/seek/volume/mute, queue controls/endings, reload/navigation,
+autoplay rejection, multiple tabs, GBA events, media-error recovery, responsive
+themes, dialogs, logout, singleton cleanup and preview no-request behavior were
+verified. Generated WAV fixtures also exercise populated folder playlists.
+Generated-WAV soundtrack run: **12/12 groups passed**. GBA/Shoutbox regression:
+**6/6 groups passed**, including all six actual game
+boot/video/exit checks and browser backup isolation. This does not replace real
+speaker/controller/full in-game save-cycle checks.
+
+Public preview: **90 files**, all **13 HTML pages** disable private music, with
+no audio/ROM/save/environment/private backend files. Music, ROMs and database
+sources are unchanged from HEAD. Nine MP3s were already tracked and remain a
+public-release blocker. No commit/push/deployment or automatic history cleanup.
+See [full report](IMPLEMENTATION_v0.7.2.1.md) and [setup](SOUNDTRACK.md).

@@ -16,3 +16,5 @@ coverage/
 # Reproducible third-party EmulatorJS runtime; install with npm run vendor:emulator
 /vendor/emulatorjs/
 /preview-dist/
+# Private soundtrack collection (already tracked files need manual remediation)
+/Dexhaven-Music/

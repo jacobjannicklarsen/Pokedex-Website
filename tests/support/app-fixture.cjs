@@ -8,5 +8,5 @@ module.exports=async (t,overrides={})=>{
  t.after(async()=>{await new Promise(r=>server.close(r));store.clear(()=>{});if(path.dirname(path.resolve(uploadDir))!==path.resolve(os.tmpdir())||!path.basename(uploadDir).startsWith('dexhaven-admin-test-'))throw Error('Unexpected temporary path');await fs.rm(uploadDir,{recursive:true,force:true,maxRetries:3,retryDelay:100});});
  function client(){let cookie='',csrf='';return {async call(url,{method='GET',body,headers={},raw=false,form}={}){const r=await fetch(base+url,{method,headers:{Cookie:cookie,...(method!=='GET'?{'X-CSRF-Token':csrf}:{}),...(body&&!form?{'Content-Type':'application/json'}:{}),...headers},body:form||(body?JSON.stringify(body):undefined)});if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];const data=raw?await r.text():r.status===204?{}:await r.json();if(data.csrfToken)csrf=data.csrfToken;return {status:r.status,data};}};}
  async function register(name){const c=client();await c.call('/api/auth/session');const result=await c.call('/api/auth/register',{method:'POST',body:{username:name,email:`${name}@example.test`,password:'staff security test password'}});if(result.status!==201)throw Error(JSON.stringify(result));return {c,user:result.data.user};}
- return {repo,client,register,uploadDir,base};
+ return {repo,client,register,uploadDir,base,config};
 };

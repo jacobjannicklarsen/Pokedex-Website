@@ -185,3 +185,9 @@ public battle snapshot, not a database migration or normal startup step.
 ## v0.7.2 private Game Library and Shoutbox
 
 Follow [GAME_LIBRARY.md](GAME_LIBRARY.md) for the local E: directory, environment entries, pinned runtime installation and six-game/manual-save checklist. Apply [the Shoutbox migration](database/MIGRATION_v0.7.2.md) manually in MySQL Workbench. Do not rerun db:setup on an existing database. Review the already-tracked ROM warning before any Git push.
+# v0.7.2.1 soundtrack setup
+
+Follow [SOUNDTRACK.md](SOUNDTRACK.md#windows--vs-code-setup) for the private music
+directory, Owner login and player controls. Restart the existing terminal once
+after configuring music; do not launch a duplicate server. No database commands
+or new dependencies are needed for the soundtrack update.

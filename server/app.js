@@ -151,6 +151,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   });
   require('./shoutbox').routes(app,repo);
   require('./gba').routes(app,{config,root});
+  require('./music').routes(app,{config});
   require('./admin-routes').routes(app,repo);
   require('./forum-routes').routes(app,repo);
   require('./enhancement-routes').routes(app,repo,{config});
@@ -239,7 +240,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['shoutbox.js','shoutbox.css','games.js','games.css','gba-saves.js','gba-emulator.js','gba-player.js','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
+  for (const asset of ['music-library.js','music-player.js','music-player.css','shoutbox.js','shoutbox.css','games.js','games.css','gba-saves.js','gba-emulator.js','gba-player.js','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));

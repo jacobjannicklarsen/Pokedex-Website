@@ -2,6 +2,7 @@
 # Prefer the explicit public-only build: npm run build:preview.
 exclude:
   - Dexhaven-GBA
+  - Dexhaven-Music
   - node_modules
   - server
   - tests
