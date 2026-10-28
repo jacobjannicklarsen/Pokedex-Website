@@ -1,5 +1,15 @@
 # Windows / VS Code setup
 
+## v0.7.1 existing-installation upgrade
+
+Do not rerun schema setup against existing data. Back up the database and upload
+directory, complete earlier migrations, then review and manually apply
+[database/MIGRATION_v0.7.1.md](database/MIGRATION_v0.7.1.md). Its eleven new tables
+and two existing-table ALTERs are not executed at startup. DDL commits implicitly;
+inspect any interrupted upgrade instead of blindly rerunning ALTERs. Keep your
+existing SESSION_SECRET. Restart Express and perform the guide's two-account,
+privacy, upload, poll and saved-replay persistence checks before publishing.
+
 **v0.6.2 upgrade:** review [database/MIGRATION_v0.6.2.md](database/MIGRATION_v0.6.2.md) for backup, Workbench execution, validation, recovery and explicit existing-ID Owner bootstrap. No staff migration or Owner assignment has been run. Existing accounts remain Trainers, with ranks calculated from existing Caught records. See [ADMINISTRATION.md](ADMINISTRATION.md) for the permission matrix and suspension policy.
 
 **v0.6.1:** review the separate [Trainer Card Studio migration](database/MIGRATION_v0.6.1.md) for existing decoration tables. It is prepared only and must be approved before application. Fresh installs use the updated schema. Sprite images require access to the public PokéAPI sprite host and fall back to a local placeholder.

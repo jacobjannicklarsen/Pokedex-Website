@@ -12,12 +12,74 @@
   let activeView = viewFromLocation();
   let authMode = 'login';
   const authDialog = $('#auth-dialog');
+  const rememberedUsernameKey = 'dexhaven-remembered-username';
+  const rememberUsernameLabel = element('label', 'remember-username');
+  const rememberUsername = element('input');
+  rememberUsername.type = 'checkbox'; rememberUsername.id = 'auth-remember-username';
+  rememberUsernameLabel.append(rememberUsername, document.createTextNode('Remember username'));
+  $('#password-help').before(rememberUsernameLabel);
+  function savedUsername() {
+    try { const value = localStorage.getItem(rememberedUsernameKey); return typeof value === 'string' && value.length <= 254 ? value : ''; }
+    catch { return ''; }
+  }
+  function saveUsername(value) {
+    try { if (value) localStorage.setItem(rememberedUsernameKey, value); else localStorage.removeItem(rememberedUsernameKey); }
+    catch { /* Login still works when browser storage is unavailable. */ }
+  }
+  rememberUsername.addEventListener('change', () => { if (!rememberUsername.checked) saveUsername(''); });
   const content = $('#account-content');
   const pendingFavorites = new Set();
   const teamSelectors = new Set();
   const caughtFilters = new Set();
   let selectorRecovery;
   let avatarEditor;
+  const profileTrigger = $('#header-profile');
+  const profileDropdown = element('div', 'profile-dropdown');
+  profileDropdown.hidden = true;
+  profileTrigger.before(profileDropdown);
+  const profileMenu = element('nav', 'profile-dropdown-links');
+  profileMenu.id = 'profile-dropdown';
+  profileMenu.hidden = true;
+  profileMenu.setAttribute('aria-label', 'Account options');
+  for (const [label, target] of [
+    ['Trainer profile', 'trainers.html#view=profile'],
+    ['Profile customization', 'settings.html#section=customize'],
+    ['Password & Security', 'settings.html#section=security'],
+    ['Privacy', 'settings.html#section=privacy'],
+    ['Preferences', 'settings.html#section=preferences']
+  ]) {
+    const link = element('a', '', label);
+    link.href = new URL(target, siteRoot).href;
+    profileMenu.append(link);
+  }
+  profileDropdown.append(profileTrigger, profileMenu);
+  function closeProfileMenu(restoreFocus = false) {
+    profileMenu.hidden = true;
+    profileTrigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) profileTrigger.focus();
+  }
+  function openProfileMenu() {
+    if (!session.user) return;
+    profileMenu.hidden = false;
+    profileTrigger.setAttribute('aria-expanded', 'true');
+  }
+  profileTrigger.addEventListener('click', () => profileMenu.hidden ? openProfileMenu() : closeProfileMenu());
+  profileDropdown.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !profileMenu.hidden) {
+      event.preventDefault(); event.stopPropagation(); closeProfileMenu(true);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); openProfileMenu();
+      const links = [...profileMenu.querySelectorAll('a')];
+      const current = links.indexOf(document.activeElement);
+      const next = current < 0 ? (event.key === 'ArrowDown' ? 0 : links.length - 1) : (current + (event.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length;
+      links[next].focus();
+    }
+  });
+  document.addEventListener('click', event => { if (!profileDropdown.contains(event.target)) closeProfileMenu(); });
+  profileDropdown.addEventListener('focusout', () => {
+    setTimeout(() => { if (!profileDropdown.contains(document.activeElement)) closeProfileMenu(); }, 0);
+  });
+  profileMenu.addEventListener('click', event => { if (event.target.closest('a')) closeProfileMenu(); });
 
   function recoverSelectors() {
     if (globalThis.PokemonSelector?.create) return Promise.resolve();
@@ -99,8 +161,9 @@
     const profile = $('#header-profile');
     const avatar = $('#header-avatar');
     const initial = $('#header-avatar-initial');
-    profile.href = viewTarget('/profile');
-    profile.setAttribute('aria-label', authenticated ? `Open ${session.user.username}'s trainer profile` : 'Open trainer profile');
+    profileDropdown.hidden = !authenticated;
+    if (!authenticated) closeProfileMenu();
+    profile.setAttribute('aria-label', authenticated ? `Open account options for ${session.user.username}` : 'Open account options');
     profile.title = authenticated ? session.user.username : '';
     initial.textContent = authenticated ? session.user.username[0].toUpperCase() : '';
     const avatarUrl = authenticated ? session.user.avatarUrl : null;
@@ -132,11 +195,14 @@
     authMode = mode;
     if (dialog.open) dialog.close();
     $('#auth-form').reset(); $('#auth-error').hidden = true;
+    const remembered = savedUsername();
+    $('#auth-identifier').value = remembered; rememberUsername.checked = Boolean(remembered);
     setAuthMode();
     if (!authDialog.open) authDialog.showModal();
   }
   function setAuthMode() {
     const register = authMode === 'register';
+    rememberUsernameLabel.hidden = register; rememberUsername.disabled = register;
     $('#auth-title').textContent = register ? 'Join Dexhaven' : 'Log in to Dexhaven';
     $('#auth-submit').textContent = register ? 'Register' : 'Log in';
     $('#auth-switch').textContent = register ? 'Already a trainer? Log in' : 'New here? Create an account';
@@ -288,7 +354,7 @@
     else panel.append(element('span', 'trainer-avatar avatar-initial', user.username[0].toUpperCase()));
     const identity=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element('h2','',user.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;nameRow.append(name,motto);
     const meta=element('div','trainer-identity-meta'),titleSlot=element('span');titleSlot.dataset.trainerTitleSlot='';globalThis.TrainerRanks?.role(meta,user.staff?.role||'trainer');meta.append(titleSlot);
-    const biography=element('p','profile-biography',user.bio||'Your story is still unwritten. Add a biography below.');biography.dataset.profileBio='';
+    const biography=element('div','profile-biography',user.bio||'Your story is still unwritten. Add a biography below.');if(user.bioFormat==='limited')RichBiography.render(biography,user.bio);biography.dataset.profileBio='';
     identity.append(element('p','eyebrow','YOUR TRAINER CARD'),nameRow,meta,biography,element('p','profile-account-details',`${user.email} · Joined ${new Date(user.createdAt).toLocaleDateString()}`));
     const progress=element('aside','profile-progress'),rank=element('div');rank.dataset.trainerRank='';progress.append(element('h3','','Your collection rank'),rank);globalThis.TrainerProgress?.renderRank(rank);
     const totals=element('div','profile-totals');for(const [label,value,view]of [['Teams',session.teams.length,'/teams'],['Favourites',session.favorites.size,'/favorites']]){const counter=action(label,()=>navigate(view),'profile-counter');counter.prepend(element('strong','',value));totals.append(counter);}progress.append(totals);
@@ -300,7 +366,7 @@
     const save = element('button', 'action-button', 'Save trainer info'); save.type = 'submit';
     form.append(label, element('p', 'form-help', 'Your one biography for Dexhaven. Control who can see it with Show biography publicly below.'), save); form.addEventListener('submit', async event => {
       event.preventDefault(); save.disabled = true;
-      try { const data = await request('/profile', { method: 'PATCH', body: { bio: bio.value } }); session.user = data.user; biography.textContent = data.user.bio || 'Your story is still unwritten. Add a biography below.'; notice('Trainer info saved.'); }
+      try { const data = await request('/profile', { method: 'PATCH', body: { bio: bio.value,...(user.bioFormat==='limited'?{format:'limited'}:{}) } }); session.user = data.user; if(data.user.bioFormat==='limited')RichBiography.render(biography,data.user.bio);else biography.textContent=data.user.bio||'Your story is still unwritten. Add a biography below.'; notice('Trainer info saved.'); }
       catch (error) { notice(error.message, true); } finally { save.disabled = false; }
     });
     const avatarForm = element('form', 'account-form trainer-panel');
@@ -334,6 +400,8 @@
     const fields=element('div','profile-editor-grid');fields.append(avatarForm,form);editor.append(fields);content.append(editor);
     globalThis.DexhavenCommunity?.settings(content, { user, teams: session.teams, request, notice, currentUserId: () => session.user?.id, trackSelector: selector => teamSelectors.add(selector) });
     globalThis.TrainerDecorations?.mount(content, panel, {user,request,notice,currentUserId:()=>session.user?.id});
+    request('/settings').then(s=>{if(panel.isConnected&&session.user?.id===user.id&&s.bannerUrl)ProfileExtras.banner(panel,s.bannerUrl);}).catch(()=>{});
+    const settingsLink=element('a','text-button','Account settings');settingsLink.href='settings.html';content.append(settingsLink);
     const summaries=element('div','profile-summary-grid'),teams=element('section','trainer-panel profile-summary'),favorites=element('section','trainer-panel profile-summary');
     teams.append(element('h3','',`Teams · ${session.teams.length}`));
     if(!session.teams.length)teams.append(element('p','form-help','Your next team starts with one favourite partner.'));
@@ -495,7 +563,9 @@
       // Refresh anonymous CSRF state if the initial API request failed or the session expired.
       await refreshSession();
       const body = authMode === 'register' ? { username: $('#auth-username').value, email: $('#auth-email').value, password: $('#auth-password').value } : { identifier: $('#auth-identifier').value, password: $('#auth-password').value };
+      const shouldRememberUsername = rememberUsername.checked;
       const data = await request(`/auth/${authMode}`, { method: 'POST', body });
+      if (Object.hasOwn(body, 'identifier')) saveUsername(shouldRememberUsername ? body.identifier.trim() : '');
       session.user = data.user; session.csrf = data.csrfToken; session.ready = true; session.privateReady = false; session.privateError = '';
       updateAccountUI(); authDialog.close(); $('#auth-form').reset();
       notice(`Welcome, ${session.user.username}!`);
@@ -510,10 +580,6 @@
     catch (error) { notice(error.message, true); } finally { $('#logout-button').disabled = false; }
   });
   globalThis.PokedexAccounts = { decorateCard, decorateDetails, onPokemonUpdate };
-  $('#header-profile').addEventListener('click', event => {
-    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    event.preventDefault(); navigate('/profile');
-  });
   $('#header-avatar').addEventListener('error', () => {
     $('#header-avatar').hidden = true; $('#header-avatar-initial').hidden = false;
   });
@@ -525,7 +591,7 @@
   updateAccountUI();
   [...(grid?.children || [])].forEach(tile => { const pokemon = state.pokemon.get(Number(tile.dataset.id)); if (pokemon) decorateCard(tile, pokemon); });
   navigate(activeView, false);
-  globalThis.DexhavenAccount={request,refresh:refreshSession,getUser:()=>session.user};
+  globalThis.DexhavenAccount={request,refresh:refreshSession,getUser:()=>session.user,isReady:()=>session.ready};
   let focusRefresh;globalThis.addEventListener('focus',()=>{clearTimeout(focusRefresh);focusRefresh=setTimeout(()=>refreshSession().catch(()=>{}),150);});
   refreshSession().then(() => { if (activeView !== '/') renderPage(); }).catch(error => {
     session.ready = true;

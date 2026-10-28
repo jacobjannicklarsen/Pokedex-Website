@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="interactions.css">
     <link rel="stylesheet" href="community.css">
     <link rel="stylesheet" href="forums.css">
+    <link rel="stylesheet" href="community-expansion.css">
     <link rel="stylesheet" href="battle.css">
     <script src="encyclopedia-data.js" defer></script>
     <script src="pokemon-data.js" defer></script>
@@ -37,13 +38,20 @@
     <script src="pokemon-sprites.js" defer></script>
     <script src="profile-decorations.js" defer></script>
     
+    <script src="rich-biography.js" defer></script>
+    <script src="profile-extras.js" defer></script>
     <script src="account.js" defer></script>
+    <script src="member-cards.js" defer></script>
     <script src="forum-notifications.js" defer></script>
     <script src="battle-calculations.js" defer></script>
 <script src="battle-data.js" defer></script>
+<script src="vendor/battle-simulator.js" defer></script>
+<script src="battle-engine-legacy.js" defer></script>
+<script src="battle-simulator.js" defer></script>
 <script src="battle-engine.js" defer></script>
 <script src="battle-runner.js" defer></script>
-<script src="battle.js" defer></script>
+<script src="battle-recording.js" defer></script>
+    <script src="battle.js" defer></script>
 </head>
 <body data-page="battle">
 
@@ -56,10 +64,10 @@
         <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
         <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
       </button>
-      <a id="header-profile" class="header-profile" href="trainers.html#view=profile" aria-label="Open trainer profile" data-requires-auth hidden>
+      <button id="header-profile" class="header-profile" type="button" aria-label="Open account options" aria-expanded="false" aria-controls="profile-dropdown" data-requires-auth hidden>
         <img id="header-avatar" alt="" width="36" height="36" hidden>
         <span id="header-avatar-initial" aria-hidden="true"></span>
-      </a>
+      </button>
     </div>
   </header>
   <nav class="trainer-nav" aria-label="Main navigation">
@@ -79,7 +87,34 @@
     </div>
     <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
   </nav>
-  <main id="main"><header class="battle-intro"><p class="eyebrow">A FRIENDLY RIVALRY. A FRESH STRATEGY.</p><h1>Your next move.<br><span>Your kind of battle.</span></h1><p class="hero-description">Pick your Pok&eacute;mon, build a moveset and meet your match. Play against the CPU or watch two strategies collide.</p></header><nav class="community-subnav" aria-label="Community sections"><a href="community.html">Trainer directory</a><a href="forums.html">Forums</a><a href="battle.html" aria-current="page">Battle Arena</a></nav><details class="battle-rules trainer-panel"><summary>Black/White inspired rules &amp; limitations</summary><p class="form-help">Levels 1&ndash;100, 31 IVs, zero EVs and neutral nature. Historical Generation V stats, types and learnsets. No Fairy type, held items, abilities, weather, switching or multiplayer. Machine and breeding moves are included only when listed for Black/White. Unsupported moves cannot be equipped. Empty movesets or exhausted PP use Struggle with quarter maximum-HP recoil. Critical hits deal double damage; damage rounding is simplified. Burn, poison, paralysis, sleep, freeze and a bounded set of stat-stage moves are supported. A battle draws after 200 turns. Simulations award no ranks, caught Pok&eacute;mon or achievements.</p></details><p id="account-message" class="account-message" role="status" hidden></p><p id="battle-notice" role="status" aria-live="polite" hidden></p><section id="battle-content" aria-label="Battle Arena"><p class="form-help">Preparing the Arena&hellip;</p></section><noscript><p class="notice">Enable JavaScript to play a local battle. The Arena works without an account.</p></noscript></main>
+  <main id="main">
+    <header class="battle-intro battle-intro-illustrated">
+      <div class="battle-intro-copy">
+        <p class="eyebrow">A FRIENDLY RIVALRY. A FRESH STRATEGY.</p>
+        <h1>Your next move.<br><span>Your kind of battle.</span></h1>
+        <p class="hero-description">Pick your Pok&eacute;mon, build a moveset and meet your match.<br>Play against the CPU or watch two strategies collide.</p>
+        <div class="battle-intro-actions">
+          <a class="action-button" href="#battle-content">Build your battle <span aria-hidden="true">&darr;</span></a>
+          <a class="text-button" href="battle-history.html">History &amp; replays <span aria-hidden="true">&nearr;</span></a>
+        </div>
+        <ul class="battle-quick-facts" aria-label="Arena overview"><li>649 Pok&eacute;mon</li><li>Levels 1&ndash;100</li><li>3 AI difficulties</li></ul>
+      </div>
+      <figure class="battle-guide intro-portrait"><img src="./images/prof_nicklas-cutout.png" alt="Professor Benjamin holding a Pok&eacute; Ball" width="1024" height="1536" decoding="async" fetchpriority="high"></figure>
+    </header>
+    <nav class="community-subnav" aria-label="Community sections"><a href="community.html">Trainer directory</a><a href="forums.html">Forums</a><a href="forums.html#trending=1">Trending</a><a href="forums.html#latest=1">What&rsquo;s new</a><a href="forums.html#members=1">Members</a><a href="staff.html">Staff</a></nav>
+    <details class="battle-rules trainer-panel">
+      <summary>Black/White inspired rules &amp; limitations</summary>
+      <div class="battle-rules-grid">
+        <section><h2>A level playing field</h2><p class="form-help">Generation V types and mechanics, with historical Black/White learnsets and levels 1&ndash;100. Each contender uses 31 IVs, zero EVs, a neutral nature and base PP. Battles have one Pok&eacute;mon per side, with no held items, abilities, reserve team or multiplayer.</p></section>
+        <section><h2>Know your moves</h2><p class="form-help">Choose up to four legal moves, including Black/White machine and breeding moves. Move effects include weather, multi-hit and charging attacks, protection, Substitute, Transform and status conditions. Moves needing a held item, reserve teammate or another missing condition can fail, just as in the games. An empty moveset or exhausted PP triggers Struggle.</p></section>
+        <section><h2>Play, learn, replay</h2><p class="form-help">Generation V battle mechanics run locally using Pok&eacute;mon Showdown. Battles draw after 200 turns. Simulations never change caught records or caught-based ranks. Only qualified, server-prepared recordings count toward separate activity achievements.</p></section>
+      </div>
+    </details>
+    <p id="account-message" class="account-message" role="status" hidden></p>
+    <p id="battle-notice" role="status" aria-live="polite" hidden></p>
+    <section id="battle-content" aria-label="Battle Arena"><p class="form-help">Preparing the Arena&hellip;</p></section>
+    <noscript><p class="notice">Enable JavaScript to play a local battle. The Arena works without an account.</p></noscript>
+  </main>
   <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
   <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
   <dialog id="auth-dialog" aria-labelledby="auth-title">

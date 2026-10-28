@@ -77,15 +77,22 @@ class AdminRepository{
    }else if(kind==='suspend'){
     await connection.execute('INSERT INTO user_restrictions (user_id, issued_by, reason, issued_at, expires_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3), TIMESTAMPADD(HOUR, ?, UTC_TIMESTAMP(3)))',[targetId,actorId,value.reason,value.hours]);
     await this.record(connection,actor,target,'restriction.apply',{hours:value.hours,reason:value.reason});
+   }else if(kind==='password'){
+    const [credentials]=await connection.execute('SELECT password_hash FROM users WHERE id = ? FOR UPDATE',[actorId]);
+    if(credentials[0]?.password_hash!==value.actorHash)throw new HttpError(409,'Your credentials changed. Log in again before retrying.');
+    const defaults=require('./account-settings').defaults();
+    await connection.execute('INSERT INTO user_settings (user_id, profile, privacy, notifications, preferences, security_version) VALUES (?, ?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE security_version = security_version + 1',[targetId,...['profile','privacy','notifications','preferences'].map(key=>JSON.stringify(defaults[key]))]);
+    await connection.execute('UPDATE users SET password_hash = ? WHERE id = ?',[value.hash,targetId]);
+    await this.record(connection,actor,target,'password.change',{reason:value.reason,sessionsRevoked:true});
    }else{
     if(target.restriction?.id!==value.restrictionId)throw new HttpError(409,'That restriction is no longer active. Refresh the user list.');
     await connection.execute('UPDATE user_restrictions SET revoked_at = UTC_TIMESTAMP(3), revoked_by = ?, revoke_reason = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL',[actorId,value.reason,value.restrictionId,targetId]);
     await this.record(connection,actor,target,'restriction.revoke',{restrictionId:value.restrictionId,reason:value.reason});
    }
    // Bump the version on restrictions too, preventing stale changes in another tab.
-   if(['suspend','revoke'].includes(kind))await connection.execute("INSERT INTO user_roles (user_id, role, permissions_json, version) VALUES (?, 'trainer', NULL, 1) ON DUPLICATE KEY UPDATE version = version + 1",[targetId]);
+   if(['suspend','revoke','password'].includes(kind))await connection.execute("INSERT INTO user_roles (user_id, role, permissions_json, version) VALUES (?, 'trainer', NULL, 1) ON DUPLICATE KEY UPDATE version = version + 1",[targetId]);
    const result=this.view(actor,await this.target(connection,targetId));await connection.commit();return result;
-  }catch(error){await connection.rollback();if(error.code==='ER_NO_SUCH_TABLE')throw unavailable();throw error;}finally{connection.release();}
+  }catch(error){await connection.rollback();if(error.code==='ER_NO_SUCH_TABLE')throw unavailable();if(kind==='password'&&error.code==='ER_CHECK_CONSTRAINT_VIOLATED'&&error.message.includes('ck_audit_action'))throw new HttpError(503,'Password changes require database/migrations/owner-password-audit.sql. Apply this migration in MySQL Workbench and retry.');throw error;}finally{connection.release();}
  }
  async bootstrapOwner(userId){
   const connection=await this.pool.getConnection();

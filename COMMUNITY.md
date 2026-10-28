@@ -1,5 +1,32 @@
 # Dexhaven v0.6.0 — Trainer Community & Advanced Team Analysis
 
+## v0.7.1 account and social controls
+
+Click the logged-in header's profile picture for Trainer profile, Profile customization, Password & Security, Privacy and Preferences shortcuts (`settings.html`). Its eleven
+sections provide account details, customization, security, privacy, notifications,
+preferences, following, blocks, bookmarks, reactions received and forum activity.
+Trainer Hub still owns existing teams/favourites/progress; there is one account,
+one biography and one set of sharing settings. Avatar and banner editing appear
+before Biography. Existing Card Studio is reused.
+
+Optional birthday, general location, website, gender, occupation and labeled social
+links start private. Publication requires both an explicit field switch and the
+master public profile switch. Birthday can expose no date, month/day only, or full
+date plus age. Banner publication is independently revocable. Rich biography
+supports bold, italic, paragraphs, lists and HTTP(S) links through a safe parser;
+old plain biographies remain literal until explicitly saved as formatted text.
+
+Password/security actions verify the current password, rotate the current session
+and invalidate other sessions on their next protected request. Email/username are
+read-only. Verified email changes, recovery, account export/deletion and outbound
+mail are deferred; no nonfunctional controls are exposed. Blocks apply two-way to
+social interactions and delivery, while public content remains public. Optional
+presence reflects a 24-hour window, not exact online tracking.
+
+See [manual migration](database/MIGRATION_v0.7.1.md),
+[API](server/API.md#v071-community-settings-and-saved-simulations) and
+[implementation report](IMPLEMENTATION_v0.7.1.md).
+
 The website remains **Dexhaven**, the development project remains **Pokédex Website**, and the database remains **pokedex_app**. Implementation is on `dev/v0.6.0`; the existing uncommitted homepage artwork styling was carried forward. No migration, live database write, deployment, release, implementation commit or push was performed.
 
 ## Start and navigate

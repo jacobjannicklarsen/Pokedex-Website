@@ -12,7 +12,7 @@ async function main(){
  const history=data.move_changelog.filter(m=>orders[m.changed_in_version_group_id]>Number(bw.order)).sort((a,b)=>orders[b.changed_in_version_group_id]-orders[a.changed_in_version_group_id]);
  const moves=data.moves.filter(m=>Number(m.generation_id)<=5).map(m=>{const row={...m};for(const h of history.filter(h=>h.move_id===m.id))for(const key of ['type_id','power','pp','accuracy','priority','target_id','effect_id','effect_chance'])if(h[key]!=='')row[key]=h[key];return row;});
  if(process.argv.includes('--inspect')){for(const id of [...new Set(moves.map(m=>m.effect_id))].sort((a,b)=>Number(a)-Number(b))){const prose=data.move_effect_prose.find(e=>e.move_effect_id===id&&e.local_language_id==='9');console.log(id,prose?.short_effect,moves.filter(m=>m.effect_id===id).slice(0,5).map(m=>m.identifier).join(','));}return;}
- // Added after inspection: whitelist only explicitly implemented historical effects.
+ // Every historical move executes through the pinned full Generation V simulator.
  const support=require('../battle-move-support');
  const moveRecords=moves.map(m=>({id:Number(m.id),name:m.identifier,type:types[m.type_id],category:['','status','physical','special'][Number(m.damage_class_id)],power:m.power===''?null:Number(m.power),accuracy:m.accuracy===''?null:Number(m.accuracy),pp:Number(m.pp),priority:Number(m.priority),target:Number(m.target_id),effectId:Number(m.effect_id),effectChance:Number(m.effect_chance)||0})).filter(m=>m.type).map(m=>({...m,...support.describe(m)}));
  const chart=Object.fromEntries(Object.values(types).map(t=>[t,Object.fromEntries(Object.values(types).map(v=>[v,1]))]));
@@ -24,6 +24,7 @@ async function main(){
   const learnset=data.pokemon_moves.filter(m=>m.pokemon_id===p.id&&m.version_group_id==='11'&&['1','2','4'].includes(m.pokemon_move_method_id)).map(m=>({moveId:Number(m.move_id),method:({'1':'level-up','2':'egg','4':'machine'})[m.pokemon_move_method_id],level:Number(m.level)}));return{id,name:p.identifier,types:chosen.sort((a,b)=>Number(a.slot)-Number(b.slot)).map(t=>types[t.type_id]),stats,learnset};});
  if(pokemon.length!==649||pokemon.some(p=>!p.types.length||p.types.some(t=>!t)||Object.values(p.stats).some(v=>!Number.isInteger(v)||v<1)))throw Error('Incomplete Generation V species snapshot');
  const result={ruleset:'black-white',generation:5,source:{repository:'https://github.com/PokeAPI/pokeapi',revision,files:hashes},assumptions:{ivs:31,evs:0,nature:'neutral'},types:chart,moves:moveRecords,pokemon};
+ require('./battle-data-corrections.cjs')(result);
  await fs.writeFile(path.join(__dirname,'../data/battle-v5.json'),JSON.stringify(result)+'\n');console.log(`Verified ${pokemon.length} species, ${moveRecords.length} moves (${moveRecords.filter(m=>m.supported).length} supported), and ${Object.keys(chart).length} historical types.`);
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;});

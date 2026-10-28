@@ -6,7 +6,7 @@ const logic = require('../../server/progression');
 class MemoryCommunity {
   constructor(repo) { this.repo=repo;this.saved=new Map();this.shares=new Map();this.decorations=new Map(); }
   async decoration(id){return structuredClone(this.decorations.get(id)||require('../../server/decorations').defaults());}
-  async earnedBadges(id){const keys=this.repo.awards.get(id)||new Map();return logic.definitions.filter(d=>keys.has(d.key)).map(({key,name,description,icon,rarity,category})=>({key,name,description,icon,rarity,category}));}
+  async earnedBadges(id){const keys=this.repo.awards.get(id)||new Map(),extra=await this.repo.enhancements.store.metrics(id);return logic.definitions.filter(d=>keys.has(d.key)&&(!d.revocable||d.metric({extra},[])>=d.goal)).map(({key,name,description,icon,rarity,category})=>({key,name,description,icon,rarity,category}));}
   async saveDecoration(id,value){const earned=new Set((await this.earnedBadges(id)).map(b=>b.key));if(value.pinnedBadges.some(key=>!earned.has(key)))throw new HttpError(400,'Only your earned achievements can be pinned.');this.decorations.set(id,structuredClone(value));return structuredClone(value);}
   async settings(id) { const s={...(this.saved.get(id)||defaults())};if(s.featuredTeamId&&!this.repo.savedTeams.some(t=>t.id===s.featuredTeamId))s.featuredTeamId=null;return s; }
   async saveSettings(id,value) {if(value.featuredTeamId!==null&&!this.repo.savedTeams.some(t=>t.id===value.featuredTeamId&&t.userId===id))throw new HttpError(404,'Featured team not found.');this.saved.set(id,{...value});return {...value};}
@@ -18,6 +18,6 @@ class MemoryCommunity {
   async share(userId,id,visibility){this.owned(userId,id);const result={visibility,shareId:this.shares.get(id)?.shareId||crypto.randomUUID()};this.shares.set(id,result);return {...result};}
   async publicTeams(id){return (await this.repo.teams(id)).filter(t=>this.shares.get(t.id)?.visibility==='public').map(t=>({...t,shareId:this.shares.get(t.id).shareId}));}
   async publicTeam(shareId){const team=this.repo.savedTeams.find(t=>this.shares.get(t.id)?.shareId===shareId&&this.shares.get(t.id)?.visibility==='public');if(!team)throw new HttpError(404,'Shared team unavailable.');const u=await this.repo.user(team.userId);return {name:team.name,username:u.username,profileAvailable:(await this.settings(u.id)).enabled,shareId,pokemonIds:[...team.pokemonIds]};}
-  async publicProgress(id){const collection=[...(this.repo.collections.get(id)?.values()||[])],statistics=logic.statistics(collection);const saved=this.repo.awards.get(id)||new Map();return {statistics,achievements:logic.achievements(statistics,[],[...saved].map(([key,unlockedAt])=>({key,unlockedAt})))};}
+  async publicProgress(id){const collection=[...(this.repo.collections.get(id)?.values()||[])],statistics=logic.statistics(collection);statistics.extra=await this.repo.enhancements.store.metrics(id);const saved=this.repo.awards.get(id)||new Map();return {statistics,achievements:logic.achievements(statistics,[],[...saved].map(([key,unlockedAt])=>({key,unlockedAt})))};}
 }
 module.exports={MemoryCommunity};

@@ -167,7 +167,7 @@
     const hero=element('div','achievement-vault');hero.append(element('p','eyebrow','YOUR HALL OF FAME'),element('h3','',`${unlocked.length} / ${awards.length} earned`),element('p','',`${awards.filter(a=>!a.unlockedAt&&a.current/a.goal>=.5).length} achievements are at least halfway within reach. Keep exploring, catching and building.`));target.append(hero);
     const toolbar=element('div','achievement-filters');toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Filter achievements');
     let selected='all';
-    const options=[['all','All badges'],['unlocked','Earned'],['locked','Locked'],['near','Nearly there'],...['collection','exploration','regions','types','teams','favourites'].map(key=>[key,prettyName(key)])];
+    const options=[['all','All badges'],['unlocked','Earned'],['locked','Locked'],['near','Nearly there'],...['collection','exploration','regions','types','teams','favourites','community','battle'].map(key=>[key,prettyName(key)])];
     options.forEach(([key,label])=>{const button=element('button','achievement-filter',label);button.type='button';button.dataset.achievementFilter=key;button.setAttribute('aria-pressed',String(key==='all'));button.onclick=()=>{selected=key;toolbar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();};toolbar.append(button);});target.append(toolbar);
     const count=element('p','form-help');count.setAttribute('role','status');target.append(count);
     const grid = element('div', 'achievement-grid');

@@ -18,7 +18,7 @@ const teamAnalysis = require('../team-analysis-data');
 const decorations = require('./decorations');
 
 const publicUser = (user,staff) => ({
-  id: user.id, username: user.username, email: user.email, bio: user.bio,
+  id: user.id, username: user.username, email: user.email, bio: user.bio,...(user.bio_format==='limited'?{bioFormat:'limited'}:{}),
   avatarUrl: user.avatar_filename ? `/media/avatars/${user.avatar_filename}` : null,
   createdAt: user.created_at,
   ...(staff?{staff:{available:staff.available,role:staff.role,permissions:staff.permissions,roleVersion:staff.roleVersion}}:{})
@@ -47,11 +47,12 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   }));
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.use('/api', express.json({ limit: '16kb', strict: true }));
-  app.use(['/api', '/media/avatars'], session({
+  app.use(['/api', '/media/avatars','/media/banners'], session({
     name: 'pokedex.sid', store, secret: config.secret,
     resave: false, saveUninitialized: false, rolling: true,
     cookie: { httpOnly: true, secure: config.production, sameSite: 'lax', maxAge: TTL, path: '/' }
   }));
+  app.use(['/api','/media/avatars','/media/banners'],async(req,res,next)=>{if(req.session?.userId&&repo.enhancements){const version=await repo.enhancements.securityVersion(req.session.userId);if(version!==Number(req.session.securityVersion||0))delete req.session.userId;}next();});
   const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: authLimit, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many attempts. Please try again later.' } });
   const uploadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many uploads. Please wait a minute.' } });
 
@@ -78,6 +79,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     const staff=await staffFor(user);if(staff.restriction)throw restricted(staff);
     await sessionCall(req, 'regenerate');
     req.session.userId = user.id;
+    req.session.securityVersion=repo.enhancements?await repo.enhancements.securityVersion(user.id):0;
     req.session.csrf = crypto.randomBytes(32).toString('hex');
     await sessionCall(req, 'save');
     return { user: publicUser(user,staff), csrfToken: req.session.csrf };
@@ -137,6 +139,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     return { team, analysis: teamAnalysis.analyze(team.pokemonIds, speciesData, typeChart.resources) };
   }));
   require('./forum-routes').routes(app,repo,true);
+  require('./enhancement-routes').routes(app,repo,{config,publicOnly:true});
   app.use('/api', async (req, res, next) => {
     const user = req.session.userId ? await repo.user(req.session.userId) : null;
     if (!user) return next(new v.HttpError(401, 'Please log in to continue.'));
@@ -147,6 +150,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   });
   require('./admin-routes').routes(app,repo);
   require('./forum-routes').routes(app,repo);
+  require('./enhancement-routes').routes(app,repo,{config});
   app.get('/api/profile', (req, res) => res.json({ user: publicUser(req.user,req.staff) }));
   app.get('/api/profile/decorations', communityOperation(async req => {
     await repo.progression.snapshot(req.user.id);
@@ -165,7 +169,8 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   });
   app.patch('/api/profile', async (req, res) => {
     v.object(req.body);
-    const user = await repo.updateBio(req.user.id, v.text(req.body.bio, 'Biography', 0, 500));
+    const bio=v.text(req.body.bio,'Biography',0,500),format=req.body.format||'plain';if(!['plain','limited'].includes(format))v.fail('Choose a supported biography format.');if(format==='limited')try{require('../rich-biography').parse(bio);}catch(e){v.fail(e.message);}
+    const user = await repo.updateBio(req.user.id,bio,format);
     res.json({ user: publicUser(user,req.staff) });
   });
   const upload = multer({
@@ -231,10 +236,17 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
+  for (const asset of ['community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
+  app.get('/images/prof_nicklas.png', (req, res) => res.sendFile(path.join(root, 'images/prof_nicklas.png')));
+  app.get('/images/prof_nicklas-cutout.png', (req, res) => res.sendFile(path.join(root, 'images/prof_nicklas-cutout.png')));
+  app.get('/images/patrick.png', (req, res) => res.sendFile(path.join(root, 'images/patrick.png')));
+  for (const image of ['analyst_jannick.png', 'lucas.png', 'oscar.png']) {
+    app.get(`/images/${image}`, (req, res) => res.sendFile(path.join(root, 'images', image)));
+  }
+  app.get('/media/banners/:filename',async(req,res)=>{if(!require('./enhancement-routes').safeFile.test(req.params.filename)||!req.session.userId)throw new v.HttpError(404,'Banner unavailable.');const owner=await repo.user(req.session.userId);if(!owner)throw new v.HttpError(404,'Banner unavailable.');const staff=await staffFor(owner);if(staff.restriction)throw restricted(staff);const row=await repo.enhancements.settings.row(req.session.userId);if(row.bannerFilename!==req.params.filename)throw new v.HttpError(404,'Banner unavailable.');res.set('Cache-Control','no-store').sendFile(path.join(config.uploadDir,req.params.filename));});
   app.get('/media/avatars/:filename', async (req, res, next) => {
     if (!avatarPattern.test(req.params.filename)) return next(new v.HttpError(404, 'Image not found.'));
     // Existing avatar URLs are owner-only. Public pictures use a revocable profile route.
@@ -244,7 +256,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(config.uploadDir, req.params.filename));
   });
-  for(const page of ['forums.html','battle.html'])app.get('/'+page,(req,res)=>res.sendFile(path.join(root,page)));
+  for(const page of ['forums.html','battle.html','staff.html','settings.html','battle-history.html'])app.get('/'+page,(req,res)=>res.sendFile(path.join(root,page)));
   app.get('/data/battle-v5.json',(req,res)=>res.sendFile(path.join(root,'data/battle-v5.json')));
   app.get('/pokemon.html', (req, res) => res.sendFile(path.join(root, 'pokemon.html')));
   app.get('/dashboard.html', (req, res) => res.sendFile(path.join(root, 'dashboard.html')));

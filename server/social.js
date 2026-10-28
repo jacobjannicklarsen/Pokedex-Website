@@ -1,0 +1,19 @@
+'use strict';
+const {HttpError}=require('./validation');
+class Social{
+ constructor(repo,store,settings){this.repo=repo;this.store=store;this.settings=settings;}
+ async target(username){const u=await this.repo.userByName(require('./community').username(username));if(!u)throw new HttpError(404,'Trainer unavailable.');return u;}
+ async blocked(a,b,s=this.store){if(!a||!b||a===b||!await this.store.available())return false;return Boolean(await s.count('blocks',{userId:a,targetId:b})||await s.count('blocks',{userId:b,targetId:a}));}
+ async change(userId,username,kind,enabled){return this.store.atomic(async s=>{await this.repo.forums.actor(s,userId);const target=await this.target(username);if(target.id===userId)throw new HttpError(400,'Choose a different trainer.');if(kind==='follows'&&enabled){if(await this.blocked(userId,target.id,s))throw new HttpError(403,'Following is unavailable between these accounts.');const row=await this.settings.row(target.id,s);if(!row.privacy.acceptFollowers)throw new HttpError(403,'This trainer is not accepting followers.');}
+  const where={userId,targetId:target.id},exists=await s.count(kind,where);if(enabled&&!exists)await s.insert(kind,where);if(!enabled)await s.remove(kind,where);
+  if(kind==='blocks'&&enabled){await s.remove('follows',{userId,targetId:target.id});await s.remove('follows',{userId:target.id,targetId:userId});}
+  if(kind==='follows'&&enabled&&!exists&&(await this.settings.row(target.id,s)).notifications.followers)await s.insert('notifications',{userId:target.id,actorId:userId,threadId:null,postId:null,eventKey:`follow:${userId}:${Math.floor(Date.now()/86400000)}`,kind:'follower'},true);
+  return{enabled};});}
+ async list(userId,kind,page=1){const rows=await this.store.rows(kind,{userId},{desc:true,limit:26,offset:(page-1)*25});const items=[];for(const r of rows.slice(0,25)){const u=await this.repo.user(r.targetId);if(u)items.push({username:u.username,createdAt:r.createdAt,profileAvailable:(await this.repo.community.settings(u.id)).enabled});}return{items,next:rows.length>25?page+1:null};}
+ async bookmark(userId,threadId,enabled){return this.store.atomic(async s=>{await this.repo.forums.actor(s,userId);if((await s.get('threads',threadId))?.visibility!=='visible')throw new HttpError(404,'Discussion unavailable.');const w={userId,threadId};if(enabled)await s.insert('bookmarks',w,true);else await s.remove('bookmarks',w);return{enabled};});}
+ async saved(userId,kind,page=1){const rows=await this.store.rows(kind,{userId},{desc:true,limit:26,offset:(page-1)*25}),items=[];for(const r of rows.slice(0,25)){const thread=await this.store.get('threads',r.threadId);if(thread?.visibility==='visible')items.push(await this.repo.forums.threadView(thread));}return{items,next:rows.length>25?page+1:null};}
+ async markRead(userId){return this.store.atomic(async s=>{await this.repo.forums.actor(s,userId);const row=(await s.rows('reads',{userId},{limit:1}))[0];if(row)await s.update('reads',row.id,{readAt:new Date()});else await s.insert('reads',{userId,readAt:new Date()});return{read:true};});}
+ async readAll(userId){return this.store.atomic(async s=>{await this.repo.forums.actor(s,userId);if(s.markAllNotifications)return s.markAllNotifications(userId);for(const n of await s.rows('notifications',{userId,readAt:null},{limit:2000}))await s.update('notifications',n.id,{readAt:new Date()});return{read:true};});}
+ async notifyPost(base,threadId,postId,actorId,mentions){if(!await this.store.available())return base.legacyNotify(threadId,postId,actorId,mentions);const s=base.connection?new(require('./extension-store').ExtensionStore)(this.store.pool,this.repo,base.connection):this.store,t=await s.get('threads',threadId),c=await s.get('categories',t.categoryId),announcement=Boolean(c.announcements&&await s.count('posts',{threadId})===1);return s.notifyExtended(threadId,postId,actorId,mentions,announcement);}
+}
+module.exports={Social};

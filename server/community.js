@@ -32,6 +32,7 @@ function directoryCard(user,settings,decoration,publicTeamCount,showcaseTeam=nul
     decoration:{...require('./decorations').normalize(decoration),pinnedBadges:[]},
     publicTeamCount:Number(publicTeamCount),
     showcaseTeam:showcaseTeam?{name:showcaseTeam.name,shareId:showcaseTeam.shareId,pokemonIds:[...showcaseTeam.pokemonIds]}:null };
+  if(settings.shareBio&&user.bio_format==='limited')card.bioFormat='limited';
   if(settings.shareProgress&&Number.isInteger(user.caughtCount))card.rank=require('./trainer-ranks').calculate(user.caughtCount);
   if(['owner','administrator','moderator'].includes(user.staffRole))card.staffRole=user.staffRole;
   return card;
@@ -45,6 +46,7 @@ async function profile(repo, user, settings, preview = false) {
     featuredPokemonId: settings.featuredPokemonId,
     featuredTeamId: publicTeams.some(t => t.id === settings.featuredTeamId) ? settings.featuredTeamId : null,
     teams: publicTeams.map(team => ({ name: team.name, shareId: team.shareId, pokemonIds: team.pokemonIds, featured: team.id === settings.featuredTeamId })) };
+  if(settings.shareBio&&user.bio_format==='limited')result.bioFormat='limited';
   const decoration=await repo.community.decoration(user.id);
   const publicRole=(await repo.community.publicRoles([user.id])).get(user.id);
   if(publicRole)result.staffRole=publicRole;
@@ -62,6 +64,7 @@ async function profile(repo, user, settings, preview = false) {
       result.decoration.pinnedBadges=result.pinnedBadges.map(a=>a.key);
     }
   }
+  if(repo.enhancements)Object.assign(result,await repo.enhancements.publicFields(user.id,settings));
   return result;
 }
 module.exports = { defaults, settings, visibility, username, shareId, profile, directoryCard };

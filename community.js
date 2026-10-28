@@ -39,9 +39,9 @@
     else header.append(element('span','trainer-avatar avatar-initial',p.username[0].toUpperCase()));
     const info=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element(preview?'h3':'h1','public-profile-name',p.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;TrainerNames.decorate(name,p.staffRole);nameRow.append(name,motto);
     const meta=element('div','trainer-identity-meta'),title=element('span');title.dataset.trainerTitleSlot='';const staffLabel=TrainerNames.badge(p.staffRole);if(staffLabel)meta.append(staffLabel);meta.append(title);
-    info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),nameRow,meta);if(p.bio)info.append(element('p','profile-biography',p.bio));
+    info.append(element('p','eyebrow',preview?'PUBLIC PROFILE PREVIEW':'DEXHAVEN TRAINER'),nameRow,meta);if(p.bio)info.append(p.bioFormat==='limited'?RichBiography.render(element('div','profile-biography'),p.bio):element('div','profile-biography',p.bio));
     info.append(element('p','form-help',`Trainer since ${new Date(p.createdAt).toLocaleDateString()}`));if(p.rank){const rank=element('div');TrainerRanks.render(rank,p.rank);info.append(rank);}header.append(info);target.append(header);
-    globalThis.TrainerDecorations?.apply(header,p.decoration,p.pinnedBadges||[]);
+    globalThis.TrainerDecorations?.apply(header,p.decoration,p.pinnedBadges||[]);globalThis.ProfileExtras?.apply(header,p);
     if(!preview)copyLink(target,`trainer/${encodeURIComponent(p.username)}`);
     if(p.featuredPokemonId){target.append(element('h3','','Featured Pokémon'));roster(target,[p.featuredPokemonId],records,false,'battle');}
     target.append(element('h3','','Shared teams'));
@@ -101,7 +101,7 @@
     const body=element('div','directory-card-body'),identity=element('div','directory-card-identity'),nameRow=element('div','trainer-name-row'),heading=element('h3'),nameLink=link(t.username,`trainer/${encodeURIComponent(t.username)}`,'directory-name-link');TrainerNames.decorate(nameLink,t.staffRole);heading.append(nameLink);nameRow.append(heading);
     if(style.motto)nameRow.append(element('p','trainer-motto-inline',style.motto));identity.append(nameRow);
     const metaRow=element('div','trainer-identity-meta'),staffLabel=TrainerNames.badge(t.staffRole);if(staffLabel)metaRow.append(staffLabel);if(style.title)metaRow.append(element('span','trainer-title-ribbon',style.title));if(metaRow.children.length)identity.append(metaRow);body.append(identity);
-    if(t.bio)body.append(element('p','directory-card-bio',t.bio));
+    if(t.bio)body.append(t.bioFormat==='limited'?RichBiography.render(element('div','directory-card-bio'),t.bio):element('div','directory-card-bio',t.bio));if(t.bannerUrl)ProfileExtras.banner(card,t.bannerUrl);
     if(t.featuredPokemonId){const partner=element('div','directory-partner');const text=element('div'),name=element('strong','',directoryPokemonLabel(t.featuredPokemonId));name.dataset.publicPokemonName=t.featuredPokemonId;text.append(element('span','eyebrow','FEATURED PARTNER'),name);const art=element('div','directory-partner-art');art.append(directoryPokemonArt(t.featuredPokemonId));partner.append(art,text);body.append(partner);}
     if(t.showcaseTeam){const showcase=element('div','directory-showcase');showcase.append(element('p','',t.showcaseTeam.name));const row=element('div','directory-mini-roster');for(let slot=0;slot<6;slot++){const id=t.showcaseTeam.pokemonIds[slot];if(id){const img=directoryPokemonArt(id,'party');img.title=directoryPokemonLabel(id);row.append(img);}else row.append(element('span','directory-empty-slot','·'));}showcase.append(row);body.append(showcase);}
     if(t.rank){const rank=element('div');TrainerRanks.render(rank,t.rank,{compact:true});body.append(rank);}

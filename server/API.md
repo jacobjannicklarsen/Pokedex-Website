@@ -1,6 +1,97 @@
 # Express API
 
-Trainer cosmetics: authenticated `GET /api/profile/decorations` returns `{decoration,choices,badges}`; `PUT` accepts only the complete curated style/title/motto/pinned-badge object with existing CSRF/origin checks. Pins must be earned by the session owner. Public profiles expose styling, with pins only when achievement sharing is enabled. See [TRAINER_STYLE.md](../TRAINER_STYLE.md) for the full contract and unexecuted additive migration. Progression now returns 96 definitions with rarity/category metadata while retaining existing award keys/dates.
+## v0.7.1 community settings and saved simulations
+
+Requires the complete [manual v0.7.1 migration](../database/MIGRATION_v0.7.1.md).
+All private routes use the existing session cookie, fresh account restrictions,
+ownership and CSRF/origin checks. No request accepts an owner ID, staff role,
+earned rank, award or authoritative battle outcome. Missing/partial upgrades
+return an actionable 503. See older sections for unchanged v0.7.0 endpoints.
+
+| Method | Endpoint | Contract |
+| --- | --- | --- |
+| GET | `/api/settings` | Owner's profile/privacy/notification/preferences objects and private banner URL |
+| GET | `/api/settings/preferences` | Theme and default battle difficulty |
+| PUT | `/api/settings/profile` | Complete `{birthday,location,website,gender,genderText,occupation,social}` |
+| PUT | `/api/settings/privacy` | Complete `{birthday,location,gender,occupation,website,social,banner,activity,presence,followers,acceptFollowers}` |
+| PUT | `/api/settings/notifications` | Complete booleans `{replies,watched,mentions,followers,announcements,moderation}` |
+| PUT | `/api/settings/preferences` | `{theme:system/dark/light,battleDifficulty:easy/normal/hard}` |
+| POST | `/api/settings/activity` | Update presence only when already opted in |
+| PATCH | `/api/profile` | Existing `{bio}` stays plain; optional `format:limited` validates limited markup |
+| POST | `/api/profile/avatar` | Existing avatar multipart upload/crop |
+| DELETE | `/api/settings/avatar` | Remove owner's avatar and revoke old image URL |
+| POST | `/api/settings/banner` | Multipart `banner` and JSON `crop:{x,y,width,height}` in oriented source pixels |
+| DELETE | `/api/settings/banner` | Restore default, revoke image URL, remove previous owned file |
+| POST | `/api/settings/password` | `{currentPassword,newPassword}`; Argon2id, rotate current session and invalidate others |
+| POST | `/api/settings/revoke-sessions` | `{currentPassword}`; rotate current session and invalidate others |
+| GET | `/api/public/staff?after=id` | Live Owner/Administrator/Moderator directory, 25 entries, cursor `next` |
+| GET | `/api/public/members?after=id` | Opted-in public member directory, same pagination |
+| GET | `/api/public/members/:username` | Privacy-safe preview; blocked viewer/target returns 404 |
+| GET | `/api/public/trainers/:username/banner` | Current published banner only; no-store, 404 after revocation |
+| GET | `/api/community/discovery` | Groups/categories, latest/trending, public totals, optional 24-hour presence |
+| GET | `/api/community/latest?page=n` | Visible public posts and safe author projections |
+| GET | `/api/community/me/activity?page=n` | Owner's visible posts and statistics |
+| GET | `/api/community/me/reactions?page=n` | Owner's visible posts receiving reactions |
+| GET | `/api/social/following` or `/api/social/blocked` | Owner's paginated list, `?page=n` |
+| PUT/DELETE | `/api/social/following/:username` | Follow/unfollow; self-follow and blocked pairs prohibited |
+| PUT/DELETE | `/api/social/blocked/:username` | Block/unblock; blocking removes follows both ways |
+| GET | `/api/bookmarks?page=n` | Owner's saved, still-visible discussions |
+| PUT/DELETE | `/api/bookmarks/:threadId` | Save/remove bookmark, separate from watched discussions |
+| GET | `/api/forums/watched?page=n` | Existing discussion subscriptions |
+| GET | `/api/forums/new-posts?page=n` | Posts newer than owner's read cursor/account creation |
+| POST | `/api/forums/read` | Advance owner's forum read cursor |
+| PUT | `/api/notifications/read-all` | Mark owner's notifications read |
+| GET | `/api/forums/threads/:id/poll` | Poll/options/tallies, own selected option, closed state |
+| POST | `/api/polls/:id/vote` | `{optionId}`, one immutable choice per user/poll |
+| POST | `/api/polls/:id/close` | `{reason}`, author or authorized staff with hierarchy checks/audit |
+| PUT | `/api/admin/forums/layout/:categoryId` | `{groupName,parentId:null/id}`, one-level same-group subforums |
+| POST | `/api/battles/start` | `{configuration,mode,difficulty}` => server seed, token, ruleset |
+| POST | `/api/battles/:token/complete` | `{actions}` => server-reconstructed completed simulation ID/qualification |
+| POST | `/api/battles/import` | `{configuration,mode,difficulty,seed,actions}`, always unqualified local import |
+| GET | `/api/battles` | Owner history: `page`, `pokemon`, `outcome:all/win/loss/draw/auto`, `sort:newest/oldest/turns` |
+| GET | `/api/battles/statistics` | Owner's saved-visible totals, outcomes, modes and selected/opponent species |
+| GET | `/api/battles/:id` | Owner-only summary and integrity-checked exact versioned replay |
+| DELETE | `/api/battles/:id` | Remove from owner's history/statistics; retain qualification evidence |
+
+Optional poll on existing `POST /api/forums/threads` is
+`poll:{question,options:[2..6 distinct labels],closesAt:null/ISO-date}`. The thread
+and poll are inserted atomically. Closing date must be within 180 days. Hidden or
+locked discussions cannot accept votes; neither can expired/closed polls.
+
+Personal fields start private. Birthday is `hidden`, `month-day` or `full`; only
+`full` exposes year/age. Gender is `unspecified`, `man`, `woman`, `self-describe`;
+optional social links are at most five `{label,url}` pairs. Only HTTP(S) URLs
+without embedded credentials are accepted. Public fields additionally require the
+existing master public-profile switch. Public DTOs never contain email, security
+versions, permissions or private timestamps. Limited biography responses carry
+`bioFormat:limited`; old plain text remains literal. Rendering uses a strict AST,
+not arbitrary HTML. Source is limited to 500 characters.
+
+Banner uploads accept real JPEG/PNG/WebP, at most 2 MB and 16 MP; Sharp rotates
+EXIF, validates the 3:1 crop, strips metadata and writes 1200x400 WebP under an
+opaque filename. Avatar behavior is shared with the existing cropper. Owner media
+uses authenticated routes; published routes recheck current sharing on every read.
+
+Blocks stop follows, reactions, quotes and social notification delivery in both
+directions; otherwise-public posts/profiles remain publicly readable. Follow
+notifications are deduplicated per sender/recipient/day and link to a safe member
+preview. Blocked sender identity is omitted from previously received notifications.
+
+Battle configuration contains exactly two `{id,level,moves}` entries, validated
+against the pinned Gen V data. Player actions are selected move IDs; auto actions
+are null. At most 200 actions and 2 MB replay are accepted. Tickets expire after
+24 hours and are single-use. No client-provided frames, winner, stats or awards
+are trusted. Saved canonical SHA-256 digests prevent duplicate replay imports and
+survive MySQL JSON key reordering. Playback uses saved frames, never the current
+engine's randomness. Every record remains explicitly a simulation.
+
+New private feature groups allow 120 requests/minute; credential actions 8/15
+minutes, banners 10/minute, battle starts/imports 30/hour. Public discovery is
+limited to 180/minute alongside existing public/forum limits. Limits are per
+process. Current sessions survive reauthentication; other sessions are rejected
+on their next API/private-media request via a server-owned security version.
+
+Trainer cosmetics: authenticated `GET /api/profile/decorations` returns `{decoration,choices,badges}`; `PUT` accepts only the complete curated style/title/motto/pinned-badge object with existing CSRF/origin checks. Pins must be earned by the session owner. Public profiles expose styling, with pins only when achievement sharing is enabled. See [TRAINER_STYLE.md](../TRAINER_STYLE.md) for the full contract and unexecuted additive migration. Progression now returns 102 definitions (including six v0.7.1 community/battle awards) with rarity/category metadata while retaining existing award keys/dates.
 
 ## Trainer community (v0.6.0)
 

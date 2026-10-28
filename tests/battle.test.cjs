@@ -3,7 +3,7 @@ const c=require('../battle-calculations'),engine=require('../battle-engine'),dat
 const move=id=>snapshot.moves.find(m=>m.id===id),rng=value=>()=>value;
 function fighter({id=1,level=50,types=['normal'],stats={hp:200,attack:100,defense:100,'special-attack':100,'special-defense':100,speed:100},moves=[move(1)],...rest}={}){return{id,name:'pokemon-'+id,level,types,stats,moves,...rest};}
 test('pinned historical snapshot covers every standard species, Gen V types/stats and verified learnsets',()=>{
- assert.equal(snapshot.pokemon.length,649);assert.equal(new Set(snapshot.pokemon.map(p=>p.id)).size,649);assert.equal(snapshot.moves.length,559);assert.equal(snapshot.moves.filter(m=>m.supported).length,201);assert.equal(Object.keys(snapshot.types).length,17);assert.equal(snapshot.types.fairy,undefined);
+ assert.equal(snapshot.pokemon.length,649);assert.equal(new Set(snapshot.pokemon.map(p=>p.id)).size,649);assert.equal(snapshot.moves.length,559);assert.equal(snapshot.moves.filter(m=>m.supported).length,559);assert.equal(Object.keys(snapshot.types).length,17);assert.equal(snapshot.types.fairy,undefined);
  assert.deepEqual(snapshot.pokemon.find(p=>p.id===35).types,['normal']);assert.equal(snapshot.pokemon.find(p=>p.id===25).stats.defense,30);assert.equal(snapshot.types.ghost.steel,.5);assert.equal(snapshot.types.dark.steel,.5);assert.equal(snapshot.types.dragon.steel,.5);
  assert.match(snapshot.source.revision,/^[a-f0-9]{40}$/);for(const hash of Object.values(snapshot.source.files))assert.match(hash,/^[a-f0-9]{64}$/);
  assert.equal(move(53).power,95);assert.equal(move(85).power,95);assert.equal(move(33).power,50);
@@ -14,7 +14,7 @@ test('level 1/100 integer stats and Shedinja exception use 31 IVs, zero EVs and 
 });
 test('all 649 species have a playable route at level 1 and 100; four distinct supported eligible moves only',()=>{
  for(const p of snapshot.pokemon)for(const level of [1,100]){const eligible=data.eligible(p,level,snapshot);assert.ok(eligible.every(m=>m.methods.every(r=>r.method!=='level-up'||r.level<=level)));const ids=eligible.filter(m=>m.supported).slice(0,4).map(m=>m.id),configured=data.configure(snapshot,p.id,level,ids),battle=engine.create(configured,configured);assert.ok(engine.choices(battle.fighters[0]).length>=1);}
- assert.throws(()=>data.configure(snapshot,1,50,[33,33]));assert.throws(()=>data.configure(snapshot,1,1,[63]));assert.throws(()=>data.configure(snapshot,999,50,[]));assert.equal(move(144).supported,false);assert.match(move(144).reason,/unimplemented/);
+ assert.throws(()=>data.configure(snapshot,1,50,[33,33]));assert.throws(()=>data.configure(snapshot,1,1,[63]));assert.throws(()=>data.configure(snapshot,999,50,[]));assert.equal(move(144).supported,true);
 });
 test('physical/special damage, STAB, criticals, burn, stages, double weakness and immunities match integer examples',()=>{
  const [a,b]=engine.create(fighter(),fighter()).fighters,m={...move(1),power:100};
@@ -37,7 +37,7 @@ test('burn/poison residuals, paralysis turn restriction, sleep duration, freeze 
  battle=engine.create(fighter({moves:[move(14)]}),fighter({moves:[move(14)]}));battle.fighters[0].status='paralysis';assert.equal(c.speed(battle.fighters[0]),25);next=engine.step(battle,[14,14],snapshot.types,rng(0));assert.equal(next.fighters[0].moves[0].remainingPP,30);
  battle.fighters[0].status='freeze';next=engine.step(battle,[14,14],snapshot.types,rng(.99));assert.equal(next.fighters[0].status,'freeze');next=engine.step(battle,[14,14],snapshot.types,rng(.1));assert.equal(next.fighters[0].status,null);
  battle.fighters[0].status=null;battle.fighters[0].stages.attack=6;next=engine.step(battle,[14,14],snapshot.types,rng(.9));assert.equal(next.fighters[0].stages.attack,6);
- assert.equal(move(150).supported,false);assert.throws(()=>engine.create(fighter({moves:[move(150)]}),fighter()));
+ assert.equal(move(150).supported,true);
 });
 test('knockouts end immediately, HP never goes negative, no-PP uses typeless Struggle and recoil',()=>{
  let battle=engine.create(fighter(),fighter({stats:{...fighter().stats,hp:1}}));let next=engine.step(battle,[1,1],snapshot.types,rng(.9));assert.equal(next.phase,'finished');assert.equal(next.fighters[1].hp,0);assert.throws(()=>engine.step(next,[1,1],snapshot.types));assert.equal(battle.fighters[1].hp,1,'transition must not mutate its input');
@@ -53,6 +53,6 @@ test('pause/restart cancels stale auto turns; engine exceptions stop scheduling'
  let turns=0,queue=[],cleared=[],error;const runner=new Runner({turn:()=>{turns++;return true;},set:fn=>{queue.push(fn);return queue.length;},clear:id=>cleared.push(id),onError:e=>error=e});runner.start();const stale=queue[0];runner.stop();stale();assert.equal(turns,0);runner.start();stale();assert.equal(turns,0);queue[1]();assert.equal(turns,1);runner.start(250);queue[2]();assert.equal(turns,1);assert.ok(cleared.length>=2);runner.turn=()=>{throw Error('invalid turn');};queue.at(-1)();assert.equal(runner.running,false);assert.equal(error.message,'invalid turn');
 });
 
-test('damaging stage moves deal damage before their guaranteed change; special thaw moves stay unsupported',()=>{
- const a=fighter({moves:[move(490)],stats:{...fighter().stats,speed:200}}),b=fighter({moves:[move(14)]});const next=engine.step(engine.create(a,b),[490,14],snapshot.types,rng(.5));assert.ok(next.fighters[1].hp<200);assert.equal(next.fighters[1].stages.speed,-1);assert.equal(move(503).supported,false);assert.match(move(503).reason,/thaw/);
+test('damaging stage moves deal damage before their guaranteed change; Scald is available through the full simulator',()=>{
+ const a=fighter({moves:[move(490)],stats:{...fighter().stats,speed:200}}),b=fighter({moves:[move(14)]});const next=engine.step(engine.create(a,b),[490,14],snapshot.types,rng(.5));assert.ok(next.fighters[1].hp<200);assert.equal(next.fighters[1].stages.speed,-1);assert.equal(move(503).supported,true);
 });

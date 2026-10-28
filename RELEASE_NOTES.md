@@ -1,5 +1,28 @@
 # Dexhaven release notes
 
+## v0.7.1 - Community, Battles & Profile Customization (local development)
+
+- Added an eleven-section Account Settings page, optional personal fields, explicit
+  publication switches, safe limited-format biography editing, existing avatar
+  cropping and new 3:1 banner upload/cropping/removal.
+- Added current-password protected password changes and other-session revocation.
+  Username/email remain read-only; verified outbound email is not configured.
+- Expanded forum discovery with collapsible groups/subforums, latest/trending
+  discussions, public statistics and optional recent-member presence.
+- Added public Staff Directory and shared pointer/keyboard/touch member previews,
+  follows, two-way social blocks, bookmarks, read cursors and notification switches.
+- Added immutable single-choice polls with closing dates and authorized moderation.
+- Extended the existing simulator with Easy/Normal/Hard AI, private saved history,
+  filters/statistics and exact versioned replay playback without random rerolls.
+- Added six server-derived community/simulation awards (102 definitions total).
+  The 96 original achievements and caught-based rank thresholds remain intact.
+- Prepared additive manual SQL and package/lock version **0.7.1**. No migration,
+  push, deployment or release was executed. Optional Shoutbox is deferred.
+
+See [implementation and actual verification results](IMPLEMENTATION_v0.7.1.md) and
+[manual migration instructions](database/MIGRATION_v0.7.1.md).
+
+
 ## v0.7.0 - Community Forums & Battle Arena (local development)
 
 - Added MySQL-backed categories, paginated discussions/replies, title/post editing,

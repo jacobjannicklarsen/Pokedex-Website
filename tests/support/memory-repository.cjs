@@ -8,6 +8,7 @@ class MemoryRepository {
     this.community = new (require('./memory-community.cjs').MemoryCommunity)(this);
     this.users = []; this.savedTeams = []; this.savedFavorites = new Map(); this.sequence = 0;
     this.collections = new Map(); this.awards = new Map();
+    this.enhancements=new(require('../../server/enhancements').Enhancements)(this,new(require('./memory-extensions.cjs').MemoryExtensions)(this));
     this.progression = {
       snapshot: userId => this.progressSnapshot(userId),
       set: async (userId, pokemonId, status) => {
@@ -22,19 +23,21 @@ class MemoryRepository {
   async progressSnapshot(userId) {
     const collection = [...(this.collections.get(userId)?.values() || [])].sort((a,b)=>a.pokemonId-b.pokemonId).map(row=>({...row}));
     const teams = await this.teams(userId), favorites = await this.favorites(userId), statistics = logic.statistics(collection,teams,favorites);
+    statistics.extra=await this.enhancements.store.metrics(userId);
     const saved = this.awards.get(userId) || new Map();
     for(const key of logic.eligible(statistics,teams))if(!saved.has(key))saved.set(key,new Date().toISOString());
     this.awards.set(userId,saved);
     return {collection,statistics,rank:require('../../server/trainer-ranks').calculate(statistics.national.caught),achievements:logic.achievements(statistics,teams,[...saved].map(([key,unlockedAt])=>({key,unlockedAt})))};
   }
   async user(id) { const user = this.users.find(user => user.id === id); return user ? { ...user } : null; }
+  async userByName(name){return this.users.find(u=>u.username.toLowerCase()===name.toLowerCase())||null;}
   async findLogin(identifier) { return this.users.find(user => [user.username,user.email].some(value => value.toLowerCase() === identifier.toLowerCase())) || null; }
   async createUser(data, hash) {
     if (this.users.some(user => user.username.toLowerCase() === data.username.toLowerCase() || user.email.toLowerCase() === data.email.toLowerCase())) { const error = Error('Duplicate'); error.code = 'ER_DUP_ENTRY'; throw error; }
     const user = { id: ++this.sequence, username: data.username, email: data.email, password_hash: hash, bio: '', avatar_filename: null, created_at: new Date().toISOString() };
     this.users.push(user); return { ...user };
   }
-  async updateBio(id, bio) { this.users.find(u=>u.id===id).bio=bio; return this.user(id); }
+  async updateBio(id, bio, format='plain') { const u=this.users.find(u=>u.id===id);u.bio=bio;u.bio_format=format; return this.user(id); }
   async updateAvatar(id, filename) { const user=this.users.find(u=>u.id===id);const old=user.avatar_filename;user.avatar_filename=filename;return old; }
   async teams(id) { return this.savedTeams.filter(t=>t.userId===id).map(t=>({...t,pokemonIds:[...t.pokemonIds]})); }
   async createTeam(userId,name) { const team={id:++this.sequence,userId,name,pokemonIds:[]};this.savedTeams.push(team);return {...team}; }

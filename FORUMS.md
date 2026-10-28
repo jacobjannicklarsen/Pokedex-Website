@@ -1,5 +1,29 @@
 # Dexhaven community forums
 
+## v0.7.1 additions
+
+The homepage now groups categories with persistent collapsible sections and one
+subforum level. Authorized staff organize groups in Administration; discussions
+keep their existing category IDs. All discussions, New posts, Search, Watched,
+Bookmarks and Mark forums read are real navigation/actions. Latest posts use only
+visible threads/posts. Trending uses distinct other unrestricted contributors
+(weight 3) and at most ten distinct other unrestricted reactors during seven days,
+divided by `(1 + threadAgeHours / 24)`. It is discovery, not earned rank.
+
+Staff Directory uses live server roles. Shared member cards support pointer delay,
+keyboard focus/Arrow Down/Escape and an explicit touch Preview control. Personal
+fields require opt-in and the existing public profile gate. Presence means an
+opted-in activity update within 24 hours, not an exact online indicator.
+
+Thread authors can attach a 2-6 option single-choice poll at creation; votes are
+immutable and unique per account. Polls close by deadline, author or authorized
+staff. Hidden/locked discussions reject votes. Bookmarks are private and separate
+from watched discussions. Follow/block/read/notification policy is documented in
+[the API](server/API.md#v071-community-settings-and-saved-simulations).
+
+The optional Shoutbox is deferred: additional real-time moderation, abuse limits,
+retention and transport infrastructure are needed before exposing it.
+
 Visit `forums.html` from the main navigation or Community subnavigation. The
 existing `community.html` trainer directory and clean public trainer/team links
 remain available. Public visitors can read categories and visible discussions;

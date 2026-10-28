@@ -1,5 +1,50 @@
 # Dexhaven Battle Arena
 
+## Arena presentation and moveset tools
+
+The Arena now groups matchup configuration, battle controls and the live field
+into numbered sections. Contender cards show base-stat bars, level statistics,
+colour-coded type badges and equipped-move removal shortcuts. Search by move
+name and combine Type/Category filters without changing the four-move limit.
+Invalid levels disable entry until corrected. Battlefield HUDs show side identity,
+types, health and status, with additional vertical space on small screens.
+
+Type and category keys stay lowercase in the historical data and battle engine.
+The UI now formats visible names through the shared display formatter (Water,
+Physical, Special, Status), rather than rendering those raw keys directly.
+
+The Battle Arena and Forums share one `.intro-portrait` treatment: transparent
+artwork, a bottom-only fade, alpha-shaped drop shadow and reduced-motion-aware
+entrance. The professor uses its transparent cutout; Forums uses the existing
+transparent Patrick image between the introduction and discussion actions.
+
+## v0.7.1 saved simulations
+
+The same Gen V engine now offers Easy/Normal/Hard CPU choices. Difficulty changes
+move selection, never stats or battle rules. Easy randomizes legal attacks; Normal
+retains existing scoring; Hard also considers HP, KOs, priority, PP and supported
+status/recoil decisions. This is a limited simulator, not a competitive ladder.
+
+After a completed local simulation, Save stores a server-reconstructed, unqualified
+record. Enabling activity recording before Start requests a one-use server ticket
+and seed. Both flows save only validated actions/configuration; forged outcomes
+are ignored/rejected. History is owner-only with species/outcome/order filters,
+statistics, removal and readonly exact replay playback (play/pause/restart/speed).
+Replays store initial metadata, frames, events and ruleset/revision, so future
+engine changes do not reroll previously saved outcomes. Unsaved local play still
+works without account or database support.
+
+Activity qualification additionally requires server preparation, level 50 on both
+sides, different species, at least three moves each, three turns and five seconds,
+with at most three awards-eligible records per day and one ordered pairing per day.
+Local imports and auto-mode outcomes never become personal competitive wins.
+Deleting history excludes it from statistics but retains anti-abuse/award evidence.
+Caught-based rank thresholds are unchanged. The three battle awards use only
+qualified server activity; Strategist counts Normal/Hard player-vs-CPU wins.
+
+See [manual migration](database/MIGRATION_v0.7.1.md) and
+[API/replay contracts](server/API.md#v071-community-settings-and-saved-simulations).
+
 Open `battle.html`. No login or MySQL migration is needed for local battles.
 Choose both Pokémon by name/number using the existing searchable selector,
 set independent levels and equip up to four moves. **Player vs CPU** offers one
@@ -38,90 +83,48 @@ Pikachu uses its older Defense of 30, Clefairy is Normal, Flamethrower has 95
 power, and Steel resists Ghost and Dark. Fairy is absent. See [PokéAPI's data
 definitions](https://pokeapi.co/docs/v2) for historical resource semantics.
 
-## Engine architecture and formulas
+## Full Generation V move engine
 
-- `battle-calculations.js`: integer level stats, stages, speed, historical type
-  multipliers and damage. It is DOM-free and usable by Node tests.
-- `battle-move-support.js`: explicit supported-effect whitelist used by the data
-  importer. It never marks an unknown effect as an ordinary attack.
-- `battle-data.js`: lazy local snapshot loading, level/method eligibility,
-  distinct moveset validation and the Struggle definition.
-- `battle-engine.js`: explicit immutable state transitions, injected randomness,
-  CPU scoring, event log and informational summary generation.
-- `battle-runner.js`: one cancellable timer generation, shared by auto mode;
-  pause/restart invalidates callbacks from earlier runs.
-- `battle.js`/`battle.css`: configuration, sprites, HP/status/PP display, controls,
-  CSS feedback and summary sharing. Rendering never determines damage.
+All 559 historical move records now use the pinned @pkmn/sim 0.10.11 simulator,
+extracted from Pokemon Showdown. Previously the custom engine supported 201.
+Move execution includes charging/recharge, multi-hit, fixed/variable damage,
+OHKO moves, weather, protection, Substitute, Transform, Sketch, Toxic, confusion,
+Counter/Mirror Coat, field effects and their Generation V interactions.
 
-For level `L`, base stat `B`, IV 31, EV 0 and neutral nature:
+- battle-data.js still enforces each species' historical Black/White learnset,
+  selected level, four distinct moves and standard National species #001-649.
+- battle-simulator.js adapts the full engine to immutable Arena state, injects
+  deterministic randomness and projects legal move requests, PP, HP, conditions,
+  types and transformed appearance. Forced charge/recharge turns cannot be bypassed.
+- battle-engine.js routes Arena configurations to this adapter. The former small
+  engine remains in battle-engine-legacy.js for existing DOM-free consumers/tests.
+- battle-calculations.js continues to supply setup stat tables and legacy math.
+  Active battle damage, rounding and move effects come from the full simulator.
+- battle-recording.js uses the new dexhaven-bw-sim-0.10.11 ruleset. Existing saved
+  replays remain stored frames and are never rerolled. Started tickets using older
+  rules expire through the existing validation path.
+- scripts/vendor-battle-simulator.cjs builds the pinned local browser bundle with
+  esbuild (npm run vendor:battle). It preserves class names required for serialized
+  simulator references and retains the MIT license in vendor/battle-simulator.LICENSE.
+  Node and browser use the same simulator version and deterministic adapter.
+- scripts/battle-data-corrections.cjs records explicit historical CSV corrections:
+  Cryogonal's Attack/Defense, six recovery moves' base PP, Luster Purge power,
+  Ally Switch priority, and Hidden Power's Dark/70 result with the fixed 31 IVs.
+  The importer reapplies these corrections on every regeneration.
 
-```text
-HP    = floor((2B + 31) * L / 100) + L + 10
-Other = floor((2B + 31) * L / 100) + 5
-Shedinja HP = 1
-```
+The fixed setup remains neutral nature, 31 IVs, zero EVs, base PP, no held items,
+no abilities and one Pokemon per side with no reserves. Moves requiring a missing
+item, partner or reserve can fail legitimately; their mechanics are not replaced
+with ordinary damage. Empty movesets and exhausted PP automatically use Struggle.
+Battles retain the 200-turn draw limit. Exact game cartridge RNG is not emulated.
 
-Levels are integers 1–100, default 50. Stat stages are bounded −6…+6. Ordinary
-stat multipliers use `(2+n)/2` for positive stages or `2/(2−n)` for negative;
-accuracy/evasion use base 3. Paralysis quarters Speed and independently prevents
-movement 25% of the time. Priority decides first, then current Speed, then an
-injected random tie break. Mid-turn speed changes apply to the next turn order.
+Easy chooses randomly, usually from attacks. Normal scores estimated damage and
+support opportunities. Hard adds knockout, priority, healing and recoil decisions.
+All difficulties obey the same requested moves and mechanics; stats are unchanged.
 
-Damage uses `floor(floor((floor(2L/5)+2)*Power*Attack/Defense)/50)+2`, then critical,
-85–100% integer random variation, STAB (1.5), dual-type effectiveness and physical
-burn reduction (0.5). Criticals are 1/16 normally, 1/8 for supported high-crit moves,
-deal ×2 and ignore negative attacking/positive defending stages. Physical and
-special categories use their corresponding stats. Immunity deals zero; other
-damage has a minimum of one. HP clamps to 0…maximum.
-
-Rounding intentionally uses the documented sequential floors rather than all
-cartridge fixed-point/truncation edge cases. Drain/healing/recoil use floor with
-a one-HP minimum where appropriate. This can differ by a point from cartridge
-results. The project references [Pokémon Showdown's Gen V rules](https://github.com/smogon/pokemon-showdown/tree/master/data/mods/gen5)
-for comparison; it does not claim simulator-equivalent completeness.
-
-## Supported and unsupported mechanics
-
-**201 moves** are supported. The snapshot contains the complete exact list and
-each move's effect descriptor. Supported effects include ordinary damage,
-priority attacks, always-hit attacks, increased critical chance, half-damage
-drain, quarter/third recoil, burn/poison/freeze/paralysis chances, flinching,
-ordinary one/two-stage changes, damaging stat drops and half-HP recovery.
-
-- Accuracy is a percentage adjusted by accuracy/evasion; null-accuracy and
-  explicit always-hit attacks bypass the percentage test.
-- PP is consumed when a move is attempted, including misses and immunities,
-  after sleep/freeze/paralysis/flinch checks. Exhausted moves cannot be chosen.
-- Burn and poison deal 1/8 maximum HP at the end of a turn. Burn halves physical
-  damage. Fire types cannot burn; Poison/Steel cannot be poisoned.
-- Sleep blocks 1–3 attempted turns, then clears. Freeze has a 20% per-action thaw
-  check and clears when hit by a damaging Fire move. Ice types cannot freeze.
-- Paralysis can affect Electric types in this Gen V-inspired ruleset; Electric
-  Thunder Wave still cannot affect Ground. No modern Electric paralysis immunity
-  or Grass powder immunity is added.
-- Flinch only affects a not-yet-acted opponent in the current turn. Supported
-  damaging stage moves still deal damage before applying their change.
-- A direct knockout ends actions immediately, including recoil/double knockouts.
-  End-of-turn residual damage resolves for both sides before the result check.
-  A double knockout or 200-turn safety limit is a draw.
-- If no moves are equipped, or all PP is gone, use typeless 50-power Struggle,
-  which always hits, has no STAB/type immunity and costs 1/4 maximum HP recoil.
-
-Unsupported moves remain visible in a separate list with a reason, and cannot
-be equipped. These include Transform, Sketch, Counter/Mirror Coat, Substitute,
-multi-hit/multi-turn moves, OHKO/fixed/variable damage, weather, switching,
-confusion, Toxic, recharge, Protect, field effects, ability/item interactions
-and other unimplemented effects. Scald is explicitly deferred because its thaw
-interactions extend beyond the generic burn effect. Ditto, Unown, Wobbuffet and
-Smeargle therefore use the fallback; at level 1 Magikarp/Burmy also need it.
-An empty moveset is permitted explicitly, rather than fabricating eligibility.
-
-Additional deliberate scope limits: one Pokémon per side, no switching or sleep
-counter reset on switching, no doubles/spread damage modifier, no secondary
-effect/ability interactions, no ability/item/nature choices, no complete breeding
-chain validation, no cartridge RNG emulation, no multiplayer and no ratings.
-AI scores expected power, type effectiveness, accuracy, PP and simple status/
-stage/healing opportunities. It is a basic opponent, not a competitive solver.
+Source and licensing: https://github.com/pkmn/ps/tree/main/sim (MIT), derived from
+https://github.com/smogon/pokemon-showdown. The Cryogonal historical base stats are
+also documented in Showdown's data/mods/gen6/pokedex.ts (inherited by Generation V).
 
 ## Presentation and sharing
 
@@ -136,12 +139,13 @@ hour and is never posted automatically. It is labelled an unofficial client
 simulation. No trusted competitive record, persistent battle history, rank,
 achievement or collection API is written by either battle mode.
 
-## Verification limits
+## Verification
 
-Tests cover all 649 species at levels 1 and 100, integer examples, history,
-eligibility, unsupported moves, physical/special damage, stages, accuracy,
-immunities, criticals, PP, status duration, knockouts, Struggle, seeded replay,
-AI and timer cancellation. Browser tests exercise configuration, manual/auto
-controls, sharing, error retry, both themes, keyboard focus and mobile geometry.
-They do not establish cartridge-perfect emulation or validate every move against
-an actual Black/White cartridge. Follow the supported-effect contract above.
+Tests exercise every move record and forced continuation, all 649 species at levels
+1/100, snapshot/simulator stat agreement, charging, recharge, Substitute, Transform
+(including copying a shorter moveset), protection, fixed/multi-hit damage, weather,
+escalating Toxic, Struggle and non-mutating transitions. Existing replay/API tests
+cover owner isolation, deterministic reconstruction, integrity and activity awards.
+Chrome checks cover actual Transform selection, updated live HUDs, and identical
+complex-move replays in the browser and Node, plus both themes and mobile layouts.
+These checks are not a claim of comparison against every real cartridge scenario.

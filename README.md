@@ -1,4 +1,14 @@
-# Dexhaven v0.7.0 — Community Forums & Battle Arena
+# Dexhaven v0.7.1 — Community, Battles & Profile Customization
+
+Version **0.7.1** adds Account Settings, avatar/banner cropping and explicit personal-field
+privacy, safe formatted biographies, grouped forums and polls, Staff Directory,
+member previews, following/blocking and bookmarks. The Arena now offers three AI
+difficulties, private saved simulation history, exact recorded replays and separate
+validated activity achievements. Existing Pokédex rank thresholds stay unchanged.
+See [the implementation report](IMPLEMENTATION_v0.7.1.md),
+[API contracts](server/API.md#v071-community-settings-and-saved-simulations) and
+[manual migration](database/MIGRATION_v0.7.1.md). The SQL has not been run; no release,
+push or deployment has been performed.
 
 Version **0.7.0** adds [community forums](FORUMS.md), moderation/notifications and
 [a local Battle Arena](BATTLE_ARENA.md) for all 649 species. The Arena has player

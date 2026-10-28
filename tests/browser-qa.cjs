@@ -33,7 +33,7 @@ async function main() {
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['forums.html','battle.html','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-runner.js','data/battle-v5.json','about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-hub.css','community.css','trainer-names.js','interactions.css','trainer-ranks.js','admin.html','admin.css','admin.js','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png'];
+    const allowed=['settings.html','staff.html','battle-history.html','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.html','battle.html','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','data/battle-v5.json','about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-hub.css','community.css','trainer-names.js','interactions.css','trainer-ranks.js','admin.html','admin.css','admin.js','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png','images/prof_nicklas.png','images/prof_nicklas-cutout.png','images/patrick.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -150,6 +150,9 @@ async function main() {
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await command('Page.navigate', { url: origin });
+  if(process.env.QA_BATTLE_POLISH_ONLY){await require('./support/battle-polish-browser.cjs')({check,evaluate,command,waitFor,origin});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_DISCOVERY_ONLY){await require('./support/discovery-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
+  if(process.env.QA_V071_ONLY){await require('./support/v071-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_V070_ONLY){await require('./support/v070-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_COMMUNITY_ONLY){await require('./support/community-polish.cjs').run({check,origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_COMMUNITY_BASELINE){await require('./support/community-polish.cjs').baseline({origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});return;}
@@ -605,7 +608,8 @@ async function main() {
     await waitFor(`document.querySelector('#header-avatar').naturalWidth>0`);
     assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')===document.querySelector('img.trainer-avatar').getAttribute('src')`),true);
     assert.equal(await evaluate(`document.querySelector('#header-profile').hidden`),false);
-    await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('#header-profile').click()`);
+    await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('#header-profile').click();document.querySelector('#profile-dropdown a').click()`);
+    await waitFor(`document.querySelector('#trainer-heading')?.textContent==='Trainer Profile'`);
     assert.equal(await evaluate(`document.querySelector('#trainer-heading').textContent`),'Trainer Profile');
   });
   await check('avatar framing previews zoom, pointer/keyboard movement, reset/cancel and uploads the selected crop',async()=>{
@@ -691,7 +695,7 @@ async function main() {
       assert.equal(await evaluate('document.documentElement.dataset.theme'),theme);
       assert.equal(await evaluate('window.qaRequests'),0);
       assert.equal(await evaluate(`document.querySelector('#account-content')`),null);
-      await evaluate(`document.querySelector('#header-profile').click()`);
+      await evaluate(`document.querySelector('#header-profile').click();document.querySelector('#profile-dropdown a').click()`);
       await waitFor(`!!document.querySelector('.profile-panel') && state.pokemon.size===649 && !state.loading`);
       assert.equal(await evaluate('location.pathname'),'/trainers.html');
       assert.equal(await evaluate(`document.querySelector('#header-avatar').getAttribute('src')===document.querySelector('img.trainer-avatar').getAttribute('src')`),true);
@@ -795,7 +799,7 @@ async function main() {
     const dragon=await evaluate(`[...document.querySelectorAll('#account-content tbody tr')].find(n=>n.children[0].textContent==='Dragon')?.textContent`);assert.match(dragon,/Dragon21/);
     assert.equal(await evaluate(`document.querySelectorAll('.recent-registration').length`),3);
     await evaluate(`document.querySelector('[data-view="/achievements"]').click()`);
-    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),96);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),102);
     assert.match(await evaluate(`document.querySelector('[data-achievement="first-catch"]').textContent`),/Unlocked/);
     assert.match(await evaluate(`document.querySelector('[data-achievement="pokemon-collector"]').textContent`),/Locked/);
     await evaluate(`document.querySelector('[data-view="/teams"]').click();document.querySelector('.team-create input').value='Progression Six';document.querySelector('.team-create').requestSubmit()`);
@@ -1267,16 +1271,16 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('.community-directory').textContent.includes('browser_trainer')`),false);
     assert.deepEqual(exceptions,[]);
   });
-  await check('expanded achievement vault filters all 96 medals and supports categories and earned status',async()=>{
+  await check('expanded achievement vault filters all 102 medals and supports categories and earned status',async()=>{
     await command('Page.navigate',{url:origin+'/trainers.html#view=achievements'});
-    await waitFor(`document.querySelectorAll('.achievement-card').length===96`);
+    await waitFor(`document.querySelectorAll('.achievement-card').length===102`);
     assert.equal(await evaluate(`document.querySelectorAll('.achievement-card[data-rarity="legendary"]').length>0`),true);
     await evaluate(`document.querySelector('[data-achievement-filter="types"]').click()`);
     assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),57);
     await evaluate(`document.querySelector('[data-achievement-filter="unlocked"]').click()`);
     assert.equal(await evaluate(`document.querySelectorAll('.achievement-card:not(.unlocked)').length`),0);
     await evaluate(`document.querySelector('[data-achievement-filter="all"]').click()`);
-    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),96);
+    assert.equal(await evaluate(`document.querySelectorAll('.achievement-card').length`),102);
     for(const theme of ['light','dark']){
       if(await evaluate('document.documentElement.dataset.theme')!==theme)await evaluate(`document.querySelector('#theme-toggle').click()`);
       for(const width of [320,375,1280]){await command('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);}
@@ -1349,6 +1353,7 @@ async function main() {
   await require('./support/admin-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
   await require('./support/community-polish.cjs').run({check,origin,evaluate,command,waitFor,repo:fixtureRepo,uploadDir});
   await require('./support/v070-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
+  await require('./support/v071-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});
   await check('static community preview gives a clear backend-required state without exposing private data',async()=>{
     await command('Page.navigate',{url:origin+'/preview/Pokedex-Website/community.html'});
     await waitFor(`document.querySelector('.community-error')`);

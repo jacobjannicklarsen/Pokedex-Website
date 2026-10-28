@@ -23,6 +23,8 @@
 .directory-showcase>p::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--card-accent); flex-shrink:0; }
 .directory-mini-roster { gap:5px; }
 .directory-mini-roster .pokemon-sprite,.directory-empty-slot { border-radius:8px; background:var(--bg); }
+/* Use each sprite's intrinsic dimensions instead of enlarging the pixel art. */
+body[data-page="community"] :is(.directory-partner,.directory-mini-roster) .pokemon-sprite { width:auto; height:auto; max-width:100%; justify-self:center; align-self:center; }
 .directory-card-actions .action-button,.directory-card-actions>.text-button { min-height:44px; display:inline-flex; align-items:center; gap:8px; }
 .directory-card-actions .action-button { border-radius:9px; }
 .directory-card-actions>.text-button { padding:8px 0; }

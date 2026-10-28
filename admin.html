@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="interactions.css">
     <link rel="stylesheet" href="community.css">
     <link rel="stylesheet" href="forums.css">
+    <link rel="stylesheet" href="community-expansion.css">
     <link rel="stylesheet" href="admin.css">
     <meta name="robots" content="noindex,nofollow">
     <script src="encyclopedia-data.js" defer></script>
@@ -37,8 +38,11 @@
     <script src="sprite-availability.js" defer></script>
     <script src="pokemon-sprites.js" defer></script>
     <script src="profile-decorations.js" defer></script>
+    <script src="rich-biography.js" defer></script>
+    <script src="profile-extras.js" defer></script>
     <script src="community.js" defer></script>
     <script src="account.js" defer></script>
+    <script src="member-cards.js" defer></script>
     <script src="forum-notifications.js" defer></script>
     <script src="forum-admin.js" defer></script>
     <script src="admin.js" defer></script>
@@ -54,10 +58,10 @@
         <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
         <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
       </button>
-      <a id="header-profile" class="header-profile" href="trainers.html#view=profile" aria-label="Open trainer profile" data-requires-auth hidden>
+      <button id="header-profile" class="header-profile" type="button" aria-label="Open account options" aria-expanded="false" aria-controls="profile-dropdown" data-requires-auth hidden>
         <img id="header-avatar" alt="" width="36" height="36" hidden>
         <span id="header-avatar-initial" aria-hidden="true"></span>
-      </a>
+      </button>
     </div>
   </header>
   <nav class="trainer-nav" aria-label="Main navigation">

@@ -60,6 +60,7 @@
   for(const user of users){const row=element('article','admin-user');row.dataset.userId=user.id;const info=element('div');info.append(element('h3','',user.username));TrainerRanks.role(info,user.role);info.append(element('p','form-help',`Account #${user.id} · Joined ${new Date(user.createdAt).toLocaleDateString()}`));
    if(user.restriction){const restriction=element('p','admin-status restricted',`Suspended until ${new Date(user.restriction.expiresAt).toLocaleString()}. ${user.restriction.reason} · Issued by account #${user.restriction.issuedBy}`);info.append(restriction);}else info.append(element('p','admin-status','Active account'));
    const controls=element('div','admin-user-actions');if(user.actions.roleOptions.length)controls.append(button('Change role',()=>openAction(user,'role')));if(user.actions.canPermissions)controls.append(button('Staff permissions',()=>openAction(user,'permissions')));if(user.actions.canRestrict)controls.append(button('Suspend',()=>openAction(user,'suspend')));if(user.actions.canRevoke)controls.append(button('Revoke suspension',()=>openAction(user,'revoke')));
+   if(context.role==='owner'&&user.actions.canPassword)controls.append(button('Change password',()=>openAction(user,'password')));
    if(!controls.children.length)controls.append(element('p','form-help',user.role==='owner'?'Protected Owner account':'No permitted changes'));
    row.append(info,controls);list.append(row);
   }if(!users.length)list.append(element('p','form-help','No matching Trainers. Try another username or ID.'));content.append(list);
@@ -67,8 +68,17 @@
  }
  function openAction(user,kind){
   const opener=document.activeElement;dialog?.remove();dialog=element('dialog','admin-dialog');dialog.setAttribute('aria-labelledby','admin-dialog-title');
-  const title=element('h2','',({role:'Change role',permissions:'Manage staff permissions',suspend:'Suspend account',revoke:'Revoke suspension'})[kind]);title.id='admin-dialog-title';dialog.append(title,element('p','form-help',`${user.username} · #${user.id}. Confirm only after reviewing this account and your reason.`));
-  const form=element('form','admin-form');const body={version:user.version};let roleSelect,hours,permissions;
+  const title=element('h2','',({role:'Change role',permissions:'Manage staff permissions',password:'Change password',suspend:'Suspend account',revoke:'Revoke suspension'})[kind]);title.id='admin-dialog-title';dialog.append(title,element('p','form-help',`${user.username} · #${user.id}. Confirm only after reviewing this account and your reason.`));
+  const form=element('form','admin-form');const body={version:user.version};let roleSelect,hours,permissions,currentPassword,newPassword,confirmPassword;
+  if(kind==='password'){
+   function passwordField(text,name,autocomplete,min){const label=element('label','',text),input=element('input');input.type='password';input.name=name;input.autocomplete=autocomplete;input.minLength=min;input.maxLength=128;input.required=true;label.append(input);form.append(label);return input;}
+   currentPassword=passwordField('Your current Owner password','currentPassword','current-password',1);
+   newPassword=passwordField('New password for '+user.username,'newPassword','new-password',12);
+   confirmPassword=passwordField('Confirm new password','confirmPassword','new-password',12);
+   const checkPasswords=()=>confirmPassword.setCustomValidity(newPassword.value===confirmPassword.value?'':'Passwords must match.');newPassword.oninput=checkPasswords;confirmPassword.oninput=checkPasswords;
+   form.append(element('p','form-help','Use 12–128 characters. This signs the account out on all devices, including this session if you change your own password.'));
+   dialog.addEventListener('close',()=>form.reset(),{once:true});
+  }
   if(kind==='role'){const label=element('label','','New staff role');roleSelect=element('select');roleSelect.name='role';for(const role of user.actions.roleOptions){const o=element('option','',labels[role]);o.value=role;roleSelect.append(o);}roleSelect.value=user.role;label.append(roleSelect);form.append(label,element('p','form-help',context.role==='owner'?'Your role change resets the permission subset to the new role defaults. Trainer progression is unaffected.':'Owner-assigned permission limits remain in force after your role change. Trainer progression is unaffected.'));}
   if(kind==='permissions'){const fields=element('fieldset');fields.append(element('legend','','Enabled permissions · role maximum'));permissions=[];for(const permission of user.actions.allowedPermissions){const label=element('label','privacy-option'),input=element('input');input.type='checkbox';input.name='permissions';input.value=permission;input.checked=user.permissions.includes(permission);permissions.push(input);label.append(input,document.createTextNode(permission));fields.append(label);}form.append(fields);}
   if(kind==='suspend'){const label=element('label','',`Duration in hours (1–${user.actions.maxHours})`);hours=element('input');hours.type='number';hours.name='hours';hours.min=1;hours.max=user.actions.maxHours;hours.step=1;hours.value=1;hours.required=true;label.append(hours);form.append(label,element('p','form-help','Suspension blocks authenticated access, including existing sessions. Expiration is automatic. It does not publish or delete account data.'));}
@@ -82,12 +92,14 @@
    const current=ticket;
    try{
     const value={...body,reason:reason.value};if(kind==='role')value.role=roleSelect.value;if(kind==='permissions')value.permissions=permissions.filter(i=>i.checked).map(i=>i.value);if(kind==='suspend')value.hours=Number(hours.value);if(kind==='revoke')value.restrictionId=user.restriction.id;
-    const path={role:'role',permissions:'permissions',suspend:'restrictions',revoke:'restrictions/revoke'}[kind];await request(`/users/${user.id}/${path}`,{method:'POST',body:value});
+    if(kind==='password'){value.currentPassword=currentPassword.value;value.newPassword=newPassword.value;}
+    const path={role:'role',permissions:'permissions',password:'password',suspend:'restrictions',revoke:'restrictions/revoke'}[kind];await request(`/users/${user.id}/${path}`,{method:'POST',body:value});
+    if(kind==='password'&&user.id===DexhavenAccount.getUser()?.id){dialog.close();await DexhavenAccount.refresh();gate('Password changed','Your sessions have been signed out. Log in with your new password.');return;}
     if(current!==ticket)return;dialog.close();await load();message('Change saved. The administrative audit record was committed.');content.querySelector(`.admin-user[data-user-id="${user.id}"] button`)?.focus();
    }catch(error){if(current!==ticket)return;status.className='form-error';status.textContent=error.message;message(error.message,true);if([401,403].includes(error.status))DexhavenAccount.refresh().catch(()=>{});}
    finally{busy=false;form.removeAttribute('aria-busy');for(const control of form.elements)control.disabled=false;}
   };
-  dialog.showModal();(roleSelect||hours||reason).focus();
+  dialog.showModal();(currentPassword||roleSelect||hours||reason).focus();
  }
  globalThis.addEventListener('dexhaven:session',event=>{if(event.detail.ready)start();});
  globalThis.addEventListener('dexhaven:session-error',event=>gate('Administration unavailable',event.detail.message));

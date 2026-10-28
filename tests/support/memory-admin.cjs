@@ -9,10 +9,17 @@ class MemoryAdmin{
  async overview(actor){policy.requireAccess(actor,'overview.read');return {trainers:this.repo.users.length,staff:[...this.roles.values()].filter(r=>r.role!=='trainer').length,restricted:new Set(this.restrictions.filter(r=>!r.revokedAt&&Date.parse(r.expiresAt)>Date.now()).map(r=>r.userId)).size,recent:actor.permissions.includes('audit.read')?(await this.audit(actor)).items.slice(0,6):[]};}
  async users(actor,after=0,query=''){policy.requireAccess(actor,'users.read');const all=this.repo.users.filter(u=>u.username.toLowerCase().includes(query.toLowerCase())||String(u.id)===query),rows=all.filter(u=>u.id>after).sort((a,b)=>a.id-b.id);return {items:await Promise.all(rows.slice(0,25).map(async u=>this.view(actor,await this.target(u.id)))),next:rows.length>25?rows[24].id:null,total:all.length};}
  record(actor,target,action,metadata){if(this.failAudit)throw Error('Fixture audit storage failure');this.logs.push({id:++this.sequence,actorId:actor.id,actor:this.repo.users.find(u=>u.id===actor.id)?.username,targetId:target.id,target:target.username,targetRole:target.role,action,metadata:structuredClone(metadata),createdAt:new Date().toISOString()});}
- async atomic(operation){const prior=this.tail;let release;this.tail=new Promise(r=>{release=r;});await prior;const snapshot=structuredClone({roles:this.roles,restrictions:this.restrictions,logs:this.logs,sequence:this.sequence});try{return await operation();}catch(error){Object.assign(this,snapshot);throw error;}finally{release();}}
+ async atomic(operation){const prior=this.tail;let release;this.tail=new Promise(r=>{release=r;});await prior;const snapshot=structuredClone({roles:this.roles,restrictions:this.restrictions,logs:this.logs,sequence:this.sequence,users:this.repo.users,settings:this.repo.enhancements.store.base.data.settings});try{return await operation();}catch(error){this.repo.users=snapshot.users;this.repo.enhancements.store.base.data.settings=snapshot.settings;delete snapshot.users;delete snapshot.settings;Object.assign(this,snapshot);throw error;}finally{release();}}
  async change(actorId,targetId,kind,value){return this.atomic(async()=>{
   const actor={id:actorId,...await this.access(actorId)},target=await this.target(targetId);policy.change(actor,target,kind,value);if(value.version!==target.roleVersion)throw new HttpError(409,'This account changed. Refresh the user list before trying again.');
   const role={role:target.role,permissions:this.roles.get(targetId)?.permissions??null,roleVersion:target.roleVersion+1};
+  if(kind==='password'){
+   if((await this.repo.user(actorId)).password_hash!==value.actorHash)throw new HttpError(409,'Your credentials changed.');
+   const settings=await this.repo.enhancements.settings.owned(this.repo.enhancements.store,targetId);
+   await this.repo.enhancements.store.update('settings',settings.id,{securityVersion:settings.securityVersion+1});
+   this.repo.users.find(u=>u.id===targetId).password_hash=value.hash;
+   this.record(actor,target,'password.change',{reason:value.reason,sessionsRevoked:true});
+  }
   if(kind==='role'){role.role=value.role;if(actor.role==='owner')role.permissions=null;this.record(actor,target,'role.change',{from:target.role,to:value.role,reason:value.reason});}
   if(kind==='permissions'){role.permissions=[...value.permissions];this.record(actor,target,'permissions.change',{from:target.permissions,to:value.permissions,reason:value.reason});}
   if(kind==='suspend'){const restriction={id:++this.sequence,userId:targetId,issuedBy:actorId,reason:value.reason,expiresAt:new Date(Date.now()+value.hours*3600000).toISOString()};this.restrictions.push(restriction);this.record(actor,target,'restriction.apply',{hours:value.hours,reason:value.reason});}

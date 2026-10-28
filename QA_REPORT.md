@@ -1,6 +1,6 @@
 # Pokédex QA review
 
-This report records successive project stages. The **Dexhaven v0.7.0 Community Forums & Battle Arena** section at the end describes the current version and latest verification; earlier sections document previous reviews.
+This report records successive project stages. The **Dexhaven v0.7.1 Community, Battles & Profile Customization** section at the end describes the current version and latest verification; earlier sections document previous reviews.
 
 Reviewed search, filtering, sorting, details, loading, API failures, cache behavior, accessibility, keyboard interaction, and responsive geometry. The design and existing features are preserved; each development stage below records its dependency and verification scope.
 
@@ -382,3 +382,89 @@ in [MIGRATION_v0.7.0.md](database/MIGRATION_v0.7.0.md). Browser artwork and exte
 API calls use fixtures, so upstream sprite/network availability is not established.
 The battle rules are intentionally simplified; unsupported moves are explicitly
 disabled and cartridge-perfect behavior is not claimed.
+
+
+## Dexhaven v0.7.1 Community, Battles & Profile Customization
+
+Automated `npm.cmd test`: **148 tests; 146 passed, one skipped live-MySQL test,
+one pre-existing founder-art checksum failure**. The user-supplied artwork and
+original checksum assertion are preserved. See the exact hashes in
+[the implementation report](IMPLEMENTATION_v0.7.1.md#16-automated-test-results).
+Fifteen added tests cover settings/privacy/birthdays, biography safety, image
+processing/revocation, credentials and other-session revocation, social ownership,
+notifications, discovery, layout cycles, polls, awards, replay reconstruction,
+qualification, owner isolation and schema/backward-compatible SQL contracts.
+
+Full Chromium: **97/97 browser checks passed** with fixture data. Eight new groups
+exercise actual settings registration/editing, cropped avatar/banner file input,
+limited biography/public privacy, Staff keyboard/pointer/touch previews, persisted
+collapses, poll creation/voting, bookmarks/follow/block/unblock, save/import and
+history/replay with random generation disabled, drafts on save failure, reduced
+motion and both themes at 320/768/1280 px. Existing 89 checks preserve earlier
+Pokédex/analytics/profile/team/Admin/forum/local-battle regressions. Follow-up
+focused checks also exercise the Arena's new community navigation links.
+
+Firefox: **55/55 checks passed**, extending the earlier 37 checks with settings,
+privacy, Staff and exact replay at 375/1280 px in dark/light themes, keyboard
+preview activation/dismissal and replay with RNG disabled. Headless Firefox can
+keep a document unfocused despite `.focus()`; BiDi keyboard input validates the
+explicit Arrow Down activation rather than assuming the OS focus state.
+
+Screenshots: `%TEMP%\dexhaven-v071-review` (new Chromium pages),
+`%TEMP%\dexhaven-v061-firefox` (existing Firefox output folder with expanded checks).
+Browser sessions, fixture accounts and upload directories are temporary. No live
+MySQL, production users or existing uploaded images are used. Responsive emulator
+and synthetic pointer/file-input checks are not physical-device validation.
+
+Not executed: manual MySQL upgrade, real constraint/concurrency checks, live DB
+restart persistence, actual outbound email, physical mobile and screen-reader
+validation. Complete [the migration checklist](database/MIGRATION_v0.7.1.md) before
+publishing. No migration, deployment, Git push or release was performed.
+
+
+### Avatar settings dropdown and Battle Arena portrait follow-up
+
+Removed Settings from every main navigation bar. The logged-in avatar now opens
+shared Trainer profile, Profile customization, Password & Security, Privacy and
+Preferences links. Verified toggle, outside-click and Escape dismissal, focus
+return, arrow-key navigation, section destinations and 320/768/1280 px bounds in
+both themes. Existing profile-navigation checks now follow the dropdown shortcut.
+
+Used the confirmed `images/prof_nicklas.png` on the Battle Arena introduction,
+beside the heading on desktop and below on mobile, with entrance animation and
+soft edge masking. Added only that exact image to Express's public asset routes.
+Verified actual image loading, placement, viewport bounds and reduced motion.
+
+Full Chromium regression at the shared-header stage: **98/98 passed**. Final
+focused v0.7.1 run, including the added portrait case: **10/10 passed**. Light and
+dark portrait screenshots were reviewed; original image files were not modified.
+No database migration or release action was performed for these UI changes.
+
+
+### Arena enhancement and forum Patrick portrait
+
+Enhanced Arena hierarchy, contender cards, stat bars, move search and combined
+Type/Category filters, removable equipped-move chips, readiness validation,
+controls, colour-coded capitalized type/category labels, HUDs and battle log.
+Stored battle keys and mechanics are unchanged. Raw lowercase data keys previously
+bypassed the display formatter; the UI now uses the shared name formatter and
+shared type palette. Selected mode contrast and mobile HUD separation were checked.
+
+Forums now places the original transparent `images/patrick.png` between the intro
+copy and discussion actions. Both pages use a shared `.intro-portrait` class for
+bottom-only masking, one alpha-shaped shadow, entrance animation and reduced motion.
+No Patrick raster editing was needed. The live server was reloaded; both portrait
+URLs, Forums HTML and updated battle JavaScript return HTTP 200.
+
+Latest focused Chromium checks: **11/11** forum/Arena groups, including new move
+filters, capitalization, four-move limits, invalid-level recovery, HUD separation,
+Patrick placement, image loading, themes, motion reduction and discussion access.
+Existing manual/auto battle, forum moderation, quoting, notifications and loading
+recovery checks also pass. A pre-existing wait-expression race during an empty
+forum rerender was corrected with optional chaining; the required final assertion
+was retained, and the rerun passed. Saved simulation/settings/replay checks:
+**10/10**. Firefox Arena regression: **55/55**, run before extracting the unchanged
+portrait effect into the shared class for Forums.
+
+Reviewed desktop setup/control screenshots and mobile battlefield/Patrick layouts.
+No SQL, battle-engine, package version, deployment or release changes were made.

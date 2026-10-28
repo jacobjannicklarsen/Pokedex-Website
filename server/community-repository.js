@@ -31,7 +31,7 @@ class CommunityRepository {
   }
   async earnedBadges(userId) {
     const [rows]=await this.pool.execute('SELECT achievement_key AS `key` FROM user_achievements WHERE user_id = ?', [userId]);
-    const keys=new Set(rows.map(r=>r.key));return logic.definitions.filter(d=>keys.has(d.key)).map(({key,name,description,icon,rarity,category})=>({key,name,description,icon,rarity,category}));
+    const keys=new Set(rows.map(r=>r.key)),extra=logic.definitions.some(d=>d.revocable&&keys.has(d.key))?await require('./extension-metrics').metrics(this.pool,userId):{};return logic.definitions.filter(d=>keys.has(d.key)&&(!d.revocable||d.metric({extra},[])>=d.goal)).map(({key,name,description,icon,rarity,category})=>({key,name,description,icon,rarity,category}));
   }
   async saveDecoration(userId,value) {
     const earned=new Set((await this.earnedBadges(userId)).map(b=>b.key));
@@ -71,19 +71,15 @@ class CommunityRepository {
     finally { connection.release(); }
   }
   async findTrainer(username) {
-    const [rows] = await this.pool.execute('SELECT u.id, u.username, u.bio, u.avatar_filename, u.created_at FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.username = ?', [username]);
+    let rows;try{[rows]=await this.pool.execute('SELECT u.id, u.username, u.bio, u.bio_format, u.avatar_filename, u.created_at FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.username = ?',[username]);}catch(e){if(e.code!=='ER_BAD_FIELD_ERROR'||!e.message.includes('bio_format'))throw e;[rows]=await this.pool.execute('SELECT u.id, u.username, u.bio, u.avatar_filename, u.created_at FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.username = ?',[username]);}
     return rows[0] || null;
   }
   async directory(after,query='') {
     const limit=24,pattern=`%${query.replace(/[=%_]/g,'=$&')}%`;
     const [totals]=await this.pool.execute("SELECT COUNT(*) AS total FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.username LIKE ? ESCAPE '='",[pattern]);
-    const directorySql="SELECT u.id, u.username, u.bio, u.avatar_filename, u.created_at, s.share_bio AS shareBio, s.share_avatar AS shareAvatar, s.share_progress AS shareProgress, CASE WHEN s.share_progress = 1 THEN (SELECT COUNT(*) FROM user_pokedex up WHERE up.user_id = u.id AND up.caught_at IS NOT NULL) ELSE NULL END AS caughtCount, s.featured_pokemon_id AS featuredPokemonId, (SELECT COUNT(*) FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id) AS publicTeamCount, (SELECT t.id FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id ORDER BY (t.id = s.featured_team_id) DESC, t.id DESC LIMIT 1) AS showcaseTeamId FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.id > ? AND u.username LIKE ? ESCAPE '=' ORDER BY u.id LIMIT 25";
+    let directorySql="SELECT u.id, u.username, u.bio, u.bio_format, u.avatar_filename, u.created_at, s.share_bio AS shareBio, s.share_avatar AS shareAvatar, s.share_progress AS shareProgress, CASE WHEN s.share_progress = 1 THEN (SELECT COUNT(*) FROM user_pokedex up WHERE up.user_id = u.id AND up.caught_at IS NOT NULL) ELSE NULL END AS caughtCount, s.featured_pokemon_id AS featuredPokemonId, (SELECT COUNT(*) FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id) AS publicTeamCount, (SELECT t.id FROM teams t JOIN team_sharing ts ON ts.team_id = t.id AND ts.is_public = 1 WHERE t.user_id = u.id ORDER BY (t.id = s.featured_team_id) DESC, t.id DESC LIMIT 1) AS showcaseTeamId FROM users u JOIN trainer_public_settings s ON s.user_id = u.id AND s.enabled = 1 WHERE u.id > ? AND u.username LIKE ? ESCAPE '=' ORDER BY u.id LIMIT 25";
     let rows;
-    try { [rows]=await this.pool.execute(directorySql,[after,pattern]); }
-    catch(error) {
-      if(error.code!=='ER_BAD_FIELD_ERROR'||!error.message.includes('share_bio'))throw error;
-      [rows]=await this.pool.execute(directorySql.replace('s.share_bio AS shareBio','0 AS shareBio'),[after,pattern]);
-    }
+    for(let attempt=0;attempt<3;attempt++){try{[rows]=await this.pool.execute(directorySql,[after,pattern]);break;}catch(error){if(error.code!=='ER_BAD_FIELD_ERROR')throw error;if(error.message.includes('bio_format'))directorySql=directorySql.replace('u.bio_format',"'plain' AS bio_format");else if(error.message.includes('share_bio'))directorySql=directorySql.replace('s.share_bio AS shareBio','0 AS shareBio');else throw error;}}
     const page=rows.slice(0,limit),styles=new Map(),teams=new Map();
     if(page.length){
       const placeholders=page.map(()=>'?').join(','),ids=page.map(u=>u.id);
@@ -137,6 +133,7 @@ class CommunityRepository {
     const collection = await this.repo.progression.collection(this.pool, userId);
     const [unlocks] = await this.pool.execute('SELECT achievement_key AS `key`, unlocked_at AS unlockedAt FROM user_achievements WHERE user_id = ?', [userId]);
     const statistics = logic.statistics(collection);
+    const extra=await require('./extension-metrics').metrics(this.pool,userId);if(Object.keys(extra).length)statistics.extra=extra;
     return { statistics, achievements: logic.achievements(statistics, [], unlocks) };
   }
 }

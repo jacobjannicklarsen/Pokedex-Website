@@ -30,8 +30,8 @@ html.theme-ready :is(.text-button,#auth-submit) {
 @media(hover:hover) {
  :is(.text-button,#auth-submit):not(:disabled):hover { text-decoration-color:currentColor; }
 }
-/* Homepage discovery links keep their aligned layout while responding to input. */
-.home-features .explore-link {
+/* Discovery links keep their aligned layout while responding to input. */
+:is(.home-features,.hub-intro) .explore-link {
  --link-accent:var(--mint);
  position:relative;
  min-height:44px;
@@ -40,8 +40,8 @@ html.theme-ready :is(.text-button,#auth-submit) {
  border-bottom-color:transparent;
  transition:color .16s,transform .12s;
 }
-:root[data-theme="light"] .home-features .explore-link { --link-accent:var(--accent-ink); }
-.home-features .explore-link::after {
+:root[data-theme="light"] :is(.home-features,.hub-intro) .explore-link { --link-accent:var(--accent-ink); }
+:is(.home-features,.hub-intro) .explore-link::after {
  content:'';
  position:absolute;
  inset-inline:0;
@@ -53,18 +53,18 @@ html.theme-ready :is(.text-button,#auth-submit) {
  transition:transform .18s ease-out;
  pointer-events:none;
 }
-.home-features .explore-link>span { transition:transform .18s ease-out; }
-.home-features .explore-link:is(:focus-visible,:active) { color:var(--link-accent); }
-.home-features .explore-link:is(:focus-visible,:active)::after { transform:scaleX(1); }
-.home-features .explore-link:active { transform:translateY(1px); }
+:is(.home-features,.hub-intro) .explore-link>span { transition:transform .18s ease-out; }
+:is(.home-features,.hub-intro) .explore-link:is(:focus-visible,:active) { color:var(--link-accent); }
+:is(.home-features,.hub-intro) .explore-link:is(:focus-visible,:active)::after { transform:scaleX(1); }
+:is(.home-features,.hub-intro) .explore-link:active { transform:translateY(1px); }
 @media(hover:hover) {
- .home-features .explore-link:hover { color:var(--link-accent); }
- .home-features .explore-link:hover::after { transform:scaleX(1); }
- .home-features .explore-link:hover>span { transform:translate(3px,-3px); }
+ :is(.home-features,.hub-intro) .explore-link:hover { color:var(--link-accent); }
+ :is(.home-features,.hub-intro) .explore-link:hover::after { transform:scaleX(1); }
+ :is(.home-features,.hub-intro) .explore-link:hover>span { transform:translate(3px,-3px); }
 }
 @media(prefers-reduced-motion:reduce) {
- .home-features .explore-link::after,.home-features .explore-link>span { transition:none; }
- .home-features .explore-link>span { transform:none !important; }
+ :is(.home-features,.hub-intro) .explore-link::after,:is(.home-features,.hub-intro) .explore-link>span { transition:none; }
+ :is(.home-features,.hub-intro) .explore-link>span { transform:none !important; }
 }
 @media(hover:hover) {
  button:not(:disabled):hover,.action-button:hover { box-shadow:0 3px 12px #0002; }

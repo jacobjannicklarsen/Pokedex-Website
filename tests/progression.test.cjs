@@ -43,6 +43,7 @@ function fakePool() {
     async beginTransaction(){calls.push('begin');backup={records:new Map(records),awards:new Map(awards)};},
     async commit(){calls.push('commit');},async rollback(){calls.push('rollback');records.clear();backup.records.forEach((v,k)=>records.set(k,v));awards.clear();backup.awards.forEach((v,k)=>awards.set(k,v));},release(){calls.push('release');},
     async execute(sql,params){calls.push({sql,params});const now='2026-10-27T10:00:00.000Z';
+      if(sql.includes('FROM enhancement_state'))return [[]];
       if(sql.startsWith('SELECT id FROM users'))return [[{id:params[0]}]];
       if(sql.startsWith('INSERT INTO user_pokedex')){records.set(params[1],{pokemonId:params[1],seenAt:now,caughtAt:sql.includes('UTC_TIMESTAMP(3), NULL')?null:now,updatedAt:now});return [{}];}
       if(sql.startsWith('DELETE FROM user_pokedex')){records.delete(params[1]);return [{}];}
@@ -55,10 +56,11 @@ function fakePool() {
   };
   return{pool:{getConnection:async()=>connection},calls,records,awards,setFail(value){failAward=value;}};
 }
-test('96 unique achievements have reachable thresholds, categories and permanent historical awards',()=>{
-  assert.equal(logic.definitions.length,96);assert.equal(new Set(logic.definitions.map(a=>a.key)).size,96);
+test('102 unique achievements retain the 96 original thresholds and permanent historical awards',()=>{
+  assert.equal(logic.definitions.length,102);assert.equal(new Set(logic.definitions.map(a=>a.key)).size,102);
   const full=logic.statistics(rows(range(1,649)),Array.from({length:5},()=>({memberCount:6})),range(1,100));
   assert.equal(logic.eligible(full,Array.from({length:5},()=>({memberCount:6}))).length,96);
+  full.extra={communityThreads:1,communityReplies:25,communityReactions:100,simulations:50,simulationWins:10};assert.equal(logic.eligible(full,Array.from({length:5},()=>({memberCount:6}))).length,102);
   for(const definition of logic.definitions){assert.ok(['bronze','silver','gold','legendary'].includes(definition.rarity));assert.ok(definition.goal>0);assert.ok(definition.category);}
   for(const type of require('../pokemon-data').types){
     const ids=require('../data/pokemon-summary.json').pokemon.filter(p=>p.types.includes(type)).map(p=>p.id);
@@ -67,7 +69,7 @@ test('96 unique achievements have reachable thresholds, categories and permanent
     assert.ok(!logic.eligible(logic.statistics(rows(ids.slice(0,-1))),[]).includes(`type-${type}-master`));
     assert.ok(logic.eligible(logic.statistics(rows(ids)),[]).includes(`type-${type}-master`));
   }
-  const saved=logic.definitions.map(d=>({key:d.key,unlockedAt:'2026-10-27T10:00:00Z'}));
+  const saved=logic.definitions.filter(d=>!d.key.startsWith('community-')&&!d.key.startsWith('battle-')).map(d=>({key:d.key,unlockedAt:'2026-10-27T10:00:00Z'}));
   assert.equal(logic.achievements(logic.statistics([]),[],saved).filter(a=>a.unlockedAt).length,96);
 });
 test('reconciling known achievements avoids repeated INSERTs and preserves their timestamps',async()=>{

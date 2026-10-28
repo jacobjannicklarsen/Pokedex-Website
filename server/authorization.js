@@ -2,7 +2,7 @@
 const {HttpError}=require('./validation');
 const levels={trainer:0,moderator:1,administrator:2,owner:3};
 const base=['panel.access','overview.read','users.read','restrictions.apply','restrictions.revoke','audit.read','forums.moderate'];
-const capabilities={trainer:[],moderator:base,administrator:[...base,'roles.manage','forums.configure'],owner:[...base,'roles.manage','permissions.manage','audit.all','forums.configure']};
+const capabilities={trainer:[],moderator:base,administrator:[...base,'roles.manage','forums.configure'],owner:[...base,'roles.manage','permissions.manage','passwords.manage','audit.all','forums.configure']};
 function context({role='trainer',permissions=null,roleVersion=0,restriction=null,available=true}={}){
  if(!Object.hasOwn(levels,role))throw new HttpError(503,'Account authorization settings require review.');
  if(typeof permissions==='string'){try{permissions=JSON.parse(permissions);}catch{throw new HttpError(503,'Account authorization settings require review.');}}
@@ -24,11 +24,16 @@ function actions(actor,target){
   maxHours:actor.role==='moderator'?24:24*30,
   canRevoke:lower&&actor.permissions.includes('restrictions.revoke')&&Boolean(target.restriction)&&(actor.role!=='moderator'||target.restriction.issuedBy===actor.id),
   canPermissions:lower&&actor.role==='owner'&&actor.permissions.includes('permissions.manage')&&target.role!=='trainer',
+  canPassword:actor.role==='owner'&&actor.permissions.includes('passwords.manage')&&(lower||actor.id===target.id),
   allowedPermissions:lower&&actor.role==='owner'?[...capabilities[target.role]]:[]};
 }
 function change(actor,target,kind,value){
- const permission={role:'roles.manage',permissions:'permissions.manage',suspend:'restrictions.apply',revoke:'restrictions.revoke'}[kind];
+ const permission={role:'roles.manage',permissions:'permissions.manage',password:'passwords.manage',suspend:'restrictions.apply',revoke:'restrictions.revoke'}[kind];
  requireAccess(actor,permission);
+ if(kind==='password'){
+  if(!actions(actor,target).canPassword)throw new HttpError(403,'Only the Owner can change passwords. Other Owner accounts are protected.');
+  return;
+ }
  if(!below(actor,target))throw new HttpError(403,'You cannot change your own account or an account with equal or higher authority. Owner accounts are protected.');
  const allowed=actions(actor,target);
  if(kind==='role'&&!allowed.roleOptions.includes(value.role))throw new HttpError(403,'That role assignment is not permitted.');

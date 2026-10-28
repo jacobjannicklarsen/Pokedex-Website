@@ -50,5 +50,5 @@ test('v0.5.0 preserves shared layout, trainer isolation and four-page navigation
   assert.ok(hub.includes('id="trainer-invitation"'));
   assert.match(hub,/<title>Trainer Hub — Dexhaven<\/title>/);
   const lock=JSON.parse(read('package-lock.json'));
-  assert.equal(lock.version,'0.7.0');assert.equal(lock.packages[''].version,'0.7.0');
+  assert.equal(lock.version,'0.7.1');assert.equal(lock.packages[''].version,'0.7.1');
 });

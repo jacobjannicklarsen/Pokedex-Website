@@ -4,11 +4,11 @@ const { ProgressionRepository } = require('./progression-repository');
 const { awardTeamBuilder } = require('./progression');
 const { CommunityRepository } = require('./community-repository');
 class Repository {
-  constructor(pool) { this.pool = pool; this.forums=new(require('./forums').Forums)(this,new(require('./forum-store').ForumStore)(pool,this)); this.administration = new(require('./admin-repository').AdminRepository)(pool); this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); }
+  constructor(pool) { this.pool = pool; this.forums=new(require('./forums').Forums)(this,new(require('./forum-store').ForumStore)(pool,this)); this.administration = new(require('./admin-repository').AdminRepository)(pool); this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); this.enhancements=new(require('./enhancements').Enhancements)(this); }
   async user(id) {
-    const [rows] = await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?', [id]);
-    return rows[0] || null;
+    let rows;try{[rows]=await this.pool.execute('SELECT id, username, email, bio, bio_format, avatar_filename, created_at FROM users WHERE id = ?',[id]);}catch(e){if(e.code!=='ER_BAD_FIELD_ERROR'||!e.message.includes('bio_format'))throw e;[rows]=await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?',[id]);}return rows[0]||null;
   }
+  async userByName(username){const [r]=await this.pool.execute('SELECT id, username, avatar_filename, created_at FROM users WHERE username=?',[username]);return r[0]||null;}
   async findLogin(identifier) {
     const [rows] = await this.pool.execute('SELECT id, password_hash FROM users WHERE username = ? OR email = ? LIMIT 1', [identifier, identifier]);
     return rows[0] || null;
@@ -17,8 +17,8 @@ class Repository {
     const [result] = await this.pool.execute('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)', [username, email, hash]);
     return this.user(result.insertId);
   }
-  async updateBio(userId, bio) {
-    await this.pool.execute('UPDATE users SET bio = ? WHERE id = ?', [bio, userId]);
+  async updateBio(userId, bio, format='plain') {
+    try{await this.pool.execute('UPDATE users SET bio = ?, bio_format = ? WHERE id = ?',[bio,format,userId]);}catch(e){if(e.code!=='ER_BAD_FIELD_ERROR'||!e.message.includes('bio_format'))throw e;if(format!=='plain')throw new HttpError(503,'Formatted biographies require the manual v0.7.1 migration.');await this.pool.execute('UPDATE users SET bio = ? WHERE id = ?',[bio,userId]);}
     return this.user(userId);
   }
   async updateAvatar(userId, filename) {

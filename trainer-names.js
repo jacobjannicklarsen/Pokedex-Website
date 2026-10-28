@@ -3,7 +3,7 @@
  'use strict';
  const labels={owner:'Owner',administrator:'Administrator',moderator:'Moderator'};
  function decorate(target,role){
-  const text=target.textContent;target.replaceChildren();target.classList.remove('staff-name');delete target.dataset.staffNameRole;
+  const text=target.textContent;target.dataset.member=text;target.replaceChildren();target.classList.remove('staff-name');delete target.dataset.staffNameRole;
   if(!Object.hasOwn(labels,role)){target.textContent=text;return;}
   target.classList.add('staff-name');target.dataset.staffNameRole=role;
   target.append(element('span','staff-name-text',text));

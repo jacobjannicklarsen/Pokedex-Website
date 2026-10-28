@@ -27,6 +27,7 @@
     }
   }
 
+  globalThis.DexhavenTheme={setPreference(value){if(!valid(value)&&value!=='system')throw Error('Unsupported theme.');preference=valid(value)?value:null;try{if(preference)localStorage.setItem(KEY,preference);else localStorage.removeItem(KEY);}catch{}applyTheme();}};
   preference = readPreference();
   applyTheme();
   system.addEventListener('change', () => { if (!preference) applyTheme(); });
