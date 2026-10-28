@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10171e">
+    <meta name="description" content="Private local GBA Game Library for the Dexhaven Owner.">
+    <meta property="og:site_name" content="Dexhaven">
+    <meta property="og:title" content="Game Library &mdash; Dexhaven">
+    <meta property="og:description" content="Private local GBA Game Library for the Dexhaven Owner.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Game Library &mdash; Dexhaven">
+    <meta name="twitter:description" content="Private local GBA Game Library for the Dexhaven Owner.">
+    <title>Game Library &mdash; Dexhaven</title>
+    <!-- Blocking, local theme setup runs before CSS and the first page paint. -->
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="games.css">
+    <link rel="stylesheet" href="trainer-cards.css">
+    <link rel="stylesheet" href="interactions.css">
+    <link rel="stylesheet" href="community.css">
+    <link rel="stylesheet" href="forums.css">
+    <link rel="stylesheet" href="community-expansion.css">
+    <script src="encyclopedia-data.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="encyclopedia.js" defer></script>
+    <script src="trainer-ranks.js" defer></script>
+    <script src="trainer-names.js" defer></script>
+    <script src="trainer-progress.js" defer></script>
+    <script src="rich-biography.js" defer></script>
+    <script src="profile-extras.js" defer></script>
+    <script src="account.js" defer></script>
+    <script src="gba-saves.js" defer></script>
+    <script src="gba-emulator.js" defer></script>
+    <script src="games.js" defer></script>
+    <script src="member-cards.js" defer></script>
+    <script src="forum-notifications.js" defer></script>
+</head>
+<body data-page="games">
+
+  <header class="site-header">
+    <a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a>
+    <span class="header-label">FIVE GENERATIONS. YOUR CHOICES.</span>
+    <div class="header-actions">
+      <span class="region"><i></i>Change theme</span>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme" hidden>
+        <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.2A8.8 8.8 0 0 1 10.8 3.5a8.8 8.8 0 1 0 9.7 9.7Z"></path></svg>
+      </button>
+      <button id="header-profile" class="header-profile" type="button" aria-label="Open account options" aria-expanded="false" aria-controls="profile-dropdown" data-requires-auth hidden>
+        <img id="header-avatar" alt="" width="36" height="36" hidden>
+        <span id="header-avatar-initial" aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
+  <nav class="trainer-nav" aria-label="Main navigation">
+    <a href="./" data-page="home">Home</a>
+    <a href="pokemon.html" data-page="pokemon">National Pokédex</a>
+    <a href="trainers.html" data-page="trainers">Trainer Hub</a>
+    <a href="community.html" data-page="community">Community</a>
+    <a href="forums.html" data-page="forums">Forums</a>
+    <a href="battle.html" data-page="battle">Battle Arena</a>
+    <a href="games.html" data-page="games" aria-current="page">Games</a>
+    <a href="dashboard.html" data-page="dashboard">Analytics</a>
+    <a href="about.html" data-page="about">About</a>
+    <a href="admin.html" data-staff-link hidden>Administration</a>
+    <span id="session-status" class="form-help" role="status">Checking session…</span>
+    <div id="guest-actions" class="guest-actions" hidden>
+      <button id="account-button" class="text-button" type="button">Log in</button>
+      <button id="register-button" class="text-button" type="button">Register</button>
+    </div>
+    <button id="logout-button" class="text-button" type="button" hidden>Log out</button>
+  </nav>
+<main id="main"><p id="account-message" class="account-message" role="status" hidden></p><header class="games-intro"><p class="eyebrow">SIX GAMES. YOUR NEXT ADVENTURE.</p><h1>A little nostalgia.<br><span>A whole new journey.</span></h1><p class="hero-description">Your private Game Boy Advance collection. Choose a title, press Play and return to the adventures you keep in this browser.</p></header><p id="games-status" class="notice" role="status" aria-live="polite">Checking the local Game Library...</p><section id="games-player" class="games-player" hidden><header><h2 id="games-player-title"></h2><button id="games-exit" class="text-button" type="button">Exit / Back to Games</button></header><div id="games-viewport" class="games-viewport"></div><p class="form-help">Save in-game before exiting. Use the player toolbar to export a backup or import a compatible raw .sav file.</p></section><section id="game-library" class="game-library" aria-label="Game Boy Advance collection"></section><p class="games-note">Games are available only to the Owner on the configured private local installation. In-game saves and emulator save states are different. Saves stay in this browser and are not synced to your trainer account. Clearing browser storage removes local progress, so export backups. Different ROM revisions keep separate saves.</p><noscript><p class="notice">Enable JavaScript to use the Game Library.</p></noscript></main>
+  <footer><a class="brand" href="./"><span class="pokeball" aria-hidden="true"></span>dexhaven<span>.</span></a><p>Made by Patrick, Lucas, Oscar & Jacob Jannick<br>Data & artwork from <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">PokéAPI ↗</a><br><span>An unofficial fan project. Pokémon © Nintendo / Game Freak</span></p><a href="#main">Back to top ↑</a></footer>
+  <dialog id="pokemon-dialog" aria-labelledby="detail-name"><button id="close-dialog" class="close-button" type="button" aria-label="Close Pokémon details">×</button><div id="detail-content"></div></dialog>
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <button id="close-auth" class="close-button" type="button" aria-label="Close account form">×</button>
+    <form id="auth-form" class="account-form">
+      <p class="eyebrow">WELCOME TO DEXHAVEN</p><h2 id="auth-title">Log in</h2>
+      <label id="username-label" hidden>Username<input id="auth-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+"></label>
+      <label id="email-label" hidden>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254"></label>
+      <label id="identifier-label">Username or email<input id="auth-identifier" name="identifier" autocomplete="username" maxlength="254" required></label>
+      <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <p id="password-help" class="form-help" hidden>Use 12–128 characters. Usernames use letters, numbers and underscores.</p>
+      <p id="auth-error" class="form-error" role="alert" hidden></p>
+      <button id="auth-submit" class="action-button" type="submit">Log in</button>
+      <button id="auth-switch" class="text-button" type="button">New here? Create an account</button>
+    </form>
+  </dialog>
+    
+</body>
+</html>

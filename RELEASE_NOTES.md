@@ -1,5 +1,9 @@
 # Dexhaven release notes
 
+## v0.7.2 - Game Library & Community Shoutbox (draft)
+
+See the [draft release notes](RELEASE_v0.7.2.md) and [implementation report](IMPLEMENTATION_v0.7.2.md). No release has been published; manual database/gameplay checks and the already-tracked ROM cleanup remain required.
+
 ## v0.7.1 - Community, Battles & Profile Customization (local development)
 
 - Added an eleven-section Account Settings page, optional personal fields, explicit

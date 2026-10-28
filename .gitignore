@@ -6,3 +6,13 @@ node_modules/
 uploads/
 coverage/
 *.log
+
+# Private local GBA ROM collection (already tracked files need manual removal)
+/Dexhaven-GBA/
+*.gba
+*.GBA
+*.sav
+*.srm
+# Reproducible third-party EmulatorJS runtime; install with npm run vendor:emulator
+/vendor/emulatorjs/
+/preview-dist/

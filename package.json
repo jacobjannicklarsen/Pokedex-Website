@@ -1,6 +1,6 @@
 {
   "name": "kanto-pokedex-app",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "Pokédex Website project — Dexhaven National Pokédex and Pokémon analytics, Generations I–V",
   "engines": {
@@ -18,7 +18,9 @@
     "vendor:chart": "node scripts/vendor-chart.cjs",
     "admin:bootstrap": "node scripts/bootstrap-owner.cjs",
     "data:battle": "node scripts/update-battle-data.cjs",
-    "vendor:battle": "node scripts/vendor-battle-simulator.cjs"
+    "vendor:battle": "node scripts/vendor-battle-simulator.cjs",
+    "vendor:emulator": "node scripts/vendor-emulator.cjs",
+    "build:preview": "node scripts/build-static-preview.cjs"
   },
   "dependencies": {
     "@pkmn/sim": "0.10.11",

@@ -1,6 +1,10 @@
-# Dexhaven v0.7.1 — Community, Battles & Profile Customization
+# Dexhaven v0.7.2 - Game Library & Community Shoutbox
 
-Version **0.7.1** adds Account Settings, avatar/banner cropping and explicit personal-field
+Version **0.7.2** adds the private six-game GBA library, automatic Owner-only local ROM loading, EmulatorJS/mGBA, browser-local saves and the homepage Community Shoutbox. This is an independent personal software project.
+
+Start with [Games and setup](GAME_LIBRARY.md), [manual Shoutbox migration](database/MIGRATION_v0.7.2.md), [implementation report](IMPLEMENTATION_v0.7.2.md) and [draft release](RELEASE_v0.7.2.md). **The Shoutbox migration has not been run. Six ROMs were already tracked in Git: remove their tracking/history before any public push or release.** No commit, push, release or deployment was performed.
+
+The preceding version **0.7.1** added Account Settings, avatar/banner cropping and explicit personal-field
 privacy, safe formatted biographies, grouped forums and polls, Staff Directory,
 member previews, following/blocking and bookmarks. The Arena now offers three AI
 difficulties, private saved simulation history, exact recorded replays and separate

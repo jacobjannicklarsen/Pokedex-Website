@@ -468,3 +468,25 @@ portrait effect into the shared class for Forums.
 
 Reviewed desktop setup/control screenshots and mobile battlefield/Patrick layouts.
 No SQL, battle-engine, package version, deployment or release changes were made.
+
+### v0.7.2 — Game Library and Community Shoutbox
+
+`npm.cmd test`: **173 passed, 0 failed, 2 skipped** out of 175 tests. Focused
+Chrome run with `QA_V072_ONLY=1` and `QA_V072_REAL_ROMS=1`: **6/6 groups passed**.
+These cover Shoutbox plain-text/privacy/posting/moderation, history beyond the
+200-message window, browser backup isolation/reload, player cleanup/message
+guards, mobile/tablet/desktop themes and actual boot/video/exit switching for
+all six authorized local ROMs. No commercial ROM fixtures were added or changed.
+
+Public preview build and scan passed: 87 files, with no private ROMs, saves,
+environment, runtime, player HTML, server/database or node_modules. Live Games
+returns 200; guest ROM access is 401 and direct private paths are 404. Shoutbox
+returns the expected controlled 503 until its **manual migration** is applied.
+
+Real MySQL persistence, physical-controller/audio/RTC and full commercial-game
+save/restore/import cycles remain pending owner checks. All six ROMs were already
+tracked before implementation and remain a public-release blocker. No migration,
+Git index/history rewrite, commit, push or deployment was performed. See
+[the full report](IMPLEMENTATION_v0.7.2.md),
+[setup/manual checklist](GAME_LIBRARY.md) and
+[Workbench instructions](database/MIGRATION_v0.7.2.md).

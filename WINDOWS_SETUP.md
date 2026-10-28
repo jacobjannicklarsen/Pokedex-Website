@@ -180,3 +180,8 @@ Owner review for the new forum capabilities; no accounts/permissions are rewritt
 automatically. Test MySQL persistence and privacy revocation before publishing.
 `npm.cmd run data:battle` is an explicit developer-only rebuild of the pinned
 public battle snapshot, not a database migration or normal startup step.
+
+
+## v0.7.2 private Game Library and Shoutbox
+
+Follow [GAME_LIBRARY.md](GAME_LIBRARY.md) for the local E: directory, environment entries, pinned runtime installation and six-game/manual-save checklist. Apply [the Shoutbox migration](database/MIGRATION_v0.7.2.md) manually in MySQL Workbench. Do not rerun db:setup on an existing database. Review the already-tracked ROM warning before any Git push.

@@ -6,6 +6,7 @@ class MemoryRepository {
     this.administration=new(require('./memory-admin.cjs').MemoryAdmin)(this);
     this.forums=new(require('../../server/forums').Forums)(this,new(require('./memory-forums.cjs').MemoryForums)(this));
     this.community = new (require('./memory-community.cjs').MemoryCommunity)(this);
+    this.shoutbox=new(require('../../server/shoutbox').Shoutbox)(this,new(require('./memory-shoutbox.cjs').MemoryShoutboxStore)(this));
     this.users = []; this.savedTeams = []; this.savedFavorites = new Map(); this.sequence = 0;
     this.collections = new Map(); this.awards = new Map();
     this.enhancements=new(require('../../server/enhancements').Enhancements)(this,new(require('./memory-extensions.cjs').MemoryExtensions)(this));

@@ -58,5 +58,5 @@ test('v0.6.1 schema changes are additive and retain every previous option; versi
   const check=`CONSTRAINT ck_decoration_${column} CHECK (${column} IN (${values.map(v=>"'"+v+"'").join(',')}))`;
   assert.ok((key==='titleStyle'?read('database/migrations/trainer-title-styles.sql'):sql).includes(check));assert.ok(schema.includes(check));
  }
- assert.equal(require('../package.json').version,'0.7.1');const lock=require('../package-lock.json');assert.equal(lock.version,'0.7.1');assert.equal(lock.packages[''].version,'0.7.1');
+ assert.equal(require('../package.json').version,'0.7.2');const lock=require('../package-lock.json');assert.equal(lock.version,'0.7.2');assert.equal(lock.packages[''].version,'0.7.2');
 });

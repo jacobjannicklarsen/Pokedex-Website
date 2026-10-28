@@ -4,7 +4,7 @@ const { ProgressionRepository } = require('./progression-repository');
 const { awardTeamBuilder } = require('./progression');
 const { CommunityRepository } = require('./community-repository');
 class Repository {
-  constructor(pool) { this.pool = pool; this.forums=new(require('./forums').Forums)(this,new(require('./forum-store').ForumStore)(pool,this)); this.administration = new(require('./admin-repository').AdminRepository)(pool); this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); this.enhancements=new(require('./enhancements').Enhancements)(this); }
+  constructor(pool) { this.pool = pool; this.shoutbox=new(require('./shoutbox').Shoutbox)(this,new(require('./shoutbox').ShoutboxStore)(pool,this)); this.forums=new(require('./forums').Forums)(this,new(require('./forum-store').ForumStore)(pool,this)); this.administration = new(require('./admin-repository').AdminRepository)(pool); this.progression = new ProgressionRepository(pool); this.community = new CommunityRepository(pool, this); this.enhancements=new(require('./enhancements').Enhancements)(this); }
   async user(id) {
     let rows;try{[rows]=await this.pool.execute('SELECT id, username, email, bio, bio_format, avatar_filename, created_at FROM users WHERE id = ?',[id]);}catch(e){if(e.code!=='ER_BAD_FIELD_ERROR'||!e.message.includes('bio_format'))throw e;[rows]=await this.pool.execute('SELECT id, username, email, bio, avatar_filename, created_at FROM users WHERE id = ?',[id]);}return rows[0]||null;
   }

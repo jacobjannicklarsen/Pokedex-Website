@@ -1,0 +1,14 @@
+# Defense in depth for Jekyll-based GitHub Pages previews.
+# Prefer the explicit public-only build: npm run build:preview.
+exclude:
+  - Dexhaven-GBA
+  - node_modules
+  - server
+  - tests
+  - database
+  - scripts
+  - uploads
+  - vendor/emulatorjs
+  - preview-dist
+  - gba-player.html
+  - .env

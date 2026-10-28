@@ -16,6 +16,8 @@ function configFromEnv(env = process.env) {
   if (production && parsed.protocol !== 'https:') throw Error('Production requires HTTPS APP_ORIGIN for Secure cookies.');
   return {
     production, port, host: env.HOST || '127.0.0.1', origin,
+    gbaEnabled:env.DEXHAVEN_ENABLE_GBA==='true'&&env.NODE_ENV==='development'&&(env.HOST||'127.0.0.1')==='127.0.0.1'&&env.TRUST_PROXY!=='true'&&parsed.protocol==='http:'&&['localhost','127.0.0.1'].includes(parsed.hostname),
+    gbaRomsDir:env.DEXHAVEN_GBA_ROMS_DIR?path.resolve(env.DEXHAVEN_GBA_ROMS_DIR):null,
     secret: env.SESSION_SECRET, trustProxy: env.TRUST_PROXY === 'true',
     uploadDir: path.join(__dirname, '../uploads/avatars'),
     db: { host: env.DB_HOST || '127.0.0.1', port: dbPort, user: env.DB_USER, password: env.DB_PASSWORD || '', database: 'pokedex_app', connectionLimit: 10, timezone: 'Z', charset: 'utf8mb4', multipleStatements: false }

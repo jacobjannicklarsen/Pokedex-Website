@@ -14,7 +14,7 @@ test('v0.6.2 schema is additive, preserves every existing account, and publishes
  assert.ok(sql.indexOf('INSERT INTO admin_state')>sql.indexOf('CREATE TABLE IF NOT EXISTS admin_audit_logs'));
  assert.ok(!/INSERT INTO (?:users|user_roles)/i.test(sql));
  for(const file of ['server/index.js','server/setup-db.js'])assert.ok(!read(file).includes('v0.6.2-ranks-administration.sql'));
- const metadata=require('../package-lock.json');assert.equal(require('../package.json').version,'0.7.1');assert.equal(metadata.version,'0.7.1');assert.equal(metadata.packages[''].version,'0.7.1');
+ const metadata=require('../package-lock.json');assert.equal(require('../package.json').version,'0.7.2');assert.equal(metadata.version,'0.7.2');assert.equal(metadata.packages[''].version,'0.7.2');
 });
 
 test('password audit migration expands the existing CHECK without changing records',()=>{

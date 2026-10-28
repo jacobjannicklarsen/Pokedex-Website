@@ -1,0 +1,17 @@
+.home-shoutbox { margin-block:32px 44px; padding:28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+.home-shoutbox h2 { font:600 clamp(24px,4vw,34px) 'Space Grotesk',sans-serif; margin:0 0 12px; }
+.home-shoutbox>.eyebrow { margin-bottom:12px; }
+.shoutbox-history { max-height:400px; overflow:auto; overscroll-behavior:contain; margin-block:16px; padding:4px 12px 4px 0; }
+.shoutbox-message { display:flex; align-items:start; gap:14px; padding:16px 0; border-bottom:1px solid var(--line); }
+.shoutbox-avatar { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; object-fit:cover; border:1px solid var(--line); background:var(--bg); border-radius:50%; color:var(--mint); }
+.shoutbox-copy { min-width:0; flex:1; }
+.shoutbox-meta { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; font-size:12px; }
+.shoutbox-meta time { color:var(--muted); font-size:10px; }
+.shoutbox-text { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.8; margin:12px 0 0; }
+.shoutbox-form { display:grid; grid-template-columns:1fr auto; gap:12px; padding-top:18px; border-top:1px solid var(--line); }
+.shoutbox-form label { grid-column:1/-1; display:grid; gap:10px; color:var(--muted); font-size:12px; }
+.shoutbox-form textarea { width:100%; min-height:90px; resize:vertical; border:1px solid var(--line); border-radius:10px; padding:14px; background:var(--bg); color:var(--text); font:16px 'DM Sans',sans-serif; }
+.shoutbox-guest { display:flex; flex-wrap:wrap; gap:18px; }
+.shoutbox-remove { margin-top:10px; color:#f4a19e; font-size:11px; }
+.shoutbox-confirm { width:min(520px,calc(100% - 28px)); }
+@media(max-width:500px) { .home-shoutbox { padding:20px; } .shoutbox-message { gap:10px; } }

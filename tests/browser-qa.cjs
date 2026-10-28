@@ -27,13 +27,13 @@ async function main() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const fixtureRepo=new MemoryRepository();
-  const app = await createApp({repo:fixtureRepo,store:new session.MemoryStore(),config:{origin,uploadDir,production:false,trustProxy:false,secret:'browser-fixture-only-secret-'.repeat(4)}});
+  const app = await createApp({repo:fixtureRepo,store:new session.MemoryStore(),config:{origin,uploadDir,production:false,host:'127.0.0.1',gbaEnabled:Boolean(process.env.QA_V072_REAL_ROMS),gbaRomsDir:path.join(root,'Dexhaven-GBA/ROMs'),trustProxy:false,secret:'browser-fixture-only-secret-'.repeat(4)}});
   server.on('request',(req,res)=>{
     const prefix='/preview/Pokedex-Website/';
     const pathname=new URL(req.url,origin).pathname;
     if(!pathname.startsWith(prefix))return app(req,res);
     const relative=pathname.slice(prefix.length)||'index.html';
-    const allowed=['settings.html','staff.html','battle-history.html','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.html','battle.html','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','data/battle-v5.json','about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-hub.css','community.css','trainer-names.js','interactions.css','trainer-ranks.js','admin.html','admin.css','admin.js','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png','images/prof_nicklas.png','images/prof_nicklas-cutout.png','images/patrick.png'];
+    const allowed=['games.html','games.js','games.css','gba-emulator.js','gba-saves.js','shoutbox.js','shoutbox.css','settings.html','staff.html','battle-history.html','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.html','battle.html','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','data/battle-v5.json','about.html','index.html','pokemon.html','trainers.html','dashboard.html','community.html','styles.css','trainer-hub.css','community.css','trainer-names.js','interactions.css','trainer-ranks.js','admin.html','admin.css','admin.js','trainer-cards.css','script.js','theme.js','pokemon-selector.js','account.js','avatar-cropper.js','trainer-progress.js','pokemon-data.js','advanced-filters.js','dashboard.js','encyclopedia-data.js','encyclopedia.js','team-analysis-data.js','team-analysis.js','community.js','profile-decorations.js','trainer-card-config.js','sprite-availability.js','pokemon-sprites.js','data/type-chart.json','data/pokemon-summary.json','vendor/chart.umd.js','artwork-fallback.svg','images/group-picture.png','images/prof_nicklas.png','images/prof_nicklas-cutout.png','images/patrick.png'];
     if(!allowed.includes(relative)){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Static preview: authenticated features require Express.'}));return;}
     const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
     res.setHeader('Content-Type',mime[path.extname(relative)]);fs.createReadStream(path.join(root,relative)).pipe(res);
@@ -93,6 +93,7 @@ async function main() {
     try { await fn(); results.push({ name, passed: true }); console.log(`PASS ${name}`); }
     catch (error) {
       results.push({ name, passed: false }); console.log(`FAIL ${name}: ${error.message}`);
+      if(process.env.QA_V072_ONLY){console.log('Script exceptions:',exceptions);console.log(await evaluate(`JSON.stringify(document.querySelector('#games-viewport iframe')?.contentWindow.qaRejections)`).catch(()=> 'Player diagnostics unavailable'));}
       console.log(await evaluate(`JSON.stringify({path:location.pathname,hash:location.hash,mode:window.qaMode,requests:window.qaRequests,message:document.querySelector('#account-message')?.textContent,retryHidden:document.querySelector('#trainer-catalog-retry')?.hidden,status:document.querySelector('#trainer-catalog-status')?.textContent})`).catch(()=> 'Diagnostic page state unavailable'));
       console.log(await evaluate(`JSON.stringify([...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth+1).slice(0,12).map(n=>({tag:n.tagName,class:n.className,width:n.getBoundingClientRect().width})))`).catch(()=> 'Geometry unavailable'));
     }
@@ -115,6 +116,7 @@ async function main() {
   await command('Network.setBlockedURLs', { urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*'] });
   await command('Fetch.enable',{patterns:[{urlPattern:'*raw.githubusercontent.com*',requestStage:'Request'}]});
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.qaRejections=[];addEventListener('unhandledrejection',e=>qaRejections.push(String(e.reason?.stack||e.reason)));
     window.qaRequests = 0; window.qaDetailRequests = 0; window.qaMode = 'ok'; window.qaSummaryRequests=0;window.qaSummaryMode='ok';
     window.qaResourceRequests={};window.qaResourceFailures=[];window.qaResourceDelay={};
     window.qaProgressReads=0;window.qaFailCollectionRead=false;window.qaFailCollectionWrite=false;
@@ -150,6 +152,7 @@ async function main() {
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await command('Page.navigate', { url: origin });
+  if(process.env.QA_V072_ONLY){await require('./support/v072-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_BATTLE_POLISH_ONLY){await require('./support/battle-polish-browser.cjs')({check,evaluate,command,waitFor,origin});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_DISCOVERY_ONLY){await require('./support/discovery-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}
   if(process.env.QA_V071_ONLY){await require('./support/v071-browser.cjs')({check,evaluate,command,waitFor,origin,repo:fixtureRepo});if(results.some(r=>!r.passed))process.exitCode=1;return;}

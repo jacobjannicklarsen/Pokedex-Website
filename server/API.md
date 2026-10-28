@@ -232,3 +232,10 @@ forged authors and stale versions are rejected. HTTP 400 validation, 401 login,
 The Battle Arena has no result-writing API or battle tables. `GET
 /data/battle-v5.json` serves its pinned public snapshot through the static
 allowlist; summaries are untrusted forum text only.
+
+
+## v0.7.2 Game Library and Shoutbox
+
+GET /api/shoutbox/messages supports before, limit (1-50) and up to 200 comma-separated ids for deletion reconciliation. POST accepts only {message}, requires the session/CSRF pipeline, enforces 500 characters, five-second cooldown, ten/minute/account and recent duplicates. DELETE /api/shoutbox/messages/:id accepts {reason} (5-300), requires current forums.moderate plus panel access/hierarchy and atomically soft-deletes/audits. Missing tables return 503 until the manual migration.
+
+GET /api/local/gba/games, /launch/:id, /rom/:id, /player?game=:id and /runtime/* are private development-only, loopback/Host/Origin/same-site/live Owner guarded. ROM ids use a fixed map; arbitrary filesystem queries are rejected. Launch returns SHA-256 identity and a revision-pinned ROM URL; a changed revision returns 409. No saves are accepted by these APIs. See GAME_LIBRARY.md for installation and public preview limitations.

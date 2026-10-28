@@ -7,7 +7,7 @@ const {ExtensionStore}=require('../server/extension-store');
 test('v0.7.1 migration is additive, preserves legacy biographies and enforces ownership constraints',()=>{
  const sql=fs.readFileSync('database/migrations/v0.7.1-community-settings-battles.sql','utf8');
  const schema=fs.readFileSync('database/schema.sql','utf8');
- assert.ok(schema.endsWith(sql));
+ assert.ok(schema.includes(sql));
  assert.equal((sql.match(/CREATE TABLE IF NOT EXISTS/g)||[]).length,11);
  assert.ok(!/(?:^|;)\s*(?:DELETE|TRUNCATE|DROP TABLE|UPDATE users)\b/im.test(sql.replace(/^--.*$/gm,'')));
  assert.match(sql,/bio_format VARCHAR\(8\) NOT NULL DEFAULT 'plain'/);

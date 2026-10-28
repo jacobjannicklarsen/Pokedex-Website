@@ -138,6 +138,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     const team = await repo.community.publicTeam(community.shareId(req.params.shareId));
     return { team, analysis: teamAnalysis.analyze(team.pokemonIds, speciesData, typeChart.resources) };
   }));
+  require('./shoutbox').routes(app,repo,true);
   require('./forum-routes').routes(app,repo,true);
   require('./enhancement-routes').routes(app,repo,{config,publicOnly:true});
   app.use('/api', async (req, res, next) => {
@@ -148,6 +149,8 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
     req.user = user;
     next();
   });
+  require('./shoutbox').routes(app,repo);
+  require('./gba').routes(app,{config,root});
   require('./admin-routes').routes(app,repo);
   require('./forum-routes').routes(app,repo);
   require('./enhancement-routes').routes(app,repo,{config});
@@ -236,7 +239,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 
   // Explicit allowlist: never expose .env, SQL, source, tests or node_modules.
-  for (const asset of ['community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
+  for (const asset of ['shoutbox.js','shoutbox.css','games.js','games.css','gba-saves.js','gba-emulator.js','gba-player.js','community-expansion.css','settings.js','member-cards.js','staff.js','profile-extras.js','rich-biography.js','forum-discovery.js','forum-polls.js','battle-recording.js','battle-history.js','forums.css','forums.js','forum-admin.js','forum-notifications.js','battle.css','battle.js','battle-data.js','battle-calculations.js','battle-engine.js','battle-engine-legacy.js','battle-simulator.js','vendor/battle-simulator.js','battle-runner.js','styles.css', 'trainer-hub.css', 'community.css', 'trainer-names.js', 'interactions.css', 'admin.css', 'admin.js', 'trainer-ranks.js', 'trainer-cards.css', 'script.js', 'theme.js', 'pokemon-selector.js', 'account.js', 'avatar-cropper.js', 'pokemon-data.js', 'advanced-filters.js', 'dashboard.js', 'encyclopedia-data.js', 'encyclopedia.js', 'trainer-progress.js', 'team-analysis-data.js', 'team-analysis.js', 'community.js', 'profile-decorations.js', 'trainer-card-config.js', 'sprite-availability.js', 'pokemon-sprites.js', 'artwork-fallback.svg']) {
     app.get(`/${asset}`, (req, res) => res.sendFile(path.join(root, asset)));
   }
   app.get('/images/group-picture.png', (req, res) => res.sendFile(path.join(root, 'images/group-picture.png')));
@@ -263,6 +266,7 @@ async function createApp({ repo, store, config, authLimit = 30 }) {
   app.get('/data/pokemon-summary.json', (req, res) => res.sendFile(path.join(root, 'data/pokemon-summary.json')));
   app.get('/data/type-chart.json', (req, res) => res.sendFile(path.join(root, 'data/type-chart.json')));
   app.get('/vendor/chart.umd.js', (req, res) => res.sendFile(path.join(root, 'vendor/chart.umd.js')));
+  app.get('/games.html',(req,res)=>res.sendFile(path.join(root,'games.html')));
   app.get('/trainers.html', (req, res) => res.sendFile(path.join(root, 'trainers.html')));
   app.get('/community.html', (req, res) => res.sendFile(path.join(root, 'community.html')));
   app.get('/admin.html', (req,res)=>res.set('Cache-Control','no-store').sendFile(path.join(root,'admin.html')));
