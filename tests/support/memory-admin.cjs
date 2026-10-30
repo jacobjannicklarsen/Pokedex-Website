@@ -13,12 +13,19 @@ class MemoryAdmin{
  async change(actorId,targetId,kind,value){return this.atomic(async()=>{
   const actor={id:actorId,...await this.access(actorId)},target=await this.target(targetId);policy.change(actor,target,kind,value);if(value.version!==target.roleVersion)throw new HttpError(409,'This account changed. Refresh the user list before trying again.');
   const role={role:target.role,permissions:this.roles.get(targetId)?.permissions??null,roleVersion:target.roleVersion+1};
-  if(kind==='password'){
+  if(kind==='password'||kind==='username'){
    if((await this.repo.user(actorId)).password_hash!==value.actorHash)throw new HttpError(409,'Your credentials changed.');
    const settings=await this.repo.enhancements.settings.owned(this.repo.enhancements.store,targetId);
    await this.repo.enhancements.store.update('settings',settings.id,{securityVersion:settings.securityVersion+1});
-   this.repo.users.find(u=>u.id===targetId).password_hash=value.hash;
-   this.record(actor,target,'password.change',{reason:value.reason,sessionsRevoked:true});
+   if(kind==='username'){
+    if(target.username===value.newUsername)throw new HttpError(400,'Choose a different username.');
+    if(this.repo.users.some(u=>u.id!==targetId&&u.username.toLowerCase()===value.newUsername.toLowerCase()))throw new HttpError(409,'That username is already taken.');
+    this.repo.users.find(u=>u.id===targetId).username=value.newUsername;
+    this.record(actor,target,'username.change',{from:target.username,to:value.newUsername,reason:value.reason,sessionsRevoked:true});
+   }else{
+    this.repo.users.find(u=>u.id===targetId).password_hash=value.hash;
+    this.record(actor,target,'password.change',{reason:value.reason,sessionsRevoked:true});
+   }
   }
   if(kind==='role'){role.role=value.role;if(actor.role==='owner')role.permissions=null;this.record(actor,target,'role.change',{from:target.role,to:value.role,reason:value.reason});}
   if(kind==='permissions'){role.permissions=[...value.permissions];this.record(actor,target,'permissions.change',{from:target.permissions,to:value.permissions,reason:value.reason});}

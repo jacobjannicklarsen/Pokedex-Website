@@ -61,13 +61,6 @@
 :root[data-theme="light"] .member-block { color:#a32032; border-color:#d88992; background:#fff0f1; }
 @media(hover:hover) { :root[data-theme="light"] .member-block:not(:disabled):hover { color:#fff; border-color:#a32032; background:#a32032; } }
 @media(prefers-reduced-motion:reduce) { .member-social-button { transition:none; } }
-.member-popover { position:fixed; z-index:50; max-height:calc(100vh - 24px); overflow:auto; background:var(--panel); border:1px solid var(--mint); border-radius:18px; box-shadow:0 18px 55px #0005; padding:0; }
-.member-popover>.form-help { padding:20px; }
-.member-popover>.text-button { margin:10px 20px; }
-.member-popover .member-card { border:0; border-radius:16px; box-shadow:none; padding-inline:20px; }
-.member-popover .trainer-avatar { width:72px; height:72px; }
-.member-popover .avatar-frame { --avatar-size:72px; }
-.member-popover .rank-details { font-size:11px; max-width:100%; }
 .forum-secondary-nav { display:flex; flex-wrap:wrap; gap:10px 18px; padding:16px 0; margin-bottom:24px; border-bottom:1px solid var(--line); align-items:center; font-size:12px; }
 .forum-secondary-nav a { min-height:44px; display:flex; align-items:center; color:var(--muted); }
 .forum-secondary-nav a:hover { color:var(--mint); }
@@ -181,3 +174,196 @@
 .battle-recording-option { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:12px; }
 .battle-recording-option input { accent-color:var(--mint); }
 @media(max-width:700px) { .history-statistics { grid-template-columns:1fr 1fr; } .replay-scene { grid-template-columns:1fr; gap:16px; } }
+.member-card[data-staff-role=owner] { --directory-role:#d5ae65; }
+.member-card[data-staff-role=administrator] { --directory-role:#b39ae8; }
+.member-card[data-staff-role=moderator] { --directory-role:#80cdb1; }
+.member-card { --directory-role:var(--mint); }
+.member-card-top { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; }
+.member-card-stamp { font-size:9px; font-weight:700; letter-spacing:1.5px; color:var(--muted); max-width:105px; line-height:1.8; text-align:right; }
+:is(.staff-directory-list,.discovery-members) .member-card { border-radius:20px; transition:border-color .18s,box-shadow .18s; }
+:is(.staff-directory-list,.discovery-members) .member-card-top { width:calc(100% + 48px); margin:-24px -24px 0; padding:24px; border-bottom:1px solid var(--line); background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--directory-role) 18%,transparent),transparent 75%); }
+.staff-directory-list .member-card { min-height:360px; }
+.staff-directory-list .member-card .avatar-frame { --avatar-size:88px; }
+.staff-directory-list .member-card h3 { font-size:25px; }
+.staff-directory-list .member-card-stamp,.discovery-members .member-card-stamp { color:#f2fff8; text-shadow:0 1px 4px #0008; }
+.member-card .trainer-motto-inline { max-width:none; margin:12px 0 0; text-align:left; font-size:11px; }
+.member-card .trainer-identity-copy { width:100%; }
+.member-card .trainer-decoration-copy:has(.trainer-badge-shelf:empty) { display:none; }
+.member-card .trainer-title-ribbon { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.member-card-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:14px; }
+.member-card-stats>span { display:grid; gap:5px; padding:10px 6px; border:1px solid var(--line); border-radius:8px; background:var(--bg); }
+.member-card-stats strong { font:600 19px 'Space Grotesk',sans-serif; }
+.member-card-stats small { color:var(--muted); font-size:9px; }
+.staff-group[data-staff-group=owner] { --group-accent:#d5ae65; }
+.staff-group[data-staff-group=administrator] { --group-accent:#b39ae8; }
+.staff-group[data-staff-group=moderator] { --group-accent:#80cdb1; }
+.staff-group-heading { border-left:3px solid var(--group-accent,var(--mint)); padding-left:16px; }
+.staff-directory-list .member-card-actions>a { width:100%; justify-content:center; display:flex; border-radius:10px; min-height:44px; }
+.staff-directory-list .member-card-actions { width:100%; }
+.staff-group-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 24px; }
+.staff-group-heading>.form-help { max-width:450px; margin:0; }
+.staff-directory-tools { border:1px solid var(--line); border-radius:16px; padding:20px; background:color-mix(in srgb,var(--panel) 60%,transparent); }
+.staff-role-filters button[aria-pressed=true] { color:#102820; }
+.member-card .trainer-identity-meta { align-items:flex-start; gap:7px; }
+.member-card .trainer-identity-meta>span:has(.rank-card) { display:block; min-width:0; }
+:is(.member-card,.profile-identity) .trainer-identity-meta :is(.staff-badge,.community-staff-label,.rank-badge,.trainer-title-ribbon) { min-height:36px; height:36px; margin:0; padding:6px 10px; border-radius:9px; font:600 11px/1 'DM Sans',sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+:is(.member-card,.profile-identity) .rank-mark { font-size:16px; line-height:1; }
+:is(.member-card,.profile-identity) .rank-card { margin:0; display:block; }
+:is(.member-card,.profile-identity) .rank-details { padding:12px; font-size:11px; width:240px; max-width:100%; }
+.members-directory-tools { display:flex; flex-wrap:wrap; gap:16px; padding:18px; border:1px solid var(--line); border-radius:15px; background:var(--panel); }
+.members-directory-tools label { display:grid; gap:8px; color:var(--muted); font-size:11px; flex:1 1 230px; min-width:0; }
+.members-directory-tools label:last-child { flex:0 1 230px; }
+.members-directory-tools :is(input,select) { width:100%; max-width:none; min-width:0; min-height:44px; padding:11px 12px; border:1px solid var(--line); border-radius:9px; background:var(--bg); color:var(--text); font:14px 'DM Sans',sans-serif; }
+.members-filter-status { margin:12px 0 20px; }
+.discovery-members .member-card h3 { font-size:22px; }
+.discovery-members .member-card .avatar-frame { --avatar-size:72px; }
+.discovery-members .member-card-actions { width:100%; }
+.discovery-members .member-card-actions>a { border-radius:9px; min-height:42px; display:inline-flex; align-items:center; }
+.discovery-members .discovery-empty { grid-column:1/-1; }
+@media(hover:hover) { :is(.staff-directory-list,.discovery-members) .member-card:hover { border-color:var(--directory-role); box-shadow:0 8px 28px #00000018; } }
+.public-profile-page { padding-bottom:24px; }
+.public-profile-page>.community-back-link { margin-top:8px; margin-bottom:12px; }
+.public-profile-page .profile-identity { display:grid; grid-template-columns:96px minmax(0,1fr); align-items:center; gap:22px; padding:24px; margin:0 0 22px; border-radius:20px; }
+.public-profile-page .profile-identity .trainer-identity-copy { min-width:0; }
+.public-profile-page .profile-identity .avatar-frame { --avatar-size:96px; }
+.public-profile-page .profile-identity .trainer-avatar { font-size:36px; }
+.public-profile-page .profile-identity::before,.public-profile-page .profile-identity>.card-finish { height:5px; }
+.public-profile-page .profile-identity .public-profile-name { font-size:clamp(24px,3vw,34px); letter-spacing:-.8px; }
+.public-profile-page .profile-role-heading { margin:0 0 10px; font-size:9px; letter-spacing:1.7px; }
+.public-profile-page .profile-identity .trainer-identity-meta { align-items:flex-start; margin-top:12px; }
+.public-profile-page .profile-identity .trainer-motto-inline { margin:12px 0 0; max-width:60ch; font-size:12px; text-align:left; }
+.public-profile-page .profile-identity .trainer-decoration-copy:has(.trainer-badge-shelf:empty) { display:none; }
+.public-profile-page .profile-identity .trainer-badge-shelf { margin-top:12px; }
+.public-profile-page .profile-identity>.profile-custom-banner { height:84px; }
+.public-profile-page .profile-identity:has(>.profile-custom-banner) { padding-top:106px; }
+.public-profile-layout { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:22px; align-items:start; }
+.public-profile-main,.public-profile-sidebar { display:grid; gap:18px; min-width:0; }
+.profile-section { min-width:0; padding:22px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+.profile-section-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+.profile-section-heading h2 { font:600 17px 'Space Grotesk',sans-serif; margin:0; letter-spacing:-.3px; }
+.profile-section-count { display:grid; place-items:center; min-width:26px; min-height:24px; padding:3px 7px; border:1px solid var(--line); border-radius:7px; font-size:11px; color:var(--muted); }
+.public-profile-page .profile-biography { white-space:pre-wrap; font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
+.public-profile-page .profile-biography>:first-child { margin-top:0; }
+.public-profile-page .profile-biography>:last-child { margin-bottom:0; }
+.profile-facts { display:grid; gap:0; margin:0; font-size:12px; }
+.profile-facts>div { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-block:10px; border-bottom:1px solid var(--line); }
+.profile-facts>div:first-child { padding-top:0; }
+.profile-facts>div:last-child { border:0; padding-bottom:0; }
+.profile-facts dt { color:var(--muted); }
+.profile-facts dd { margin:0; text-align:right; overflow-wrap:anywhere; }
+.profile-public-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.profile-public-links .text-button { padding:7px 0; font-size:11px; }
+.profile-activity-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.profile-activity-stats>div { border:1px solid var(--line); border-radius:10px; padding:12px; background:var(--bg); }
+.profile-activity-stats strong { display:block; font:600 23px 'Space Grotesk',sans-serif; }
+.profile-activity-stats span { color:var(--muted); font-size:10px; }
+.profile-recent-discussions { margin-top:14px; }
+.profile-discussion-link { display:block; padding:10px 0; font-size:12px; border-top:1px solid var(--line); line-height:1.6; overflow-wrap:anywhere; }
+.profile-discussion-link:hover { color:var(--accent-ink,var(--mint)); }
+.public-team-card { padding:16px; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
+.public-team-card+.public-team-card { margin-top:12px; }
+.public-team-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.public-team-heading h3 { margin:0; font:600 15px 'Space Grotesk',sans-serif; overflow-wrap:anywhere; }
+.profile-featured-tag { border:1px solid var(--line); border-radius:6px; padding:5px 7px; font-size:9px; color:var(--accent-ink,var(--mint)); }
+.public-profile-page .shared-roster { grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin:14px 0; }
+.public-profile-page .shared-pokemon { padding:10px 4px; gap:7px; border-radius:9px; background:var(--panel); }
+.public-profile-page .shared-pokemon .pokemon-sprite { width:48px; height:48px; max-width:100%; object-fit:contain; }
+.public-profile-page .shared-pokemon strong { font-size:10px; line-height:1.5; }
+.public-profile-page .shared-pokemon .type-badge { padding:3px 5px; font-size:8px; }
+.public-profile-page .empty-public-slot { font-size:9px; justify-content:center; color:var(--muted); }
+.profile-team-link { display:inline-block; padding-block:5px; color:var(--accent-ink,var(--mint)); font-size:11px; }
+.public-profile-page .profile-partner .shared-roster { display:block; margin-bottom:0; }
+.public-profile-page .profile-partner .shared-pokemon { background:transparent; border:0; padding:4px; gap:10px; }
+.public-profile-page .profile-partner .pokemon-sprite { width:112px; height:112px; }
+.public-profile-page .profile-partner .shared-pokemon strong { font-size:13px; }
+.profile-favourites>.action-button { font-size:11px; margin-top:4px; min-height:40px; }
+.profile-completion-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.profile-completion-item { padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); min-width:0; }
+.profile-completion-item>span { display:block; color:var(--muted); font-size:10px; }
+.profile-completion-item strong { display:block; font:600 19px 'Space Grotesk',sans-serif; margin:8px 0; }
+.profile-completion-item progress { width:100%; height:6px; accent-color:var(--mint); }
+.profile-completion-item small { display:block; color:var(--muted); font-size:9px; line-height:1.7; margin-top:6px; }
+.profile-achievements>summary { cursor:pointer; list-style:none; margin-bottom:0; min-height:30px; }
+.profile-achievements>summary::-webkit-details-marker { display:none; }
+.profile-achievements>summary h2::after { content:''; display:inline-block; width:7px; height:7px; margin:0 0 3px 10px; border-right:1.5px solid var(--accent-ink,var(--mint)); border-bottom:1.5px solid var(--accent-ink,var(--mint)); transform:rotate(45deg); }
+.profile-achievements[open]>summary { margin-bottom:18px; }
+.profile-achievements[open]>summary h2::after { transform:rotate(225deg); margin-bottom:0; }
+.profile-award-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.profile-award { display:flex; gap:10px; border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; background:var(--bg); }
+.profile-award-icon { flex-shrink:0; font-size:20px; color:var(--mint); }
+.profile-award h3 { margin:0 0 6px; font:600 12px 'Space Grotesk',sans-serif; }
+.profile-award p,.profile-award small { font-size:10px; line-height:1.7; color:var(--muted); margin:0; }
+.profile-award small { display:block; margin-top:7px; }
+@media(max-width:1000px) { .public-profile-layout { grid-template-columns:minmax(0,1fr) 240px; gap:16px; } .profile-section { padding:18px; } .public-profile-page .shared-roster { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:760px) { .public-profile-layout { grid-template-columns:1fr; } .public-profile-sidebar { grid-template-columns:1fr 1fr; grid-row:1; } .public-profile-page .profile-identity { grid-template-columns:80px minmax(0,1fr); padding:20px; gap:16px; } .public-profile-page .profile-identity .avatar-frame { --avatar-size:80px; } .public-profile-page .profile-identity:has(>.profile-custom-banner) { padding-top:102px; } .members-directory-tools label:last-child { flex:1 1 180px; } .public-profile-page .profile-identity .trainer-motto-inline { max-width:none; text-align:left; margin:12px 0 0; } }
+@media(max-width:480px) { .public-profile-sidebar { grid-template-columns:1fr; } .public-profile-page .profile-identity { grid-template-columns:1fr; } .profile-section { padding:16px; } .profile-completion-grid { grid-template-columns:1fr 1fr; } .profile-award-grid { grid-template-columns:1fr; } .profile-activity-stats>div { padding:10px 6px; } .profile-activity-stats strong { font-size:20px; } .public-team-card { padding:12px; } }
+/* Direct avatar links and readable public profile facts/activity. */
+.member-card-portrait { display:inline-flex; flex-shrink:0; border-radius:50%; }
+.forum-avatar-link { display:inline-flex; flex-shrink:0; border-radius:14px; }
+.profile-facts>div.profile-fact-date { grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr); gap:8px; }
+.profile-facts .profile-fact-date dd { text-align:right; line-height:1.7; }
+.profile-birthday-value { display:grid; gap:2px; }
+.profile-fact-age { display:block; white-space:nowrap; color:var(--muted); font-size:11px; }
+.profile-discussion-entry { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:5px 12px; padding:12px 0; border-top:1px solid var(--line); }
+.profile-discussion-category { grid-column:1; margin:0; color:var(--muted); font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+.profile-discussion-entry .profile-discussion-link { grid-column:1; padding:0; border:0; font-weight:600; }
+.profile-activity-kind { grid-column:2; grid-row:1/3; align-self:center; padding:5px 8px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:10px; white-space:nowrap; }
+@media(max-width:480px) { .profile-discussion-entry { gap:5px 8px; } .profile-activity-kind { padding:4px 6px; } }
+/* A forum-style staff roster: compact rows, clear roles and real shared statistics. */
+.staff-intro { padding-block:36px 26px; }
+.staff-intro h1 { font-size:clamp(32px,4vw,48px); }
+.staff-directory-note { padding:16px 20px; margin-bottom:22px; }
+.staff-directory-tools { display:flex; align-items:flex-end; flex-wrap:wrap; gap:16px 24px; padding:18px; border-radius:12px; }
+.staff-directory-tools .staff-search { flex:1 1 230px; min-width:0; }
+.staff-directory-tools .staff-role-filters { flex:1 1 360px; margin:0; }
+.staff-clear { margin-left:auto; font-size:11px; }
+.staff-directory-list .staff-group { margin-bottom:28px; }
+.staff-group-heading { margin-bottom:14px; padding-block:4px; }
+.staff-group-heading h2 { display:inline-flex; align-items:center; gap:9px; font-size:20px; }
+.staff-group-heading .staff-role-icon { color:var(--group-accent); width:20px; height:20px; }
+.staff-directory-list .staff-rows { display:block; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:color-mix(in srgb,var(--bg) 65%,var(--panel)); }
+.staff-directory-list .member-card.staff-row { display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:20px; min-height:122px; margin:0; padding:22px 24px; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; box-shadow:none; }
+.staff-directory-list .staff-row:last-child { border-bottom:0; }
+.staff-directory-list .staff-row:hover { background:color-mix(in srgb,var(--directory-role) 4%,transparent); }
+.staff-row .staff-row-portrait { display:inline-flex; width:56px; height:56px; border-radius:50%; }
+.staff-row .trainer-avatar { width:56px; height:56px; border:1px solid var(--line); border-radius:50%; object-fit:cover; background:var(--panel); font-size:22px; }
+.staff-row-copy { min-width:0; }
+.staff-directory-list .staff-row h3 { margin:0 0 8px; font:600 16px/1.5 'DM Sans',sans-serif; }
+.staff-row-description { margin:0 0 6px; color:var(--muted); font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.staff-row-facts { display:flex; flex-wrap:wrap; gap:4px 14px; color:var(--muted); font-size:11px; line-height:1.7; }
+.staff-row-facts strong { color:var(--text); font-weight:500; }
+.staff-row-actions { display:grid; justify-items:end; gap:12px; }
+.staff-row-actions .community-staff-label { margin:0; min-height:26px; padding:5px 9px; border-radius:6px; font-size:10px; }
+.staff-row-profile { color:var(--muted); font-size:11px; padding-block:4px; }
+.staff-row-profile::after { content:'\2197'; margin-left:7px; color:var(--directory-role); }
+.staff-row-profile:hover { color:var(--text); }
+.staff-row-private { color:var(--muted); font-size:10px; }
+@media(max-width:600px) {
+ .staff-directory-tools { padding:14px; gap:12px; }
+ .staff-directory-tools .staff-role-filters { flex-basis:100%; }
+ .staff-directory-list .member-card.staff-row { grid-template-columns:44px minmax(0,1fr); align-items:start; gap:12px; padding:18px 14px; }
+ .staff-row .staff-row-portrait,.staff-row .trainer-avatar { width:44px; height:44px; }
+ .staff-directory-list .staff-row h3 { font-size:14px; }
+ .staff-row-actions { grid-column:2; display:flex; justify-items:initial; align-items:center; flex-wrap:wrap; gap:10px 16px; }
+ .staff-row-description { font-size:11px; }
+ .staff-row-facts { gap:3px 10px; font-size:10px; }
+ .staff-group-heading>.form-help { font-size:11px; }
+}
+/* The member card's account role is a compact, readable badge. */
+.discovery-members .member-card .member-card-stamp { display:inline-flex; align-items:center; justify-content:center; gap:6px; flex-shrink:0; max-width:160px; padding:7px 10px; border:1px solid color-mix(in srgb,var(--directory-role) 45%,var(--line)); border-radius:8px; background:color-mix(in srgb,var(--panel) 90%,transparent); color:var(--text); text-shadow:none; font:600 11px/1.4 'DM Sans',sans-serif; letter-spacing:0; text-align:left; }
+.member-card-role-label { min-width:0; overflow-wrap:normal; }
+.discovery-members .member-card-stamp .staff-role-icon { width:15px; height:15px; flex-basis:15px; }
+/* Social controls remain beside the trainer identity instead of inside the facts. */
+.profile-social { display:flex; align-items:center; flex-wrap:wrap; gap:10px 18px; margin-top:16px; }
+.profile-follower-count { display:flex; align-items:baseline; gap:7px; padding-right:16px; border-right:1px solid var(--line); }
+.profile-follower-count strong { font:600 20px 'Space Grotesk',sans-serif; color:var(--text); }
+.profile-follower-count>span { color:var(--muted); font-size:11px; }
+.profile-social-buttons { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.profile-social-buttons .member-social-button { min-height:36px; padding:8px 12px; font-size:11px; border-radius:8px; }
+.profile-social-buttons .member-follow::before { content:'+'; font-size:16px; line-height:1; }
+.profile-social-buttons .member-follow[aria-pressed=true]::before { content:'\2212'; }
+.profile-social-buttons .member-block::before { content:''; display:block; width:11px; height:11px; border:1.3px solid currentColor; border-radius:50%; background:linear-gradient(45deg,transparent 44%,currentColor 45% 55%,transparent 56%); }
+.profile-social-status { flex-basis:100%; margin:0; color:var(--muted); font-size:11px; line-height:1.6; }
+.profile-social-status:empty { display:none; }
+.profile-social-buttons .member-social-button:disabled { opacity:.5; cursor:default; }
+@media(max-width:480px) { .discovery-members .member-card .member-card-stamp { max-width:145px; padding:6px 8px; font-size:10px; } .profile-social { column-gap:12px; } .profile-follower-count { padding-right:12px; } }

@@ -8,7 +8,7 @@ test('v0.6.2 schema is additive, preserves every existing account, and publishes
   const re=new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?ENGINE=InnoDB;`);
   // The later password audit migration expands only this action constraint.
   const current=schema.match(re)[0],original=sql.match(re)[0];
-  assert.equal(table==='admin_audit_logs'?current.replace(",'password.change'",''):current,original);
+  assert.equal(table==='admin_audit_logs'?current.replace(",'password.change'",'').replace(",'username.change'",''):current,original);
  }
  assert.match(sql,/UNIQUE KEY uq_protected_owner/);assert.match(sql,/GENERATED ALWAYS AS.*role = 'owner'/);assert.match(sql,/role VARCHAR\(16\) NOT NULL DEFAULT 'trainer'/);assert.match(sql,/fk_audit_target.*ON DELETE RESTRICT/);
  assert.ok(sql.indexOf('INSERT INTO admin_state')>sql.indexOf('CREATE TABLE IF NOT EXISTS admin_audit_logs'));
@@ -22,6 +22,6 @@ test('password audit migration expands the existing CHECK without changing recor
  assert.match(sql,/ALTER TABLE admin_audit_logs/);assert.match(sql,/DROP CHECK ck_audit_action/);
  const constraint=/ADD CONSTRAINT ck_audit_action CHECK \(action IN\s*\(([\s\S]*?)\)\)/;
  const values=sql.match(constraint)[1].replace(/\s+/g,'');
- assert.equal(values,schema.match(/CONSTRAINT ck_audit_action CHECK \(action IN \(([^)]+)\)\)/)[1]);
+ assert.equal(values,schema.replace(",'username.change'",'').match(/CONSTRAINT ck_audit_action CHECK \(action IN \(([^)]+)\)\)/)[1]);
  assert.ok(!/\b(?:DROP TABLE|DROP DATABASE|DELETE FROM|TRUNCATE)\b/i.test(sql));
 });

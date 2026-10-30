@@ -29,3 +29,53 @@ test('follows, two-way blocks, bookmarks and notification preferences enforce ow
  const thread=(await a.c.call('/api/forums/threads',{method:'POST',body:{categoryId:2,title:'A social discussion',body:'A substantive discussion for the community to join.'}})).data.id,post=(await a.c.call('/api/forums/threads/'+thread)).data.posts[0];assert.equal((await patch(b.c,`/api/forums/posts/${post.id}/reaction`,{})).status,403);await b.c.call('/api/social/blocked/social_alice',{method:'DELETE'});await patch(b.c,'/api/settings/notifications',{...rules.notificationDefaults(),mentions:false,replies:false,watched:false});await patch(b.c,`/api/forums/threads/${thread}/follow`,{});await a.c.call(`/api/forums/threads/${thread}/posts`,{method:'POST',body:{body:'@social_bob this notification is disabled.'}});assert.equal((await b.c.call('/api/notifications')).data.items.length,1);
  for(let i=0;i<2;i++)await patch(a.c,'/api/bookmarks/'+thread,{});assert.equal((await a.c.call('/api/bookmarks')).data.items.length,1);assert.equal((await b.c.call('/api/bookmarks')).data.items.length,0);await repo.forums.store.update('threads',thread,{visibility:'hidden'});assert.equal((await a.c.call('/api/bookmarks')).data.items.length,0);assert.equal((await a.c.call('/api/notifications/read-all',{method:'PUT'})).status,200);
 });
+
+test('published profile gender labels are readable and still follow the gender privacy switch',async t=>{
+ const {repo,register,client}=await setup(t),a=await register('gender_labels'),guest=client();
+ await repo.community.saveSettings(a.user.id,{...await repo.community.settings(a.user.id),enabled:true});
+ await patch(a.c,'/api/settings/privacy',{...rules.privacyDefaults(),gender:true});
+ for(const [gender,label]of [['man','Male'],['woman','Female'],['unspecified','Unspecified']]){
+  await patch(a.c,'/api/settings/profile',{...rules.profileDefaults(),gender});
+  assert.equal((await guest.call('/api/public/trainers/gender_labels')).data.profile.details.gender,label);
+ }
+ await patch(a.c,'/api/settings/privacy',rules.privacyDefaults());
+ assert.equal((await guest.call('/api/public/trainers/gender_labels')).data.profile.details,undefined);
+});
+
+test('published forum activity includes category, exact post and posted/replied labels without exposing hidden discussions',async t=>{
+ const {repo,register,client}=await setup(t),a=await register('activity_labels'),guest=client();
+ await repo.community.saveSettings(a.user.id,{...await repo.community.settings(a.user.id),enabled:true});
+ await patch(a.c,'/api/settings/privacy',{...rules.privacyDefaults(),activity:true});
+ const thread=(await a.c.call('/api/forums/threads',{method:'POST',body:{categoryId:2,title:'Our next adventure',body:'A substantive discussion about our next adventure.'}})).data.id;
+ const starter=(await a.c.call('/api/forums/threads/'+thread)).data.posts[0];
+ const reply=(await a.c.call('/api/forums/threads/'+thread+'/posts',{method:'POST',body:{body:'I would like to join this adventure as well.'}})).data.id;
+ let p=(await guest.call('/api/public/trainers/activity_labels')).data.profile;
+ assert.equal(p.recentDiscussions.length,2);
+ assert.equal(p.recentDiscussions.find(d=>d.postId===starter.id).kind,'posted');
+ assert.equal(p.recentDiscussions.find(d=>d.postId===reply).kind,'replied');
+ assert.equal(p.recentDiscussions[0].category,(await repo.forums.store.get('categories',2)).name);
+ assert.ok(p.recentDiscussions.every(d=>d.title==='Our next adventure'&&d.threadId===thread));
+ await repo.forums.store.update('posts',starter.id,{visibility:'hidden'});
+ p=(await guest.call('/api/public/trainers/activity_labels')).data.profile;
+ assert.equal(p.recentDiscussions.length,1);assert.equal(p.recentDiscussions[0].kind,'replied');
+ await repo.forums.store.update('threads',thread,{visibility:'hidden'});
+ assert.equal((await guest.call('/api/public/trainers/activity_labels')).data.profile.recentDiscussions.length,0);
+ await patch(a.c,'/api/settings/privacy',rules.privacyDefaults());
+ assert.equal((await guest.call('/api/public/trainers/activity_labels')).data.profile.recentDiscussions,undefined);
+});
+
+test('relationship state is signed-in only and restores follow/block controls without exposing another viewer state',async t=>{
+ const {register,client}=await setup(t),a=await register('relationship_alice'),b=await register('relationship_bob'),guest=client();
+ const state=()=>a.c.call('/api/social/relationship/relationship_bob');
+ assert.equal((await guest.call('/api/social/relationship/relationship_bob')).status,401);
+ assert.deepEqual((await state()).data,{following:false,blocked:false,canFollow:true});
+ await patch(b.c,'/api/settings/privacy',{...rules.privacyDefaults(),acceptFollowers:false});assert.equal((await state()).data.canFollow,false);
+ await patch(b.c,'/api/settings/privacy',rules.privacyDefaults());await patch(a.c,'/api/social/following/relationship_bob',{});
+ assert.deepEqual((await state()).data,{following:true,blocked:false,canFollow:true});
+ await patch(a.c,'/api/social/blocked/relationship_bob',{});
+ assert.deepEqual((await state()).data,{following:false,blocked:true,canFollow:false});
+ assert.deepEqual((await b.c.call('/api/social/relationship/relationship_alice')).data,{following:false,blocked:false,canFollow:false});
+ await a.c.call('/api/social/blocked/relationship_bob',{method:'DELETE'});
+ assert.deepEqual((await state()).data,{following:false,blocked:false,canFollow:true});
+ assert.equal((await a.c.call('/api/social/relationship/relationship_alice')).data.canFollow,false);
+});

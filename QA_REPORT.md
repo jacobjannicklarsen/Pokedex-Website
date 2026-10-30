@@ -512,3 +512,20 @@ no audio/ROM/save/environment/private backend files. Music, ROMs and database
 sources are unchanged from HEAD. Nine MP3s were already tracked and remain a
 public-release blocker. No commit/push/deployment or automatic history cleanup.
 See [full report](IMPLEMENTATION_v0.7.2.1.md) and [setup](SOUNDTRACK.md).
+### Staff, members and public profile layout refresh
+
+Reworked public profiles into a compact identity header, public-details sidebar,
+smaller team lineups, compact completion cards, progressive favourites and
+collapsible achievements. Headings use DEXHAVEN OWNER / ADMIN / MODERATOR / TRAINER
+from the server-projected role. Preserved large staff card widths, refreshed role
+groups/covers and member metadata, and added loaded-page member search/role filters.
+Staff and caught-rank badges share a 36px baseline. Public member links/popovers
+now resolve correctly from nested `/trainer/username` routes.
+
+Chrome layout/privacy checks: **6/6 passed**. Existing discovery/staff/social
+checks: **5/5 passed**, including pagination/retry and Follow/Block actions.
+Full Node suite: **182 passed, 0 failed, 2 existing skips**. Reviewed 320/768/1280px
+layouts in both themes and screenshots of profiles/member/staff cards. Public
+profile rendering still omits unshared fields and uses the existing decoration,
+biography, sprite and privacy projections. Public preview rebuilt locally.
+No database, private media, account settings, release or deployment changes.

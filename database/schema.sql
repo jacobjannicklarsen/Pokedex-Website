@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS admin_audit_logs (
   KEY ix_admin_audit_target (target_id,id),
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT fk_audit_target FOREIGN KEY (target_id) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT ck_audit_action CHECK (action IN ('owner.bootstrap','role.change','permissions.change','restriction.apply','restriction.revoke','password.change')),
+  CONSTRAINT ck_audit_action CHECK (action IN ('owner.bootstrap','role.change','permissions.change','restriction.apply','restriction.revoke','password.change','username.change')),
   CONSTRAINT ck_audit_target_role CHECK (target_role IN ('trainer','moderator','administrator','owner')),
   CONSTRAINT ck_audit_metadata CHECK (JSON_TYPE(metadata) = 'OBJECT')
 ) ENGINE=InnoDB;

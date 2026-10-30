@@ -43,7 +43,7 @@ function byteRange(value,size){
 }
 function routes(app,{config}){
  const library=new MusicLibrary(config.musicDir);
- app.use('/api/local/music',(req,res,next)=>{if(!require('./private-local').local(req,config,config.musicEnabled))return next(new HttpError(404,'Private music is unavailable on this installation.'));if(req.staff?.role!=='owner'||req.staff.restriction)return next(new HttpError(403,'The local Owner account is required for music.'));next();});
+ app.use('/api/local/music',(req,res,next)=>{if(!require('./private-local').local(req,config,config.musicEnabled))return next(new HttpError(404,'Private music is unavailable on this installation.'));if(req.staff?.restriction)return next(new HttpError(403,'Your account is temporarily suspended.'));next();});
  app.get('/api/local/music/tracks',async(req,res)=>{if(Object.keys(req.query).some(k=>k!=='refresh')||(req.query.refresh!==undefined&&req.query.refresh!=='1'))throw new HttpError(400,'Invalid music options.');res.json(await library.scan(req.query.refresh==='1'));});
  app.get('/api/local/music/stream/:id',async(req,res,next)=>{
   if(Object.keys(req.query).length)throw new HttpError(400,'Invalid music options.');const file=await library.open(req.params.id);let handedOff=false;

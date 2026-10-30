@@ -16,11 +16,11 @@ class AccountSettings{
  async publicFields(userId,publicSettings){if(!publicSettings.enabled)return{};const row=await this.row(userId),p=row.profile,a=row.privacy,details={};
   if(p.birthday&&a.birthday!=='hidden'){details.birthday=a.birthday==='full'?p.birthday:p.birthday.slice(5);details.birthdayVisibility=a.birthday;if(a.birthday==='full'){const now=new Date(),birth=new Date(p.birthday+'T00:00:00Z');details.age=now.getUTCFullYear()-birth.getUTCFullYear()-((now.getUTCMonth()*100+now.getUTCDate())<(birth.getUTCMonth()*100+birth.getUTCDate())?1:0);}}
   for(const k of ['location','occupation','website'])if(a[k]&&p[k])details[k]=p[k];
-  if(a.gender&&p.gender!=='unspecified')details.gender=p.gender==='self-describe'?p.genderText:p.gender;
+  if(a.gender)details.gender=p.gender==='self-describe'?(p.genderText||'Unspecified'):({man:'Male',woman:'Female',unspecified:'Unspecified'}[p.gender]||'Unspecified');
   if(a.social&&p.social?.length)details.social=p.social.map(({label,url})=>({label,url}));
   const result={};if(Object.keys(details).length)result.details=details;
   if(a.banner&&row.bannerFilename)result.bannerUrl=`/api/public/trainers/${encodeURIComponent((await this.repo.user(userId)).username)}/banner`;
-  if(a.activity){result.activity=await this.store.activity(userId);result.recentDiscussions=(await this.store.latest(1,{userId,limit:3})).items.map(p=>({threadId:p.threadId,title:p.title,createdAt:p.createdAt}));}
+  if(a.activity){result.activity=await this.store.activity(userId);result.recentDiscussions=(await this.store.latest(1,{userId,limit:3})).items.map(p=>({threadId:p.threadId,postId:p.id,title:p.title,category:p.category,kind:p.activityKind,createdAt:p.createdAt}));}
   if(a.followers)result.followerCount=await this.store.count('follows',{targetId:userId});return result;
  }
 }

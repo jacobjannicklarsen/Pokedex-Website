@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const setup=require('./support/app-fixture.cjs'),{games,local,romFile}=require('../server/gba');
-test('Shoutbox public reads, authenticated posting, plain text, validation, cooldown and duplicate protection',async t=>{
+test('Shoutbox public reads, authenticated posting, plain text, validation, immediate consecutive messages and duplicate protection',async t=>{
  const s=await setup(t),a=await s.register('shout_alice'),guest=s.client();await guest.call('/api/auth/session');
  assert.equal((await guest.call('/api/shoutbox/messages')).status,200);
  assert.equal((await guest.call('/api/shoutbox/messages',{method:'POST',body:{message:'Hello'}})).status,401);
@@ -10,7 +10,9 @@ test('Shoutbox public reads, authenticated posting, plain text, validation, cool
  const data=(await guest.call('/api/shoutbox/messages')).data;
  assert.equal(data.items[0].message,text);assert.equal(data.items[0].author.username,'shout_alice');assert.equal(data.items[0].author.avatarUrl,null);assert.equal(data.items[0].author.profileAvailable,false);assert.ok(!JSON.stringify(data).includes('email'));assert.ok(!JSON.stringify(data).includes('password'));
  assert.equal((await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:text}})).status,409);
- assert.equal((await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'Another thought'}})).status,429);
+ assert.equal(data.cooldownSeconds,0);
+ assert.equal((await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'Another thought'}})).status,200);
+ assert.equal((await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'And one more thought'}})).status,200);
 });
 test('Shoutbox moderation uses live permissions and hierarchy, logs audit, hides removed messages and rolls back failures',async t=>{
  const s=await setup(t),owner=await s.register('shout_owner'),mod=await s.register('shout_mod'),a=await s.register('shout_trainer');await s.repo.administration.bootstrapOwner(owner.user.id);await s.repo.administration.change(owner.user.id,mod.user.id,'role',{role:'moderator',version:0,reason:'Test moderation'});
@@ -21,7 +23,7 @@ test('Shoutbox moderation uses live permissions and hierarchy, logs audit, hides
  const list=(await a.c.call('/api/shoutbox/messages?ids='+id)).data;assert.equal(list.items.length,0);assert.deepEqual(list.deletedIds,[id]);assert.equal(s.repo.forums.store.data.audit.at(-1).action,'shoutbox.remove');
  const own=await owner.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'Owner message'}});assert.equal((await mod.c.call('/api/shoutbox/messages/'+own.data.id,{method:'DELETE',body:{reason:'Cannot target owner'}})).status,403);
 });
-test('Shoutbox pagination and account rate limits remain enforced across requests; missing migration is isolated',async t=>{
+test('Shoutbox pagination and burst cooldown remain enforced across requests; missing migration is isolated',async t=>{
  const s=await setup(t),a=await s.register('shout_pages');
  for(let i=0;i<35;i++)await s.repo.shoutbox.store.insert(a.user.id,'Fixture message '+i);
  const first=(await a.c.call('/api/shoutbox/messages?limit=20')).data;assert.equal(first.items.length,20);const older=(await a.c.call('/api/shoutbox/messages?limit=20&before='+first.next)).data;assert.equal(older.items.length,15);assert.ok(!older.items.some(x=>first.items.some(y=>x.id===y.id)));
@@ -38,11 +40,13 @@ test('private game map, local configuration, Host/Origin checks and realpath tra
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dexhaven-gba-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));await fs.writeFile(path.join(dir,games[0].file),Buffer.alloc(192));
  assert.equal((await romFile({gbaRomsDir:dir},'firered')).stat.size,192);await assert.rejects(romFile({gbaRomsDir:dir},'../.env'));await assert.rejects(romFile({gbaRomsDir:dir},'emerald'),e=>e.status===404&&!e.message.includes(dir));
 });
-test('private game endpoints require the local Owner and never expose the configured path',async t=>{
+test('game endpoints allow signed-in trainers, require login and never expose the configured path',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dexhaven-gba-api-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));await fs.writeFile(path.join(dir,games[0].file),Buffer.alloc(192));
  const s=await setup(t,{host:'127.0.0.1',gbaEnabled:true,gbaRomsDir:dir,fixtureLocalOrigin:true}),owner=await s.register('game_owner'),a=await s.register('game_trainer');await s.repo.administration.bootstrapOwner(owner.user.id);
  const headers={Host:'localhost'};
- assert.equal((await a.c.call('/api/local/gba/rom/firered',{headers,raw:true})).status,403);
+ assert.equal((await s.client().call('/api/local/gba/rom/firered',{headers,raw:true})).status,401);
+ assert.equal((await a.c.call('/api/local/gba/rom/firered',{headers,raw:true})).status,200);
+ assert.equal((await a.c.call('/api/local/gba/games',{headers})).status,200);
  assert.equal((await owner.c.call('/api/local/gba/rom/firered',{headers,raw:true})).status,200);
  assert.equal((await owner.c.call('/api/local/gba/rom/firered?path=.env',{headers})).status,400);
  assert.equal((await owner.c.call('/api/local/gba/rom/unknown',{headers})).status,404);
@@ -78,3 +82,41 @@ test('v0.7.2 migration is additive, matches fresh installs and never runs at sta
 });
 
 test('real MySQL Shoutbox persistence and migration verification remain pending owner execution',{skip:'Owner must manually apply v0.7.2-shoutbox.sql; no database writes are authorized by this test.'},()=>{});
+
+test('Shoutbox accepts the fourth message in ten seconds, then enforces a persisted 30-second cooldown',async t=>{
+ const s=await setup(t),a=await s.register('shout_burst');
+ t.mock.timers.enable({apis:['Date'],now:Date.now()});
+ for(let i=1;i<=4;i++){const result=await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'Burst message '+i}});assert.equal(result.status,200);assert.equal(result.data.cooldownSeconds,i===4?30:0);}
+ assert.equal(s.repo.shoutbox.store.rows.length,4);
+ assert.equal((await a.c.call('/api/shoutbox/messages')).data.cooldownSeconds,30);
+ let blocked=await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'The next thought'}});assert.equal(blocked.status,429);assert.equal(blocked.data.code,'SHOUTBOX_COOLDOWN');assert.equal(blocked.data.retryAfterSeconds,30);
+ t.mock.timers.tick(10001);
+ const {Shoutbox}=require('../server/shoutbox');s.repo.shoutbox=new Shoutbox(s.repo,s.repo.shoutbox.store);
+ blocked=await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'The next thought'}});assert.equal(blocked.status,429);assert.equal(blocked.data.retryAfterSeconds,20);
+ t.mock.timers.tick(19999);
+ assert.equal((await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'The next thought'}})).status,200);
+ assert.equal((await a.c.call('/api/shoutbox/messages')).data.cooldownSeconds,0);
+});
+
+test('Shoutbox permits three messages per ten seconds without a separate ten-per-minute cap',async t=>{
+ const s=await setup(t),a=await s.register('shout_paced');t.mock.timers.enable({apis:['Date'],now:Date.now()});
+ for(let group=0;group<4;group++){
+  for(let i=0;i<3;i++){const result=await a.c.call('/api/shoutbox/messages',{method:'POST',body:{message:'Paced message '+group+'-'+i}});assert.equal(result.status,200);assert.equal(result.data.cooldownSeconds,0);}
+  t.mock.timers.tick(10000);
+ }
+ assert.equal(s.repo.shoutbox.store.rows.length,12);
+});
+
+test('production Shoutbox reads use Unix timestamps so local database time cannot add an hour to cooldowns',async()=>{
+ const {ShoutboxStore,Shoutbox}=require('../server/shoutbox'),now=Date.now(),queries=[];
+ const pool={execute:async(sql,params)=>{queries.push({sql,params});return [Array.from({length:5},(_,i)=>({id:5-i,userId:1,message:'Time fixture '+i,createdAtEpoch:String(now-1000-i)}))];}};
+ const store=new ShoutboxStore(pool,{}),rows=await store.list(100,30),recent=await store.recent(1);
+ assert.ok(rows.every(row=>row.createdAt instanceof Date&&row.createdAt.getTime()<=now));
+ assert.ok(recent.every(row=>row.createdAt instanceof Date&&row.createdAt.getTime()<=now));
+ assert.equal(rows[0].createdAt.getTime(),now-1000);assert.equal('createdAtEpoch'in rows[0],false);
+ assert.ok(queries.every(q=>q.sql.includes('UNIX_TIMESTAMP(created_at)*1000')));
+ assert.ok(queries[1].sql.includes('CURRENT_TIMESTAMP(3)-INTERVAL 5 MINUTE'));
+ const repo={administration:{access:async()=>({})},forums:{author:async()=>({username:'clock_test'})}};
+ const data=await new Shoutbox(repo,{...store,list:async()=>rows,recent:async()=>recent}).read({},1);
+ assert.ok(data.cooldownSeconds>0&&data.cooldownSeconds<=30);
+});

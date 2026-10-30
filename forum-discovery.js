@@ -26,7 +26,7 @@
  }
  function authorLine(author,createdAt){
   const meta=el('div','discovery-meta');
-  if(author){const name=el('span','discovery-author',author.username);name.dataset.member=author.username;name.tabIndex=0;TrainerNames.decorate(name,author.staffRole);meta.append(name);}
+  if(author){const name=el('span','discovery-author',author.username);name.dataset.member=author.username;TrainerNames.decorate(name,author.staffRole);meta.append(name);}
   if(createdAt){const time=el('time','',new Date(createdAt).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}));time.dateTime=createdAt;meta.append(time);}
   return meta;
  }
@@ -55,7 +55,15 @@
   const noun=members?'trainer':trending?'discussion':'post';
   const count=el('span','discovery-result-count',`${data.items.length} ${noun}${data.items.length===1?'':'s'}${params.has('after')||page>1?' on this page':''}`);header.append(copy,count);root.append(header);
   if(!data.items.length){const box=el('div','discovery-empty');box.append(el('h3','',members?'Your community starts here':trending?'A new conversation is waiting':'Nothing new here yet'),el('p','form-help',empty||'There are no results to show.'),link(members?'Explore the Trainer Hub':'Browse all discussions',members?'trainers.html':'forums.html#all=1','explore-link'));root.append(box);}
-  const list=el('div',members?'staff-grid discovery-members':'discovery-feed');data.items.forEach((item,index)=>list.append(members?MemberCards.card(item):feedCard(item,index,trending)));root.append(list);
+  const list=el('div',members?'staff-grid discovery-members':'discovery-feed');
+  if(params.has('members')&&data.items.length){
+   const tools=el('div','members-directory-tools'),label=el('label','','Find a trainer on this page'),search=el('input'),roleLabel=el('label','','Community role'),role=el('select');search.type='search';search.placeholder='Search by username';search.maxLength=24;label.append(search);role.setAttribute('aria-label','Filter members by role');
+   for(const [value,text]of [['all','All roles'],['trainer','Trainers'],['owner','Owners'],['administrator','Administrators'],['moderator','Moderators']]){if(value!=='all'&&!data.items.some(p=>(p.staffRole||'trainer')===value))continue;const option=el('option','',text);option.value=value;role.append(option);}roleLabel.append(role);tools.append(label,roleLabel);root.append(tools);
+   const feedback=el('p','members-filter-status form-help');feedback.setAttribute('role','status');root.append(feedback);
+   const renderMembers=()=>{const matches=data.items.filter(p=>p.username.toLowerCase().includes(search.value.trim().toLowerCase())&&(role.value==='all'||(p.staffRole||'trainer')===role.value));list.replaceChildren(...matches.map(p=>MemberCards.card(p,{context:'directory'})));feedback.textContent=matches.length+' of '+data.items.length+' trainers on this page';if(!matches.length){const empty=el('div','discovery-empty');empty.append(el('h3','','No trainers match yet'),el('p','form-help','Try another name or choose a different community role.'));list.append(empty);}};
+   search.oninput=role.onchange=renderMembers;renderMembers();
+  }else data.items.forEach((item,index)=>list.append(members?MemberCards.card(item,{context:'directory'}):feedCard(item,index,trending)));
+  root.append(list);
   if(data.next||page>1||params.has('after')){
    const pager=el('nav','forum-pagination discovery-pagination');pager.setAttribute('aria-label',members?'Member directory pages':'Discussion feed pages');
    if(params.has('after')){const first=new URLSearchParams(params);first.delete('after');pager.append(link('Back to first page','forums.html#'+first,'text-button'));}

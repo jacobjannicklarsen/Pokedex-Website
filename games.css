@@ -17,3 +17,44 @@
 #games-status { border-color:var(--line); background:var(--panel); color:var(--muted); line-height:1.8; }
 .gba-player-body { margin:0; padding:12px; background:#10171e; color:#edf5f1; font:13px/1.6 system-ui,sans-serif; }.gba-player-body #game { width:100%; height:calc(100vh - 100px); min-height:240px; }.gba-player-help { font-size:11px; }.gba-player-body #player-status { margin:0 0 8px; }
 @media(max-width:1050px) { .game-library { grid-template-columns:1fr 1fr; } }@media(max-width:650px) { .game-library { grid-template-columns:1fr; }.games-player { padding:16px; }.games-viewport,.games-viewport iframe { min-height:340px; } }
+/* Games: an animated pixel portal, inspired by a handheld's link connection. */
+.games-intro { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); align-items:center; gap:28px; max-width:none; }
+.games-intro h1 { font-size:clamp(32px,4vw,50px); }
+.games-intro-copy { min-width:0; }
+.games-hero-art { position:relative; isolation:isolate; min-width:0; margin:0; }
+.games-hero-art::before { content:''; position:absolute; inset:3% 0; border-radius:50%; background:radial-gradient(ellipse,#88d6c51c,transparent 68%); }
+.games-hero-art>img { position:relative; z-index:1; display:block; width:100%; height:auto; -webkit-mask-image:none; mask-image:none; }
+.games-portal { overflow:hidden; border-radius:50%; position:absolute; width:82%; aspect-ratio:1; left:50%; top:46%; transform:translate(-50%,-50%); pointer-events:none; }
+.games-portal::before { content:''; position:absolute; inset:0; border-radius:50%; background:repeating-conic-gradient(from 10deg,#80e5b88c 0deg 5deg,transparent 5deg 15deg,#e8bb7980 15deg 20deg,transparent 20deg 30deg); -webkit-mask-image:radial-gradient(transparent 64%,#000 65%,#000 66%,transparent 67%); mask-image:radial-gradient(transparent 64%,#000 65%,#000 66%,transparent 67%); animation:games-portal-spin 40s linear infinite; }
+.games-portal i { position:absolute; left:7%; top:36%; width:7px; height:7px; background:var(--mint); box-shadow:10px 0 0 color-mix(in srgb,var(--mint) 30%,transparent),0 10px 0 color-mix(in srgb,var(--mint) 30%,transparent); animation:games-link-pulse 4s ease-in-out infinite; }
+.games-portal i:nth-child(2) { left:85%; top:18%; background:#e8bb79; animation-delay:-1.3s; }
+.games-portal i:nth-child(3) { left:75%; top:82%; animation-delay:-2.6s; }
+.games-pixel { position:absolute; z-index:2; width:5px; height:5px; background:var(--mint); box-shadow:5px 5px 0 #80e5b860,-5px -5px 0 #80e5b830; pointer-events:none; animation:games-pixel-drift 5s ease-in-out infinite; }
+.games-pixel-one { left:3%; top:38%; }
+.games-pixel-two { right:4%; top:59%; animation-delay:-2s; background:#e8bb79; }
+.games-pixel-three { right:19%; top:7%; animation-delay:-3.5s; }
+@keyframes games-portal-spin { to { transform:rotate(360deg); } }
+@keyframes games-link-pulse { 0%,100% { opacity:.25; } 50% { opacity:.85; } }
+@keyframes games-pixel-drift { 0%,100% { transform:translateY(4px); opacity:.3; } 50% { transform:translateY(-8px); opacity:.9; } }
+@media(max-width:700px) { .games-intro { grid-template-columns:1fr; gap:12px; padding-top:30px; } .games-hero-art { width:min(100%,460px); justify-self:center; } }
+@media(prefers-reduced-motion:reduce) { .games-portal::before,.games-portal i,.games-pixel { animation:none; } }
+@media(forced-colors:active) { .games-portal,.games-pixel { display:none; } }
+/* A full-colour aura surrounds the unmasked artwork, never the image rectangle. */
+.games-aura { overflow:hidden; position:absolute; inset:-2% -1%; border-radius:50%; pointer-events:none; -webkit-mask-image:radial-gradient(ellipse,#000 25%,transparent 70%); mask-image:radial-gradient(ellipse,#000 25%,transparent 70%); }
+.games-aura::before { content:''; position:absolute; inset:-12%; border-radius:50%; background:conic-gradient(from 30deg,#74ceff70,#a5ffe03d,#f4bf7180,#a090ff66,#74ceff70); filter:blur(24px); animation:games-aura-flow 22s linear infinite; }
+.games-aura::after { content:''; position:absolute; inset:8%; border-radius:50%; background:radial-gradient(ellipse,color-mix(in srgb,var(--mint) 25%,transparent),transparent 68%); animation:games-aura-breathe 7s ease-in-out infinite alternate; }
+.games-hero-art::after { content:''; position:absolute; z-index:0; bottom:-4%; left:8%; width:84%; height:20%; border-radius:50%; background:radial-gradient(ellipse,#9ccfff38,transparent 68%); pointer-events:none; animation:games-aura-breathe 7s ease-in-out infinite alternate-reverse; }
+.games-energy { position:absolute; z-index:2; inset:0; pointer-events:none; }
+.games-energy i { position:absolute; left:5%; top:74%; width:3px; height:3px; border-radius:50%; background:#9ddcff; box-shadow:0 0 7px 2px #74ceff55; opacity:0; animation:games-energy-rise 6s ease-in-out infinite; }
+.games-energy i:nth-child(2) { left:13%; top:43%; width:4px; height:4px; animation-delay:-3s; }
+.games-energy i:nth-child(3) { left:32%; top:13%; background:#ffe0a2; animation-delay:-1.2s; animation-duration:7.4s; }
+.games-energy i:nth-child(4) { left:80%; top:25%; animation-delay:-4.6s; }
+.games-energy i:nth-child(5) { left:95%; top:64%; width:4px; height:4px; background:#ffe0a2; animation-delay:-2.1s; }
+.games-energy i:nth-child(6) { left:86%; top:85%; animation-delay:-5.2s; animation-duration:8s; }
+.games-energy i:nth-child(7) { left:17%; top:95%; background:#a5ffe0; animation-delay:-3.8s; }
+.games-energy i:nth-child(8) { left:62%; top:8%; width:2px; height:2px; animation-delay:-.8s; }
+@keyframes games-aura-flow { to { transform:rotate(360deg); } }
+@keyframes games-aura-breathe { from { transform:scale(.94); opacity:.45; } to { transform:scale(1.06); opacity:.85; } }
+@keyframes games-energy-rise { 0% { transform:translate(0,10px) scale(.4); opacity:0; } 25% { opacity:.9; } 70% { opacity:.55; } 100% { transform:translate(8px,-38px) scale(.3); opacity:0; } }
+@media(prefers-reduced-motion:reduce) { .games-aura::before,.games-aura::after,.games-hero-art::after,.games-energy i { animation:none; } .games-energy i { opacity:.45; } }
+@media(forced-colors:active) { .games-aura,.games-energy,.games-hero-art::after { display:none; } }

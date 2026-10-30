@@ -35,6 +35,7 @@
     <script src="music-player.js" defer></script>
     <script src="member-cards.js" defer></script>
     <script src="forum-notifications.js" defer></script>
+    <script src="about.js" defer></script>
 </head>
 <body data-page="about">
 
@@ -82,7 +83,10 @@
         <div class="team-actions"><a class="action-button" href="#about-team-title">Meet the team</a><a class="text-button" href="pokemon.html">Explore the National Pok&eacute;dex &rarr;</a></div>
       </div>
       <figure class="about-founders-art">
+        <div class="about-founders-visual">
+          <svg class="about-ribbons" viewBox="0 0 600 400" aria-hidden="true" focusable="false"><defs><linearGradient id="founder-ribbon-gradient"><stop stop-color="#73c9ee"/><stop offset=".5" stop-color="#a5e1bc"/><stop offset="1" stop-color="#e7bd85"/></linearGradient></defs><g class="about-ribbon-tracks"><path d="M30 230C80 15 500 20 565 235"/><path d="M40 270C155 360 425 45 555 120"/><path d="M45 130C160 45 440 355 560 270"/></g><g class="about-ribbon-light"><path d="M30 230C80 15 500 20 565 235"/><path d="M40 270C155 360 425 45 555 120"/><path d="M45 130C160 45 440 355 560 270"/></g></svg>
         <img src="images/group-picture.png" alt="Illustration of the four Dexhaven founders" width="1536" height="1024" fetchpriority="high">
+        </div>
         <figcaption>Lucas, Oscar, Jacob Jannick &amp; Patrick.<br><span>IT Architecture students.</span></figcaption>
       </figure>
     </section>
@@ -90,11 +94,11 @@
     <section class="about-team-section" aria-labelledby="about-team-title">
       <div class="section-heading"><div><p class="eyebrow">MEET THE TEAM</p><h2 id="about-team-title">Four students. One shared curiosity.</h2></div></div>
       <p class="about-section-copy">Lucas, Oscar, Jacob Jannick and Patrick are IT Architecture students at <strong>Erhvervsakademi K&oslash;benhavn</strong>.<br>Together, we build Dexhaven as a place to explore Pok&eacute;mon, create teams and share discoveries.</p>
-      <ul class="about-team-list" aria-label="Dexhaven team members">
-        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">01</span><h3>Lucas</h3><p class="form-help">IT Architecture student</p></li>
-        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">02</span><h3>Oscar</h3><p class="form-help">IT Architecture student</p></li>
-        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">03</span><h3>Jacob Jannick</h3><p class="form-help">IT Architecture student</p></li>
-        <li class="trainer-panel"><span class="eyebrow" aria-hidden="true">04</span><h3>Patrick</h3><p class="form-help">IT Architecture student</p></li>
+      <ul class="about-team-list" aria-label="Dexhaven team members" data-member-preview="off">
+        <li class="trainer-panel"><a class="founder-profile" data-founder-username="Lucas" aria-label="Lucas portrait"><img src="images/lucas.png" alt="Lucas" width="96" height="96" loading="lazy" decoding="async"></a><h3>Lucas</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><a class="founder-profile" data-founder-username="Oscar" aria-label="Oscar portrait"><img src="images/oscar.png" alt="Oscar" width="96" height="96" loading="lazy" decoding="async"></a><h3>Oscar</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><a class="founder-profile" data-founder-username="Jannick" aria-label="Jacob Jannick portrait"><img src="images/analyst_jannick.png" alt="Jacob Jannick" width="96" height="96" loading="lazy" decoding="async"></a><h3>Jacob Jannick</h3><p class="form-help">IT Architecture student</p></li>
+        <li class="trainer-panel"><a class="founder-profile" data-founder-username="Patrick" aria-label="Patrick portrait"><img src="images/patrick.png" alt="Patrick" width="96" height="96" loading="lazy" decoding="async"></a><h3>Patrick</h3><p class="form-help">IT Architecture student</p></li>
       </ul>
     </section>
 

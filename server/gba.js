@@ -22,7 +22,7 @@ async function romFile(config,id){
  }catch(e){if(e.status)throw e;throw new v.HttpError(404,game.title+' is unavailable because its local ROM file could not be found.');}
 }
 function routes(app,{config,root}){
- const guard=(req,res,next)=>{if(!local(req,config))return next(new v.HttpError(404,'Private games are unavailable on this installation.'));if(req.staff?.role!=='owner'||req.staff.restriction)return next(new v.HttpError(403,'The local Owner account is required to play.'));next();};
+ const guard=(req,res,next)=>{if(!local(req,config))return next(new v.HttpError(404,'Private games are unavailable on this installation.'));if(req.staff?.restriction)return next(new v.HttpError(403,'Your account is temporarily suspended.'));next();};
  app.use('/api/local/gba',guard);
  app.get('/api/local/gba/games',async(req,res)=>{
   const items=[];for(const game of games){try{const rom=await romFile(config,game.id),fingerprint=crypto.createHash('sha256').update(await fs.readFile(rom.file)).digest('hex');items.push({id:game.id,available:true,fingerprint});}catch(e){items.push({id:game.id,available:false,message:e.status?e.message:'The local game is unavailable.'});}}res.json({games:items});
@@ -37,7 +37,7 @@ function routes(app,{config,root}){
  app.get('/api/local/gba/player',(req,res)=>{
   if(!safeId(req.query.game)||Object.keys(req.query).some(k=>k!=='game'))throw new v.HttpError(404,'Unknown game.');
   // Pinned mGBA's Emscripten bootstrap requires dynamic JS. This exception is confined
-  // to the authenticated, local Owner player document; the main site's CSP is unchanged.
+  // to the authenticated, local player document; the main site's CSP is unchanged.
   res.set('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; frame-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'");
   res.sendFile(path.join(root,'gba-player.html'));
  });

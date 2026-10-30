@@ -120,7 +120,7 @@
         session.user = null; session.favorites.clear(); session.teams = []; session.privateReady = false; updateAccountUI();
         if (activeView !== '/') renderPage();
       }
-      const failure=new Error(data.error || 'The request failed. Please try again.');failure.status=response.status;failure.code=data.code;throw failure;
+      const failure=new Error(data.error || 'The request failed. Please try again.');failure.status=response.status;failure.code=data.code;if(Number.isFinite(data.retryAfterSeconds))failure.retryAfterSeconds=data.retryAfterSeconds;throw failure;
     }
     return data;
   }
@@ -352,11 +352,11 @@
     const panel = element('div', 'trainer-panel profile-panel');
     if (user.avatarUrl) { const img = element('img', 'trainer-avatar'); img.src = user.avatarUrl; img.alt = `${user.username}'s profile picture`; panel.append(img); }
     else panel.append(element('span', 'trainer-avatar avatar-initial', user.username[0].toUpperCase()));
-    const identity=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element('h2','',user.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;nameRow.append(name,motto);
+    const identity=element('div','trainer-identity-copy'),nameRow=element('div','trainer-name-row'),name=element('h2','',user.username),motto=element('p','trainer-motto-inline');motto.dataset.trainerMottoSlot='';motto.hidden=true;nameRow.append(name);
     const meta=element('div','trainer-identity-meta'),titleSlot=element('span');titleSlot.dataset.trainerTitleSlot='';globalThis.TrainerRanks?.role(meta,user.staff?.role||'trainer');meta.append(titleSlot);
     const biography=element('div','profile-biography',user.bio||'Your story is still unwritten. Add a biography below.');if(user.bioFormat==='limited')RichBiography.render(biography,user.bio);biography.dataset.profileBio='';
-    identity.append(element('p','eyebrow','YOUR TRAINER CARD'),nameRow,meta,biography,element('p','profile-account-details',`${user.email} · Joined ${new Date(user.createdAt).toLocaleDateString()}`));
-    const progress=element('aside','profile-progress'),rank=element('div');rank.dataset.trainerRank='';progress.append(element('h3','','Your collection rank'),rank);globalThis.TrainerProgress?.renderRank(rank);
+    identity.append(element('p','eyebrow','YOUR TRAINER CARD'),nameRow,meta,motto,biography,element('p','profile-account-details',`Joined ${new Date(user.createdAt).toLocaleDateString()}`));
+    const progress=element('aside','profile-progress'),rank=element('div');rank.dataset.trainerRank='';rank.dataset.rankCompact='true';progress.append(element('h3','','Your collection rank'),rank);globalThis.TrainerProgress?.renderRank(rank);
     const totals=element('div','profile-totals');for(const [label,value,view]of [['Teams',session.teams.length,'/teams'],['Favourites',session.favorites.size,'/favorites']]){const counter=action(label,()=>navigate(view),'profile-counter');counter.prepend(element('strong','',value));totals.append(counter);}progress.append(totals);
     globalThis.TrainerNames?.decorate(name,user.staff?.role);panel.append(identity,progress);content.append(panel);
     const shortcuts=element('nav','profile-shortcuts');shortcuts.setAttribute('aria-label','Profile settings');for(const [label,selector]of [['Edit profile','.profile-editor'],['Privacy & sharing','.community-settings'],['Card studio','.decoration-studio']])shortcuts.append(action(label,()=>{const section=content.querySelector(selector);if(!section)return;const heading=section.querySelector('h3');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}section.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},'text-button'));content.append(shortcuts);

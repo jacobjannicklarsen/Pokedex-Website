@@ -40,3 +40,44 @@
 .admin-form .team-actions { justify-content:flex-end; }
 .admin-gate { border:1px solid var(--line); border-radius:16px; padding:32px; background:var(--panel); margin-block:24px; }
 @media(max-width:700px) { .admin-overview { grid-template-columns:1fr; } .admin-user { grid-template-columns:1fr; padding:18px; } .admin-user-actions { justify-content:flex-start; } .admin-user-actions button { flex:1; } .admin-toolbar { align-items:flex-start; flex-direction:column; } .admin-dialog { padding:22px; } }
+/* A clearer administration workspace with permission-aware shortcuts. */
+.admin-intro { max-width:none; padding-block:36px 18px; border-bottom:1px solid var(--line); }
+.admin-intro h1 { letter-spacing:-1.4px; margin-bottom:12px; }
+.admin-intro .hero-description { max-width:650px; font-size:14px; }
+.admin-toolbar { margin-block:18px; padding:14px 18px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.admin-session { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.admin-session-name { font-size:12px; font-weight:600; color:var(--text); }
+.admin-toolbar-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; }
+.admin-toolbar-actions .text-button { padding:6px 0; font-size:11px; }
+.admin-updated { color:var(--muted); font-size:10px; }
+.admin-tabs { padding:5px; border:1px solid var(--line); border-radius:12px; background:color-mix(in srgb,var(--panel) 55%,transparent); margin-bottom:24px; gap:4px; }
+.admin-tabs button { flex:1 1 140px; border-color:transparent; background:transparent; font-size:12px; min-height:42px; }
+.admin-tabs button[aria-current=page] { border-color:var(--line); background:var(--panel); box-shadow:0 2px 8px #00000010; color:var(--accent-ink,var(--mint)); }
+.admin-overview article { position:relative; padding:22px; overflow:hidden; }
+.admin-overview article::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--mint); }
+.admin-overview article[data-metric=staff]::before { background:#b39ae8; }
+.admin-overview article[data-metric=restricted]::before { background:#dca277; }
+.admin-overview strong { font-size:34px; margin-block:12px 8px; }
+.admin-overview .form-help { font-size:11px; line-height:1.7; }
+.admin-quick-actions { margin-block:26px; }
+.admin-quick-actions h2 { font-size:18px; margin:0 0 14px; }
+.admin-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.admin-shortcut { display:grid; align-content:start; gap:9px; text-align:left; padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--panel); color:var(--text); transition:border-color .15s,transform .15s; }
+.admin-shortcut strong { font-size:13px; }
+.admin-shortcut span { color:var(--muted); font-size:12px; line-height:1.7; }
+.admin-shortcut:hover { border-color:var(--mint); transform:translateY(-2px); }
+.admin-search { padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.admin-search .admin-role-filter { flex:0 1 180px; min-width:150px; }
+.admin-search select { width:100%; min-height:44px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); color:var(--text); }
+.admin-user { padding:20px; gap:16px; }
+.admin-user h3 { font-size:18px; }
+.admin-user .staff-badge { margin-top:4px; }
+.admin-user .admin-status:not(.restricted) { display:inline-block; padding:4px 8px; border:1px solid var(--line); border-radius:6px; margin:8px 0 0; font-size:10px; }
+.admin-user-actions button { min-height:38px; font-size:11px; }
+.admin-user-actions button:is(:hover,:focus-visible) { background:color-mix(in srgb,var(--mint) 8%,var(--bg)); }
+.admin-audit li { border-left:3px solid var(--line); padding:16px 18px; }
+.admin-audit li>strong { font-size:13px; line-height:1.7; }
+.admin-audit time { font-size:10px; }
+.admin-audit .form-help { font-size:11px; }
+@media(max-width:700px) { .admin-shortcuts { grid-template-columns:1fr; } .admin-toolbar-actions { width:100%; gap:8px 14px; } .admin-search label,.admin-search .admin-role-filter { flex:1 1 100%; min-width:0; } .admin-search .action-button { flex:1; } .admin-tabs button { flex-basis:40%; } }
+@media(prefers-reduced-motion:reduce) { .admin-shortcut { transition:none; } }

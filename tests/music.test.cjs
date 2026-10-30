@@ -19,11 +19,13 @@ test('music range parsing supports bounded/open/suffix ranges and rejects malfor
  assert.equal(byteRange(undefined,100),null);assert.deepEqual(byteRange('bytes=0-9',100),{start:0,end:9});assert.deepEqual(byteRange('bytes=80-',100),{start:80,end:99});assert.deepEqual(byteRange('bytes=-20',100),{start:80,end:99});assert.deepEqual(byteRange('bytes=0-999',100),{start:0,end:99});
  for(const r of ['bytes=100-','bytes=20-10','bytes=-0','bytes=0-1,5-6','bytes=-','garbage','bytes=9007199254740993-'])assert.throws(()=>byteRange(r,100),e=>e.status===416);
 });
-test('private music routes enforce Owner/local origin, safe metadata, MIME, length, HEAD and byte ranges',async t=>{
+test('music routes allow signed-in trainers and enforce local origin, safe metadata, MIME, length, HEAD and byte ranges',async t=>{
  const dir=await directory(t),bytes=Buffer.from(Array.from({length:256},(_,i)=>i));await fs.writeFile(path.join(dir,'Sample.mp3'),bytes);
  const s=await setup(t,{host:'127.0.0.1',musicEnabled:true,musicDir:dir,fixtureLocalOrigin:true}),owner=await s.register('music_owner'),trainer=await s.register('music_trainer');await s.repo.administration.bootstrapOwner(owner.user.id);
- assert.equal((await s.client().call('/api/local/music/tracks')).status,401);assert.equal((await trainer.c.call('/api/local/music/tracks')).status,403);
+ assert.equal((await s.client().call('/api/local/music/tracks')).status,401);assert.equal((await trainer.c.call('/api/local/music/tracks')).status,200);
  const catalog=await owner.c.call('/api/local/music/tracks');assert.equal(catalog.status,200);assert.ok(!JSON.stringify(catalog.data).includes(dir));const id=catalog.data.tracks[0].id;
+ assert.equal((await trainer.c.call('/api/local/music/stream/'+id,{headers:{Range:'bytes=12-21'},raw:true})).status,206);
+ assert.equal((await s.client().call('/api/local/music/stream/'+id,{raw:true})).status,401);
  assert.equal((await owner.c.call('/api/local/music/tracks',{headers:{Origin:'https://evil.test'}})).status,404);
  assert.equal((await owner.c.call('/api/local/music/stream/'+id+'?path=.env')).status,400);assert.equal((await owner.c.call('/api/local/music/stream/bad')).status,404);assert.equal((await owner.c.call('/Dexhaven-Music/Sample.mp3',{raw:true})).status,404);
  // Obtain the fixture session cookie without bypassing the real session/CSRF stack.

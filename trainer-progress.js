@@ -130,7 +130,7 @@
     wrapper.append(element('span', '', `${label}: ${count} / ${total} (${percent.toFixed(2)}%)`));
     const bar = element('progress'); bar.max = total; bar.value = count; bar.textContent = `${percent.toFixed(2)}%`; wrapper.append(bar); return wrapper;
   }
-  function renderRank(target){target.replaceChildren();if(ready&&bundle?.rank)globalThis.TrainerRanks?.render(target,bundle.rank);else target.append(element('span','form-help',error||'Loading trainer rank…'));}
+  function renderRank(target){target.replaceChildren();if(ready&&bundle?.rank)globalThis.TrainerRanks?.render(target,bundle.rank,{compact:target.dataset.rankCompact==='true'});else target.append(element('span','form-help',error||'Loading trainer rank…'));}
   function renderProgress(target) {
     if (pendingView(target)) return;
     const rank=element('div');rank.dataset.trainerRank='';renderRank(rank);target.append(rank);

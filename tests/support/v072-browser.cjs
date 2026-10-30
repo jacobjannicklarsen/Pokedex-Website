@@ -6,11 +6,13 @@ module.exports=async({check,evaluate,command,waitFor,origin,repo})=>{
  const pause=ms=>new Promise(r=>setTimeout(r,ms));
  async function nav(page){await command('Page.navigate',{url:origin+'/'+page});await waitFor(`location.href===${JSON.stringify(origin+'/'+page)}&&globalThis.DexhavenAccount?.isReady()`);}
  async function capture(name){const dir=path.join(os.tmpdir(),'dexhaven-v072-review');fs.mkdirSync(dir,{recursive:true});const s=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(dir,name),Buffer.from(s.data,'base64'));}
- await check('homepage Shoutbox renders public plain text, guest prompts and posting/moderation',async()=>{
-  await nav('');await waitFor(`document.querySelector('.shoutbox-message')`);
+ await check('homepage Shoutbox stays hidden for guests and supports signed-in posting/moderation',async()=>{
+  await nav('');assert.equal(await evaluate(`document.querySelector('#shoutbox').hidden`),true);
   assert.equal(await evaluate('window.shoutXSS===true'),false);assert.equal(await evaluate(`document.querySelector('.shoutbox-form').hidden`),true);assert.equal(await evaluate(`document.querySelector('.shoutbox-remove')`),null);
   await evaluate(`document.querySelector('#account-button').click();document.querySelector('#auth-identifier').value='v072_owner';document.querySelector('#auth-password').value='Version 072 test password';document.querySelector('#auth-form').requestSubmit()`);
-  await waitFor(`DexhavenAccount.getUser()?.username==='v072_owner'&&document.querySelector('.shoutbox-form').hidden===false`);
+  await waitFor(`DexhavenAccount.getUser()?.username==='v072_owner'&&document.querySelector('.shoutbox-form').hidden===false&&document.querySelector('.shoutbox-message')`);assert.equal(await evaluate(`document.querySelector('#shoutbox').hidden`),false);
+  assert.equal(await evaluate(`document.querySelector('.shoutbox-form').getBoundingClientRect().top>=document.querySelector('.shoutbox-history').getBoundingClientRect().bottom`),true);
+  assert.equal(await evaluate(`document.querySelector('.shoutbox-send').disabled`),true);
   await evaluate(`document.querySelector('.shoutbox-form textarea').value='Hello from the Owner';document.querySelector('.shoutbox-form').requestSubmit()`);
   await waitFor(`document.querySelector('#shoutbox').textContent.includes('Hello from the Owner')`);
   await evaluate(`document.querySelector('.shoutbox-remove').click()`);await waitFor(`document.querySelector('.shoutbox-confirm[open]')`);
@@ -22,9 +24,9 @@ module.exports=async({check,evaluate,command,waitFor,origin,repo})=>{
   for(let i=0;i<240;i++)await repo.shoutbox.store.insert(trainer.id,'History fixture '+i);
   await nav('');await waitFor(`document.querySelectorAll('.shoutbox-message').length===30`);
   const first=()=>evaluate(`Number(document.querySelector('.shoutbox-message')?.dataset.messageId)`);
-  for(let i=0;i<8;i++){const old=await first();await evaluate(`document.querySelector('#shoutbox > button:not([hidden]):not(:disabled)').click()`);await waitFor(`Number(document.querySelector('.shoutbox-message')?.dataset.messageId)<${old}`);}
+  for(let i=0;i<8;i++){const old=await first();await evaluate(`document.querySelector('.shoutbox-older:not([hidden]):not(:disabled)').click()`);await waitFor(`Number(document.querySelector('.shoutbox-message')?.dataset.messageId)<${old}`);}
   assert.equal(await first(),2);assert.equal(await evaluate(`document.querySelectorAll('.shoutbox-message').length`),200);
-  await evaluate(`[...document.querySelectorAll('#shoutbox > button')].find(b=>b.textContent==='Latest messages').click()`);
+  await evaluate(`document.querySelector('.shoutbox-latest').click()`);
   await waitFor(`document.querySelectorAll('.shoutbox-message').length===30`);assert.equal(await first(),213);
  });
  await check('Game Library contains six native cards and browser saves isolate games and revisions',async()=>{

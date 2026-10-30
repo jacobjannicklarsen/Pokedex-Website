@@ -12,10 +12,10 @@
  function button(label,image,action,cls=''){const b=node('button','music-button '+cls);b.type='button';b.setAttribute('aria-label',label);b.title=label;b.append(icon(image));b.onclick=action;return b;}
  const root=node('aside','music-player');root.hidden=true;root.setAttribute('aria-label','Dexhaven soundtrack player');
  const bar=node('div','music-bar'),symbol=node('span','music-symbol');symbol.append(icon('music'));
- const copy=node('div','music-copy'),title=node('strong','','Pokémon soundtrack'),subtitle=node('small','','Private local collection');copy.append(title,subtitle);
+ const copy=node('div','music-copy'),title=node('strong','','Pokémon soundtrack'),subtitle=node('small','','Site soundtrack');copy.append(title,subtitle);
  const panel=node('section','music-panel');panel.id='music-panel';panel.hidden=true;panel.setAttribute('aria-label','Soundtrack controls');
  const compactPlay=button('Play music','play',togglePlay,'music-play'),compactNext=button('Next track','next',()=>advance(1)),expand=button('Expand music player','expand',()=>setExpanded(panel.hidden));expand.setAttribute('aria-controls',panel.id);expand.setAttribute('aria-expanded','false');bar.append(symbol,copy,compactPlay,compactNext,expand);
- const heading=node('h2','music-heading','Your soundtrack'),region=node('p','form-help','All Tracks'),status=node('p','music-status','Loading your private music library…');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+ const heading=node('h2','music-heading','Your soundtrack'),region=node('p','form-help','All Tracks'),status=node('p','music-status','Loading the music library…');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const controls=node('div','music-controls'),previous=button('Previous track','previous',()=>advance(-1)),play=button('Play music','play',togglePlay,'music-play'),next=button('Next track','next',()=>advance(1)),shuffle=button('Shuffle','shuffle',()=>{state.shuffle=!state.shuffle;queue.setShuffle(state.shuffle);save();render();}),repeat=button('Repeat all','repeat',()=>{state.repeat={all:'one',one:'off',off:'all'}[state.repeat];queue.repeat=state.repeat;save();render();});controls.append(shuffle,previous,play,next,repeat);
  const seek=node('input');seek.type='range';seek.min=0;seek.max=100;seek.step=.1;seek.value=0;seek.disabled=true;seek.setAttribute('aria-label','Seek within track');
  const progress=node('div','music-progress'),elapsed=node('span','','0:00'),duration=node('span','','—');progress.append(elapsed,duration);
@@ -30,7 +30,7 @@
  function currentTrack(){return tracks.find(t=>t.id===state.track);}
  function render(){
   const track=currentTrack(),playing=!audio.paused&&!audio.ended;title.textContent=track?.title||(tracks.length?'Choose your soundtrack':'Soundtrack unavailable');title.title=title.textContent;heading.textContent=track?.title||'Your soundtrack';region.textContent=state.playlist||'All Tracks';
-  subtitle.textContent=emulating?'Paused for your game':blockedByTab?'Playing in another tab':playing?'Now playing':track?'Paused · '+(track.playlist||'All Tracks'):'Private local collection';
+  subtitle.textContent=emulating?'Paused for your game':blockedByTab?'Playing in another tab':playing?'Now playing':track?'Paused · '+(track.playlist||'All Tracks'):'Site soundtrack';
   for(const b of [play,compactPlay]){b.replaceChildren(icon(playing?'pause':'play'));const label=playing?'Pause music':'Play music';b.setAttribute('aria-label',label);b.title=label;b.disabled=!track||emulating;}
   for(const b of [previous,next,compactNext,shuffle,repeat])b.disabled=!queue.current||emulating;
   shuffle.setAttribute('aria-pressed',String(state.shuffle));repeat.setAttribute('aria-pressed',String(state.repeat!=='off'));repeat.setAttribute('aria-label','Repeat '+state.repeat);repeat.title='Repeat '+state.repeat;repeat.dataset.mode=state.repeat;
@@ -81,15 +81,15 @@
  volume.oninput=()=>{state.volume=Number(volume.value)/100;audio.volume=state.volume;save();render();};
  playlist.onchange=()=>{state.playlist=playlist.value;state.order=[];state.track=null;failed.clear();rebuildQueue();renderList();if(queue.current)select(queue.current,0,state.playing);else{audio.pause();audio.removeAttribute('src');audio.load();state.playing=false;save();render();}};
  async function loadLibrary(force=false){
-  const token=++revision;refresh.disabled=true;notify('Loading your private music library…');
+  const token=++revision;refresh.disabled=true;notify('Loading the music library…');
   try{const data=await DexhavenAccount.request('/local/music/tracks'+(force?'?refresh=1':''));if(token!==revision)return;tracks=data.tracks.filter(t=>Boolean(audio.canPlayType(t.mime)));if(!data.playlists.includes(state.playlist))state.playlist='';
    playlist.replaceChildren(new Option('All Tracks',''));for(const p of data.playlists.filter(p=>tracks.some(t=>t.playlist===p)))playlist.add(new Option(p,p));playlist.value=state.playlist;
-   const old=state.track,position=state.position;rebuildQueue();renderList();failed.clear();if(state.track){if(audio.src&&old===state.track){render();}else select(state.track,old===state.track?position:0,state.playing&&state.enabled);notify(tracks.length+' tracks in your private library.');}else{audio.pause();audio.removeAttribute('src');audio.load();state.playing=false;notify(data.tracks.length?'Your browser does not support the available audio formats.':'No supported audio files found. Add audio to your private folder, then refresh.');render();}
-  }catch(e){if(token!==revision)return;notify(e.status===404?'Private music is unavailable here. Use your configured local installation.':e.status===401||e.status===403?'Log in with the local Owner account to use music.':'The private music library is unavailable. Check the local configuration, then refresh.');if(!tracks.length)render();}
+   const old=state.track,position=state.position;rebuildQueue();renderList();failed.clear();if(state.track){if(audio.src&&old===state.track){render();}else select(state.track,old===state.track?position:0,state.playing&&state.enabled);notify(tracks.length+' tracks in the music library.');}else{audio.pause();audio.removeAttribute('src');audio.load();state.playing=false;notify(data.tracks.length?'Your browser does not support the available audio formats.':'No supported audio files found. Add audio to your private folder, then refresh.');render();}
+  }catch(e){if(token!==revision)return;notify(e.status===404?'Private music is unavailable here. Use your configured local installation.':e.status===401||e.status===403?'Log in to use music.':'The private music library is unavailable. Check the local configuration, then refresh.');if(!tracks.length)render();}
   finally{if(token===revision)refresh.disabled=false;}
  }
  function session(){
-  const user=DexhavenAccount.getUser(),id=user?.staff?.role==='owner'?user.id:null;if(id===userId)return;revision++;playRevision++;audio.pause();release();root.hidden=!id;
+  const user=DexhavenAccount.getUser(),id=user?.id||null;if(id===userId)return;revision++;playRevision++;audio.pause();release();root.hidden=!id;
   if(!id){userId=null;tracks=[];audio.removeAttribute('src');audio.load();return;}userId=id;leaving=false;blockedByTab=false;state=lib.read(storage);audio.volume=state.volume;audio.muted=state.muted;loadLibrary();
  }
  function emulator(active){

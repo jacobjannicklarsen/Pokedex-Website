@@ -147,3 +147,30 @@
 @media(max-width:400px) { .battle-settings-grid { grid-template-columns:1fr; gap:18px; } .battle-mode-field { grid-column:auto; } .battle-session-actions>#battle-start { width:100%; } .battle-ready-summary { padding:12px; } .battle-rules { padding:16px; } .battle-mode-group { flex-direction:column; } }
 @media(max-width:400px) { .battle-move-choice { grid-template-columns:20px minmax(0,1fr); } .battle-move-choice>.type-badge { grid-column:2; justify-self:start; } .battle-selection-summary>img { float:none; } .battle-move-button { padding:12px; } .battle-controls { gap:12px; } }
 @media(prefers-reduced-motion:reduce) { .battle-stage *,.battle-result { animation:none !important; transition:none !important; } .battle-damage-number { display:none; } }
+/* Battle: a holographic analysis field with traveling circuit signals. */
+.battle-data-hero { position:relative; isolation:isolate; min-width:0; width:100%; max-width:300px; height:350px; justify-self:center; }
+.battle-data-hero::before { content:''; position:absolute; inset:0 -2%; border-radius:50%; background:radial-gradient(ellipse,#76d8ff22,transparent 68%); pointer-events:none; }
+.battle-data-hero .intro-portrait { position:relative; z-index:1; height:100%; width:100%; }
+.battle-data-hero .intro-portrait img { filter:none; }
+.battle-data-traces { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.battle-data-grid { fill:none; stroke:#8bbde0; stroke-width:1; stroke-linejoin:round; opacity:.3; }
+.battle-data-grid path:nth-child(2) { stroke-dasharray:2 8; opacity:.65; }
+.battle-data-streams { fill:none; stroke:#91e9ff; stroke-width:2; stroke-linecap:round; stroke-dasharray:9 140; animation:battle-data-transmit 6s linear infinite; }
+.battle-data-streams path:nth-child(even) { stroke:#c5adff; stroke-dashoffset:65; }
+.battle-data-points { fill:#91e9ff; opacity:.65; }
+.battle-data-scan { position:absolute; inset:4% 4% 10%; overflow:hidden; border-radius:50%; pointer-events:none; -webkit-mask-image:radial-gradient(ellipse,#000 25%,transparent 70%); mask-image:radial-gradient(ellipse,#000 25%,transparent 70%); }
+.battle-data-scan::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent 0 17px,#9bc8ff0e 17px 18px),repeating-linear-gradient(90deg,transparent 0 17px,#9bc8ff0e 17px 18px); }
+.battle-data-scan::after { content:''; position:absolute; left:0; right:0; top:-25%; height:24%; background:linear-gradient(transparent,#84dfff12,#b4efff80); animation:battle-data-sweep 6s ease-in-out infinite; }
+.battle-data-readout { position:absolute; z-index:2; display:flex; align-items:flex-end; gap:3px; width:36px; height:30px; padding:5px; border:1px solid #8bbde050; border-radius:4px; background:color-mix(in srgb,var(--bg) 85%,transparent); pointer-events:none; }
+.battle-data-readout-left { left:3%; top:60%; transform:rotate(-8deg); }
+.battle-data-readout-right { right:1%; top:32%; transform:rotate(8deg); }
+.battle-data-readout i { width:3px; height:85%; background:#9bdfff; transform-origin:bottom; animation:battle-data-meter 3s ease-in-out infinite alternate; }
+.battle-data-readout i:nth-child(2) { height:45%; animation-delay:-1.5s; }
+.battle-data-readout i:nth-child(3) { height:65%; animation-delay:-.7s; background:#c5adff; }
+.battle-data-readout i:nth-child(4) { height:100%; animation-delay:-2.2s; }
+@keyframes battle-data-transmit { to { stroke-dashoffset:-149; } }
+@keyframes battle-data-sweep { 0% { transform:translateY(0); opacity:0; } 20%,75% { opacity:1; } 100% { transform:translateY(550%); opacity:0; } }
+@keyframes battle-data-meter { from { transform:scaleY(.45); opacity:.4; } to { transform:scaleY(1); opacity:.85; } }
+@media(max-width:800px) { .battle-data-hero { height:280px; } }
+@media(prefers-reduced-motion:reduce) { .battle-data-streams,.battle-data-scan::after,.battle-data-readout i { animation:none; } .battle-data-scan::after { display:none; } }
+@media(forced-colors:active) { .battle-data-traces,.battle-data-scan,.battle-data-readout,.battle-data-hero::before { display:none; } }

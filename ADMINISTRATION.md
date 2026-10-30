@@ -204,3 +204,16 @@ locking on a deployed server. Perform the guide's two-session manual checks afte
 approval. Before public deployment, consider MFA/step-up authentication for staff,
 independent security review, audit retention/export monitoring and operational
 Owner recovery procedures. Forum-specific permissions/tools remain for v0.7.0.
+
+## Owner username changes
+
+In Administration > User management, Owners can choose **Change username** beside
+**Change password**. Confirm with the current Owner password and an audit reason.
+Usernames accept 3 to 24 letters, numbers or underscores and must be unique.
+The account ID, password and account data remain intact; profile URLs change and
+existing sessions are revoked. Renaming yourself requires signing in again.
+
+Existing installations must manually review and apply
+[owner-username-audit.sql](database/migrations/owner-username-audit.sql) in MySQL
+Workbench. It expands the audit CHECK without removing records and includes the
+earlier password audit action. It is not executed by application startup.

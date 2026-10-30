@@ -99,3 +99,13 @@ button:disabled { cursor:not-allowed; opacity:.65; }
 .staff-badge[data-staff-role="moderator"] { color:var(--text); border-color:var(--mint); }
 [aria-busy="true"] { cursor:progress; }
 @media(prefers-reduced-motion:reduce) { :is(button,a,input,select,textarea,summary) { transition:none !important; animation:none !important; transform:none !important; } }
+/* Rank explanations float above cards and never participate in their layout. */
+.rank-badge[aria-expanded=true] { box-shadow:0 0 0 3px color-mix(in srgb,var(--rank-colour) 16%,transparent); }
+.rank-details.rank-popover { position:fixed; z-index:1000; margin:0; max-width:calc(100vw - 24px); padding:18px; overflow:auto; overscroll-behavior:contain; border-color:color-mix(in srgb,var(--rank-colour) 45%,var(--line)); background:var(--panel); color:var(--text); box-shadow:0 14px 48px #0004; font-size:12px; line-height:1.7; outline:none; }
+.rank-popover-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.rank-popover-header h2 { margin:0; font:600 16px/1.4 'Space Grotesk',sans-serif; }
+.rank-popover-close { display:grid; place-items:center; flex-shrink:0; width:30px; height:30px; padding:0; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--muted); font-size:20px; cursor:pointer; }
+.rank-popover-close:hover { color:var(--text); border-color:var(--rank-colour); }
+.rank-popover-count { font-size:12px; }
+.rank-popover .form-help { margin:0; font-size:12px; }
+.rank-popover progress { height:7px; margin-block:14px; }
